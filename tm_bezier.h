@@ -25,6 +25,7 @@ NOTES
 		x1 = [0, 1], y1 = (-inf, inf)
 		x2 = [0, 1], y2 = (-inf, inf)
 		x3 = 1, y3 = 1
+	For most easing curves a steps count of 10 should be totally fine.
 
 	For better usability #define TMB_VECTOR with your own vector2 struct before #including this
 	header.	It has to have x and y members, or change the functions to use your vector2 struct
