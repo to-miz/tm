@@ -32,7 +32,8 @@ NOTES
 	natively.
 
 HISTORY
-	v1.0 24.06.16 initial commit
+	v1.0a	01.07.16 improved C99 conformity
+	v1.0	24.06.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following
@@ -100,7 +101,7 @@ TMB_DEF BezierForwardDifferencerData computeBezierForwardDifferencer( int steps,
 																	  float x1, float y1, float x2,
 																	  float y2, float x3, float y3 )
 {
-	BezierForwardDifferencerData result = {};
+	BezierForwardDifferencerData result = {0};
 	float ax, ay, bx, by, cx, cy;
 	float h, h2, h3;
 	float x0_3, y0_3, x1_3, y1_3, x2_3, y2_3;

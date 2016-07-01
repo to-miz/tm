@@ -57,7 +57,8 @@ ISSUES
 		  AND of both polygons) the right result is being returned.
 
 HISTORY
-	v1.0 26.06.16 initial commit
+	v1.0a	01.07.16 improved C99 conformity
+	v1.0	26.06.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following
@@ -604,7 +605,7 @@ clipPolyEmitClippedPolygons( ClipVertices* a, ClipVertices* b, ClipPolygonEntry*
 	TMP_ASSERT( b );
 	TMP_ASSERT( vertices );
 
-	ClipPolyResult result = {};
+	ClipPolyResult result = {0};
 
 	if( a->size < 1 ) {
 		return result;
@@ -671,7 +672,7 @@ clipPolyEmitClippedPolygons( ClipVertices* a, ClipVertices* b, ClipPolygonEntry*
 						vertices[put++] = current->pos;
 					} while( !( current->flags & CVF_INTERSECT ) );
 				}
-				ClipVertex* prev = current;
+				// ClipVertex* prev = current;
 				i = current->neighbor;
 				ClipVertices* temp = currentVertices;
 				currentVertices = otherVertices;
@@ -700,8 +701,8 @@ clipPolyEmitClippedPolygons( ClipVertices* a, ClipVertices* b, ClipPolygonEntry*
 			if( size > a->originalSize ) {
 				size = a->originalSize;
 			}
-			for( size_t i = 0; i < size; ++i ) {
-				vertices[i] = a->data[i].pos;
+			for( size_t j = 0; j < size; ++j ) {
+				vertices[j] = a->data[j].pos;
 			}
 			put = size;
 		} else if( b->size && clipPolyPointInsidePoly( a, b->data[0].pos ) ) {
@@ -716,8 +717,8 @@ clipPolyEmitClippedPolygons( ClipVertices* a, ClipVertices* b, ClipPolygonEntry*
 			if( size > b->originalSize ) {
 				size = b->originalSize;
 			}
-			for( size_t i = 0; i < size; ++i ) {
-				vertices[i] = b->data[i].pos;
+			for( size_t j = 0; j < size; ++j ) {
+				vertices[j] = b->data[j].pos;
 			}
 			put = size;
 		}
@@ -734,7 +735,7 @@ clipPolyEmitClippedPolygons( ClipVertices* a, ClipVertices* b, ClipPolygonEntry*
 TMP_DEF tmp_size_t clipPolyEmitClippedPolygon( ClipVertices* a, ClipVertices* b,
 											   TMP_VECTOR* vertices, tmp_size_t maxCount )
 {
-	ClipPolygonEntry entry = {};
+	ClipPolygonEntry entry = {0};
 	clipPolyEmitClippedPolygons( a, b, &entry, 1, vertices, maxCount );
 	return entry.size;
 }

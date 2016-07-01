@@ -43,7 +43,8 @@ NOTES
 	caret to the next codepoint.
 
 HISTORY
-	v1.0 24.06.16 initial commit
+	v1.0a	01.07.16 improved C99 conformity
+	v1.0	24.06.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following
@@ -57,11 +58,6 @@ LICENSE
 	#ifndef TMU_ASSERT
 		#include <assert.h>
 		#define TMU_ASSERT assert
-	#endif
-
-	#ifndef TMU_STRNCMP
-		#include <string.h>
-		#define TMU_STRNCMP strncmp
 	#endif
 
 	#ifndef TMU_MEMCPY
@@ -307,7 +303,7 @@ TMU_DEF void utf16SwapEndian( char* str, tmu_size_t length )
 
 TMU_DEF Utf16Sequence toUtf16( tmu_char32 codepoint )
 {
-	Utf16Sequence result = {};
+	Utf16Sequence result = {{0, 0}, 0};
 	if( codepoint < 0xD7FF ) {
 		result.elements[0] = (tmu_char16)codepoint;
 		result.length = 1;
@@ -385,7 +381,12 @@ TMU_DEF tmu_bool utf8HasByteOrderMark( const char* str, tmu_size_t length )
 }
 TMU_DEF tmu_bool utf8HasByteOrderNullterminated( const char* str )
 {
-	return TMU_STRNCMP( str, utf8ByteOrderMark, utf8ByteOrderMarkSizeInBytes ) == 0;
+	size_t i = 0;
+	while( *str && i < 3 && (tmu_char8)*str == utf8ByteOrderMark[i] ) {
+		++str;
+		++i;
+	}
+	return i == 3;
 }
 TMU_DEF tmu_char32 utf8NextCodepoint( const char** it, tmu_size_t* remaining )
 {

@@ -18,7 +18,8 @@ ISSUES
 	is beyond the scope of this library. Do not use these functions for big numbers.
 
 HISTORY
-	v0.9 23.06.16 initial commit
+	v0.9a	01.07.16 improved C99 conformity
+	v0.9	23.06.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following

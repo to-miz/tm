@@ -70,7 +70,7 @@ static void unicodeTest1()
 		char* out = writeBuffer;
 		size_t outRemaining = writeBufferSize;
 
-		print_char8( &out, &outRemaining, utf8ByteOrderMark, utf8ByteOrderMarkSizeInBytes );
+		print_char8( &out, &outRemaining, (char*)utf8ByteOrderMark, utf8ByteOrderMarkSizeInBytes );
 		while( remaining ) {
 			uint32_t cp = utf8NextCodepoint( &str, &remaining );
 			Utf8Sequence sequence = toUtf8( cp );
@@ -109,8 +109,6 @@ static void unicodeTest2()
 			len -= utf8ByteOrderMarkSizeInBytes;
 		}
 
-		const char* str = readBuffer;
-		size_t remaining = len;
 		uint16_t* out = writeBuffer;
 		size_t outRemaining = writeBufferCount;
 
@@ -148,12 +146,10 @@ static void unicodeTest3()
 			len -= utf16ByteOrderMarkSize;
 		}
 
-		const uint16_t* str = readBuffer;
-		size_t remaining = len;
 		char* out = writeBuffer;
 		size_t outRemaining = writeBufferSize;
 
-		print_char8( &out, &outRemaining, utf8ByteOrderMark, utf8ByteOrderMarkSizeInBytes );
+		print_char8( &out, &outRemaining, (char*)utf8ByteOrderMark, utf8ByteOrderMarkSizeInBytes );
 
 		outRemaining -= convertUtf16ToUtf8( readBuffer, len, out, outRemaining );
 		size_t outLen = writeBufferSize - outRemaining;
@@ -166,8 +162,13 @@ static void unicodeTest3()
 	free( writeBuffer );
 }
 
+#define TM_UNREFERENCED_PARAM( x ) ( x )
+
 int main( int argc, char const* argv[] )
 {
+	TM_UNREFERENCED_PARAM( argc );
+	TM_UNREFERENCED_PARAM( argv );
+
 	unicodeTest1();
 	unicodeTest2();
 	unicodeTest3();
