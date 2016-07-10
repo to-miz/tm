@@ -1,3 +1,4 @@
+#define TM_UTILITY_IMPLEMENTATION
 #define TM_USE_OWN_BEGIN_END
 #include "../tm_utility.h"
 
