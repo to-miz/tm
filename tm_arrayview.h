@@ -30,7 +30,7 @@ NOTES
 	In all other cases, this cast is unnecessary.
 
 HISTORY
-	v1.0	10.07.16	initial commit
+	v1.0	10.07.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following

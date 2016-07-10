@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9a - public domain
+tm_conversion.h v0.9.1 - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -18,6 +18,7 @@ ISSUES
 	is beyond the scope of this library. Do not use these functions for big numbers.
 
 HISTORY
+	v0.9.1	10.07.16 strncasecmp to strnicmp & print_Reverse to print_strnrev
 	v0.9a	01.07.16 improved C99 conformity
 	v0.9	23.06.16 initial commit
 
@@ -51,12 +52,12 @@ LICENSE
 	#endif
 
 	#ifndef TMC_MEMCPY
-		#include <memory.h>
+		#include <string.h>
 		#define TMC_MEMCPY memcpy
 	#endif
 
 	#ifndef TMC_MEMSET
-		#include <memory.h>
+		#include <string.h>
 		#define TMC_MEMSET memset
 	#endif
 
@@ -75,8 +76,14 @@ LICENSE
 		#define TMC_ISINF isinf
 	#endif
 
-	#ifndef TMC_STRNCASECMP
-		#define TMC_STRNCASECMP scan_strncasecmp
+	#ifndef TMC_STRNICMP
+		#define TMC_IMPLEMENT_STRNICMP
+		#define TMC_STRNICMP scan_strnicmp
+	#endif
+
+	#ifndef TMC_STRNREV
+		#define TMC_IMPLEMENT_STRNREV
+		#define TMC_STRNICMP print_strnrev
 	#endif
 #endif
 
@@ -1187,25 +1194,28 @@ static tmc_size_t print_string( char* dest, tmc_size_t maxlen, const char* src, 
 }
 
 #ifdef __cplusplus
-static tmc_int32 scan_strncasecmp( const char* a, const char* b, tmc_size_t maxlen )
-{
-	TMC_ASSERT( maxlen >= 0 );
-	while( *a && *b && maxlen-- ) {
+
+#ifdef TMC_IMPLEMENT_STRNICMP
+	static tmc_int32 scan_strnicmp( const char* a, const char* b, tmc_size_t maxlen )
+	{
+		TMC_ASSERT( maxlen >= 0 );
+		while( *a && *b && maxlen-- ) {
+			tmc_int32 aUpper = toupper( tmc_char_to_i32( *a ) );
+			tmc_int32 bUpper = toupper( tmc_char_to_i32( *b ) );
+			if( aUpper != bUpper ) {
+				break;
+			}
+			++a;
+			++b;
+		}
+		if( !maxlen ) {
+			return 0;
+		}
 		tmc_int32 aUpper = toupper( tmc_char_to_i32( *a ) );
 		tmc_int32 bUpper = toupper( tmc_char_to_i32( *b ) );
-		if( aUpper != bUpper ) {
-			break;
-		}
-		++a;
-		++b;
+		return aUpper - bUpper;
 	}
-	if( !maxlen ) {
-		return 0;
-	}
-	tmc_int32 aUpper = toupper( tmc_char_to_i32( *a ) );
-	tmc_int32 bUpper = toupper( tmc_char_to_i32( *b ) );
-	return aUpper - bUpper;
-}
+#endif
 
 TMC_DEF tmc_size_t scan_bool( const char* nullterminated, bool* out )
 {
@@ -1219,12 +1229,12 @@ TMC_DEF tmc_size_t scan_bool( const char* nullterminated, bool* out )
 			*out = false;
 		}
 		return 1;
-	} else if( TMC_STRNCASECMP( nullterminated, "true", 4 ) == 0 ) {
+	} else if( TMC_STRNICMP( nullterminated, "true", 4 ) == 0 ) {
 		if( out ) {
 			*out = true;
 		}
 		return 4;
-	} else if( TMC_STRNCASECMP( nullterminated, "false", 5 ) == 0 ) {
+	} else if( TMC_STRNICMP( nullterminated, "false", 5 ) == 0 ) {
 		if( out ) {
 			*out = false;
 		}
@@ -1248,12 +1258,12 @@ TMC_DEF tmc_size_t scan_bool_n( const char* str, tmc_size_t len, bool* out )
 			*out = false;
 		}
 		return 1;
-	} else if( TMC_STRNCASECMP( str, "true", len ) == 0 ) {
+	} else if( TMC_STRNICMP( str, "true", len ) == 0 ) {
 		if( out ) {
 			*out = true;
 		}
 		return 4;
-	} else if( TMC_STRNCASECMP( str, "false", len ) == 0 ) {
+	} else if( TMC_STRNICMP( str, "false", len ) == 0 ) {
 		if( out ) {
 			*out = false;
 		}
@@ -1318,17 +1328,17 @@ static tmc_int32 print_log10( double value )
 	return n;
 }
 
-static void print_Reverse( char* dest, tmc_size_t l )
+#ifdef TMC_IMPLEMENT_STRNREV
+static void print_strnrev( char* dest, size_t l )
 {
-	size_t len = (size_t)l;
-	size_t mid = len / 2;
-	for( size_t i = 0; i < mid; ++i ) {
-		size_t other = len - i - 1;
+	for( size_t i = 0, j = count - 1; i < j; ++i, --j ) {
 		char tmp = dest[i];
-		dest[i] = dest[other];
-		dest[other] = tmp;
+		dest[i] = dest[j];
+		dest[j] = tmp;
 	}
+	return str;
 }
+#endif
 
 TMC_DEF tmc_size_t print_i32( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_int32 value )
 {
@@ -1414,9 +1424,9 @@ TMC_DEF tmc_size_t print_u32( char* dest, tmc_size_t maxlen, PrintFormat* format
 		len = format->width;
 	}
 	if( !sign ) {
-		print_Reverse( dest, len );
+		TMC_STRNREV( dest, len );
 	} else {
-		print_Reverse( dest, len - 1 );
+		TMC_STRNREV( dest, len - 1 );
 	}
 
 	if( base > 10 && format && ( format->flags & PF_LOWERCASE ) ) {
@@ -1511,9 +1521,9 @@ TMC_DEF tmc_size_t print_u64( char* dest, tmc_size_t maxlen, PrintFormat* format
 		len = format->width;
 	}
 	if( !sign ) {
-		print_Reverse( dest, len );
+		TMC_STRNREV( dest, len );
 	} else {
-		print_Reverse( dest, len - 1 );
+		TMC_STRNREV( dest, len - 1 );
 	}
 
 	if( base > 10 && format && ( format->flags & PF_LOWERCASE ) ) {
