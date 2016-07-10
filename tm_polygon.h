@@ -1,5 +1,5 @@
 /*
-tm_polygon.h v1.0 - public domain
+tm_polygon.h v1.0b - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -57,6 +57,7 @@ ISSUES
 		  AND of both polygons) the right result is being returned.
 
 HISTORY
+	v1.0b	02.07.16 changed #include <memory.h> into string.h
 	v1.0a	01.07.16 improved C99 conformity
 	v1.0	26.06.16 initial commit
 
@@ -75,12 +76,12 @@ LICENSE
 	#endif
 
 	#ifndef TMP_MEMMOVE
-		#include <memory.h>
+		#include <string.h>
 		#define TMP_MEMMOVE memmove
 	#endif
 
 	#ifndef TMP_MEMSET
-		#include <memory.h>
+		#include <string.h>
 		#define TMP_MEMSET memset
 	#endif
 #endif

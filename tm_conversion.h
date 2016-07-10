@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9 - public domain
+tm_conversion.h v0.9a - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk

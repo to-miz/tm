@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v1.0 - public domain
+tm_unicode.h v1.0b - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -43,6 +43,7 @@ NOTES
 	caret to the next codepoint.
 
 HISTORY
+	v1.0b	02.07.16 changed #include <memory.h> into string.h
 	v1.0a	01.07.16 improved C99 conformity
 	v1.0	24.06.16 initial commit
 
@@ -61,7 +62,7 @@ LICENSE
 	#endif
 
 	#ifndef TMU_MEMCPY
-		#include <memory.h>
+		#include <string.h>
 		#define TMU_MEMCPY memcpy
 	#endif
 #endif

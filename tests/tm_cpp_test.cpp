@@ -6,8 +6,12 @@
 #include "../tm_bezier.h"
 #define TM_CONVERSION_IMPLEMENTATION
 #include "../tm_conversion.h"
+#define TM_STRING_MATCHING_IMPLEMENTATION
+#include "../tm_string_matching.h"
 
-#define TM_UNREFERENCED_PARAM( x ) ( x )
+#include "../tm_utility.h"
+
+#include "tm_test_suite.h"
 
 int main( int argc, char const* argv[] )
 {

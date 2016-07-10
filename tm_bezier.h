@@ -1,5 +1,5 @@
 /*
-tm_bezier.h v1.0 - public domain
+tm_bezier.h v1.0a - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
