@@ -61,12 +61,6 @@ LICENSE
 		tma_size_t x;
 		tma_size_t y;
 	} tma_point;
-	typedef struct {
-		tma_size_t left;
-		tma_size_t top;
-		tma_size_t right;
-		tma_size_t bottom;
-	} tma_rect;
 #endif
 
 #ifndef TM_NO_STD_ITERATOR
@@ -204,20 +198,21 @@ struct ArrayView {
 
 	inline void assign( const_iterator first, const_iterator last )
 	{
-		TMA_ASSERT( last - first == tma_get_index( sz ) );
+		TMA_ASSERT( first <= last );
+		TMA_ASSERT( static_cast< size_type >( last - first ) == sz );
 		TMA_ASSERT( &*first != begin() );
-		TMA_MEMCPY( ptr, first, sz * sizeof( value_type ) );
+		TMA_MEMCPY( ptr, first, tma_get_index( sz * sizeof( value_type ) ) );
 	}
 	inline void assign( const ArrayView other )
 	{
 		TMA_ASSERT( other.size() == size() );
 		TMA_ASSERT( other.begin() != begin() );
-		TMA_MEMCPY( ptr, other.ptr, sz * sizeof( value_type ) );
+		TMA_MEMCPY( ptr, other.ptr, tma_get_index( sz * sizeof( value_type ) ) );
 	}
 	inline void assign( const std::initializer_list< T >& list )
 	{
 		TMA_ASSERT( list.size() == tma_get_index( sz ) );
-		TMA_MEMCPY( ptr, list.begin(), sz * sizeof( value_type ) );
+		TMA_MEMCPY( ptr, list.begin(), tma_get_index( sz * sizeof( value_type ) ) );
 	}
 };
 
@@ -447,7 +442,7 @@ struct UninitializedArrayView
 		TMA_ASSERT( ( first < begin() || first >= end() ) && ( last < begin() || last >= end() ) );
 		sz = static_cast< size_type >( last - first );
 		TMA_ASSERT( sz <= cap );
-		TMA_MEMCPY( ptr, first, sz * sizeof( value_type ) );
+		TMA_MEMCPY( ptr, first, tma_get_index( sz * sizeof( value_type ) ) );
 	}
 	void assign( const_iterator first, size_type length )
 	{
@@ -456,7 +451,7 @@ struct UninitializedArrayView
 					&& ( first + length < begin() || first + length >= end() ) );
 
 		sz = length;
-		TMA_MEMCPY( ptr, first, sz * sizeof( value_type ) );
+		TMA_MEMCPY( ptr, first, tma_get_index( sz * sizeof( value_type ) ) );
 	}
 	void assign( size_type n, const value_type& val )
 	{
@@ -492,11 +487,12 @@ struct UninitializedArrayView
 	}
 	iterator insert( iterator position, const_iterator first, const_iterator last )
 	{
+		TMA_ASSERT( first <= last );
 		TMA_ASSERT( ptr || first == last );
 		TMA_ASSERT( position >= begin() && position <= end() );
 
 		auto rem = tma_get_index( remaining() );
-		size_t count = tma_get_index( last - first );
+		size_t count = static_cast< size_t >( last - first );
 		TMA_ASSERT( rem >= count );
 		if( count > 0 && count <= rem ) {
 			// range fits move entries to make room and copy
@@ -523,6 +519,7 @@ struct UninitializedArrayView
 	}
 	iterator erase( iterator first, iterator last )
 	{
+		TMA_ASSERT( first <= last );
 		TMA_ASSERT( ptr || first == last );
 		if( first == begin() && last == end() ) {
 			clear();

@@ -1,5 +1,5 @@
 /*
-tm_utility v1.0.2 - public domain
+tm_utility v1.0.3 - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,7 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.0.3	10.07.16 added unsignedof and promote_as_is_to
 	v1.0.2	10.07.16 added swap, alignment, isPowerOfTwo, isMemoryZero
 	v1.0.1	10.07.16 added crt extension functions
 	v1.0a	10.07.16 added flags, float, endian related stuff
@@ -189,6 +190,15 @@ TMUT_CONSTEXPR inline typename std::underlying_type< EnumType >::type valueof( E
 {
 	return static_cast< typename std::underlying_type< EnumType >::type >( value );
 }
+
+// returns value as unsigned version of its type
+template< class ValueType >
+auto unsignedof( ValueType value ) -> typename std::make_unsigned< ValueType >::type;
+
+// promotes value to ResultType without sign extension
+// ie promoting a char -1 to unsigned int will result in 0x000000FF
+template< class ValueType, class ResultType >
+ResultType promote_as_is_to( ValueType value );
 
 // copy count elements of src into dest
 template < class T >
@@ -374,7 +384,7 @@ inline result_type bit_cast( const value_type& value )
 }
 
 template < class Container, class ValueType >
-tmut_size_t indexof( const Container& container, const ValueType& value )
+inline tmut_size_t indexof( const Container& container, const ValueType& value )
 {
 #ifndef TM_USE_OWN_BEGIN_END
 	using std::begin;
@@ -388,6 +398,20 @@ tmut_size_t indexof( const Container& container, const ValueType& value )
 	// we take the adress after dereferencing in case we are dealing with an iterator type instead
 	// of pointers
 	return static_cast< tmut_size_t >( &value - &*first );
+}
+
+template< class ValueType >
+inline auto unsignedof( ValueType value ) -> typename std::make_unsigned< ValueType >::type
+{
+	return static_cast< typename std::make_unsigned< ValueType >::type >( value );
+}
+
+template< class ValueType, class ResultType >
+inline ResultType promote_as_is_to( ValueType value )
+{
+	static_assert( sizeof( ResultType ) >= sizeof( ValueType ),
+				   "truncating not allowed when promoting" );
+	return static_cast< ResultType >( unsignedof( value ) );
 }
 
 template < class T >
