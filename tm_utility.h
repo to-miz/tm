@@ -1,5 +1,5 @@
 /*
-tm_utility v1.0.3 - public domain
+tm_utility v1.0.5a - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,10 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.0.5a	12.07.16 fixed a bug in promote_as_is_to, template arguments were reversed
+	v1.0.5	12.07.16 added min_3/max_3 and median
+	v1.0.4a	12.07.16 fixed bug with min/max where both would return the same value on equality
+	v1.0.4	12.07.16 added WITH and SCOPED macros
 	v1.0.3	10.07.16 added unsignedof and promote_as_is_to
 	v1.0.2	10.07.16 added swap, alignment, isPowerOfTwo, isMemoryZero
 	v1.0.1	10.07.16 added crt extension functions
@@ -123,15 +127,39 @@ namespace utility
 {
 // function versions of min/max
 template< class T >
-inline T min( const T& a, const T& b ) { return ( a <= b ) ? ( a ) : ( b ); }
+inline const T& min( const T& a, const T& b ) { return ( a <= b ) ? ( a ) : ( b ); }
 template< class T >
-inline T max( const T& a, const T& b ) { return ( a >= b ) ? ( a ) : ( b ); }
+inline const T& max( const T& a, const T& b ) { return ( a <= b ) ? ( b ) : ( a ); }
+
+template< class T >
+inline const T& min( const T& a, const T& b, const T& c ) { return min( min( a, b ), c ); }
+template< class T >
+inline const T& max( const T& a, const T& b, const T& c ) { return max( a, max( b, c ) ); }
+
+template < class T >
+inline const T& median( const T& a, const T& b, const T& c )
+{
+	const T* a_, *b_;
+	if( a <= b ) {
+		a_ = &a;
+		b_ = &b;
+	} else {
+		b_ = &a;
+		a_ = &b;
+	}
+	if( *b_ <= c ) {
+		return *b_;
+	} else if( *a_ <= c ) {
+		return c;
+	}
+	return *a_;
+}
 }
 
 // min/max macros
 #ifndef TMUT_NO_MINMAX
 	#define MIN( a, b ) ( ( ( a ) <= ( b ) ) ? ( a ) : ( b ) )
-	#define MAX( a, b ) ( ( ( a ) >= ( b ) ) ? ( a ) : ( b ) )
+	#define MAX( a, b ) ( ( ( a ) <= ( b ) ) ? ( b ) : ( a ) )
 #endif
 
 #ifndef TMUT_NO_SWAP
@@ -197,7 +225,7 @@ auto unsignedof( ValueType value ) -> typename std::make_unsigned< ValueType >::
 
 // promotes value to ResultType without sign extension
 // ie promoting a char -1 to unsigned int will result in 0x000000FF
-template< class ValueType, class ResultType >
+template< class ResultType, class ValueType >
 ResultType promote_as_is_to( ValueType value );
 
 // copy count elements of src into dest
@@ -272,6 +300,44 @@ long long swapEndian( long long val );
 unsigned long long swapEndian( unsigned long long val );
 float swapEndian( float val );
 double swapEndian( double val );
+
+/* WITH macro, enables usage of scoped RAII resources
+	Example usage:
+	// create a RAII container for the resource
+	struct FileScopedResource {
+		FILE* file;
+		FileScopedResource( FILE* file ) : file( file ) {};
+		~FileScopedResource() { if( file ) fclose( file ); }
+	};
+	// overload makeScopedResource with your resource type
+	FileScopedResource makeScopedResource( FILE* file )
+	{
+		return FileScopedResource( file );
+	}
+
+	// later in code:
+	WITH( file, fopen( "foo", "w" ) ) {
+		fwrite( "bar", 3, 1, file );
+		// file will be closed automatically at the end of the scope
+	}
+*/
+#define WITH( name, expression )                              \
+	if( bool once_ = false ) {                                \
+	} else                                                    \
+		for( auto&& name = expression; !once_; once_ = true ) \
+			for( auto scoped_ = makeScopedResource( ( name ) ); !once_; once_ = true )
+
+// SCOPED macro, similar to WITH, but doesn't need a named variable
+// Useful for begin/end blocks like glBegin
+#define SCOPED( expression )   \
+	if( bool once_ = false ) { \
+	} else                     \
+		for( auto scoped_ = makeScopedResource( ( expression ) ); !once_; once_ = true )
+
+// misc macros
+#define TMUT_ARG_2_OR_1_IMPL( a, b, ... ) b
+#define TMUT_ARG_1( a, ... ) a
+#define TMUT_ARG_2_OR_1( a, b, ... ) TMUT_ARG_2_OR_1_IMPL( __VA_ARGS__, __VA_ARGS__ )
 
 // crt extensions, that are non standard and may not be provided
 extern "C" {
@@ -406,7 +472,7 @@ inline auto unsignedof( ValueType value ) -> typename std::make_unsigned< ValueT
 	return static_cast< typename std::make_unsigned< ValueType >::type >( value );
 }
 
-template< class ValueType, class ResultType >
+template < class ResultType, class ValueType >
 inline ResultType promote_as_is_to( ValueType value )
 {
 	static_assert( sizeof( ResultType ) >= sizeof( ValueType ),
