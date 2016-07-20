@@ -1,5 +1,5 @@
 /*
-tm_utility v1.0.5a - public domain
+tm_utility v1.0.6 - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,10 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.0.6	15.07.16 fixed floatEqZero & floatEqZeroSoft, they now use TMUT_ABS instead of abs
+					 added floatEqSoft & floatEq
+					 changed toleranceComparison name to floatToleranceComparison
+					 changed SCOPED macro to take __VA_ARGS__ instead of a single expression
 	v1.0.5a	12.07.16 fixed a bug in promote_as_is_to, template arguments were reversed
 	v1.0.5	12.07.16 added min_3/max_3 and median
 	v1.0.4a	12.07.16 fixed bug with min/max where both would return the same value on equality
@@ -282,11 +286,16 @@ static const float RelTolerance = 0.000001f;
 // set float to 0 if within tolerance
 #define floatZeroClamp( x ) ( ( TMUT_ABS( x ) < Float::Epsilon ) ? ( 0.0f ) : ( x ) )
 // zero tests
-#define floatEqZero( x ) ( math::abs( x ) < Float::Epsilon )
-#define floatEqZeroSoft( x ) ( math::abs( x ) < Float::BigEpsilon )
+#define floatEqZero( x ) ( TMUT_ABS( x ) < Float::Epsilon )
+#define floatEqZeroSoft( x ) ( TMUT_ABS( x ) < Float::BigEpsilon )
 #define floatGtZeroSoft( x ) ( x > Float::BigEpsilon )
 #define floatLtZeroSoft( x ) ( x < Float::BigEpsilon )
-bool toleranceComparison( float a, float b );
+#define floatEqZeroSoft( x ) ( TMUT_ABS( x ) < Float::BigEpsilon )
+// NOTE: you should know when it is appropriate to use the following two macros, if you are not sure
+// use floatToleranceComparison instead
+#define floatEq( a, b ) floatEqZero( a - b )
+#define floatEqSoft( a, b ) floatEqZeroSoft( a - b )
+bool floatToleranceComparison( float a, float b );
 
 // endian
 inline char swapEndian( char val ) { return val; }
@@ -329,10 +338,10 @@ double swapEndian( double val );
 
 // SCOPED macro, similar to WITH, but doesn't need a named variable
 // Useful for begin/end blocks like glBegin
-#define SCOPED( expression )   \
+#define SCOPED( ... )   \
 	if( bool once_ = false ) { \
 	} else                     \
-		for( auto scoped_ = makeScopedResource( ( expression ) ); !once_; once_ = true )
+		for( auto scoped_ = makeScopedResource( __VA_ARGS__ ); !once_; once_ = true )
 
 // misc macros
 #define TMUT_ARG_2_OR_1_IMPL( a, b, ... ) b
@@ -552,7 +561,7 @@ inline void zeroMemory( T* dest, size_t count )
 }
 
 // float
-inline bool toleranceComparison( float a, float b )
+inline bool floatToleranceComparison( float a, float b )
 {
 	if( a == b ) {
 		return true;
