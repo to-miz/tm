@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.1 - public domain
+tm_conversion.h v0.9.2 - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -18,6 +18,9 @@ ISSUES
 	is beyond the scope of this library. Do not use these functions for big numbers.
 
 HISTORY
+	v0.9.2	07.08.16 fixed a bug in print_double not being able to print 10 (magnitude calculation
+			         was wrong)
+			         fixed a bug in print_double rounding wrong for 0.99 and precision 1
 	v0.9.1	10.07.16 strncasecmp to strnicmp & print_Reverse to print_strnrev
 	v0.9a	01.07.16 improved C99 conformity
 	v0.9	23.06.16 initial commit
@@ -1293,13 +1296,15 @@ static const char print_NumberToCharTable[] = {
 
 static const double print_PowersOfTen[] = {1,	 10,	100,   1.0e3, 1.0e4,
 										   1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9};
-static tmc_int32 print_log10( double value )
+// magnitude is the number of digits before decimal point
+static tmc_int32 print_magnitude( double value )
 {
-	tmc_int32 n = 1;
+	// calculate integer based log10
+	tmc_int32 n = 0;
 	if( value < 0 ) {
 		value = -value;
 	}
-	while( value > 10 ) {
+	while( value >= 10 ) {
 		if( value >= 1.0e32 ) {
 			n += 32;
 			value /= 1.0e32;
@@ -1325,7 +1330,9 @@ static tmc_int32 print_log10( double value )
 			value /= 1.0e1;
 		}
 	}
-	return n;
+
+	// return magnitude = log10( value ) + 1
+	return n + 1;
 }
 
 #ifdef TMC_IMPLEMENT_STRNREV
@@ -1594,7 +1601,7 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 		value += 1;
 	}
 
-	tmc_int32 magnitude = print_log10( value );
+	tmc_int32 magnitude = print_magnitude( value );
 	if( magnitude >= scan_MaxExponent ) {
 		magnitude = scan_MaxExponent - 1;
 	}
@@ -1618,7 +1625,6 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 	}
 	double fractionalPart = value;
 
-	// FIXME: rollover for case 0.99 and precision = 1 doesn't result in 1.0
 	if( precision ) {
 		uint32Format.width = precision;
 		// fractionalPart is positive, so we can round by adding 0.5 before truncating
@@ -1640,10 +1646,17 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 						}
 					}
 				}
-				tmc_size_t fractionalLen =
-					print_u32( dest, maxlen, &uint32Format, fractionalDigits );
-				maxlen -= fractionalLen;
-				dest += fractionalLen;
+				// check whether we got rid of all digits when trimming trailing zeroes
+				if( uint32Format.width > 0 ) {
+					tmc_size_t fractionalLen =
+						print_u32( dest, maxlen, &uint32Format, fractionalDigits );
+					maxlen -= fractionalLen;
+					dest += fractionalLen;
+				} else {
+					// output a zero manually in that case
+					*dest++ = '0';
+					--maxlen;
+				}
 			}
 		} else if( format && ( format->flags & PF_PADDING_ZEROES ) && maxlen > 1 ) {
 			*dest++ = '.';
