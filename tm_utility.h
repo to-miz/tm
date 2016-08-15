@@ -1,5 +1,5 @@
 /*
-tm_utility v1.0.6 - public domain
+tm_utility v1.0.7 - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,9 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.0.7	12.08.16 added mapToRange
+	v1.0.6a	10.08.16 added paranthesis to getAlignmentOffset to make it clear that "-" has
+					 precedence over "&"
 	v1.0.6	15.07.16 fixed floatEqZero & floatEqZeroSoft, they now use TMUT_ABS instead of abs
 					 added floatEqSoft & floatEq
 					 changed toleranceComparison name to floatToleranceComparison
@@ -120,12 +123,24 @@ LICENSE
 	#define TMUT_ABS abs
 #endif
 
+// used to see if we are 64bit or 32bit
+#ifndef TMUT_POINTER_SIZE
+	#include <cstdint>
+	#if INTPTR_MAX == INT64_MAX
+		#define TMUT_POINTER_SIZE 8
+	#elif INTPTR_MAX == INT32_MAX
+		#define TMUT_POINTER_SIZE 4
+	#endif
+#endif
+
 // define this if you use another type as your size type, like int
 #ifndef TMUT_OWN_TYPES
 	typedef size_t tmut_size_t;
 	// tmut_uintptr needs to be an unsigned integral as big as a pointer
 	typedef size_t tmut_uintptr;
 #endif
+
+static_assert( sizeof( tmut_uintptr ) == sizeof( void* ), "uintptr is not pointer size" );
 
 namespace utility
 {
@@ -196,7 +211,6 @@ TMUT_CONSTEXPR inline  bool isPowerOfTwo( unsigned int x ) { return x && !( x & 
 // returns how much ptr needs to be offset to be aligned to alignment
 unsigned int getAlignmentOffset( const void* ptr, unsigned int alignment );
 
-static_assert( sizeof( tmut_uintptr ) == sizeof( void* ), "uintptr is not pointer size" );
 #define assert_alignment( ptr, alignment ) \
 	TMUT_ASSERT( ( ( ( tmut_uintptr )( ptr ) ) % ( alignment ) ) == 0 )
 
@@ -261,6 +275,23 @@ float clamp( float val, float lower = 0, float upper = 1 );
 
 // returns a/b if b != 0, def otherwise
 float safeDivide( float a, float b, float def = 0.0f );
+
+// returns value mapped to [min, max) almost fairly
+inline int32 mapToRange( int32 value, int32 min, int32 max )
+{
+#if TMUT_POINTER_SIZE == 8
+	// 64bit architecture
+	// use 64bit multiplication followed by a rightshift
+	typedef unsigned long long uint64;
+	typedef unsigned int uint32;
+	return (int)( (uint64)( (uint32)value ) * (uint64)( (uint32)( max - min ) ) >> 32 ) + min;
+#elif TMUT_POINTER_SIZE == 4
+	// 32bit architecture
+	return value % ( max - min ) + min;
+#else
+	#error unknown pointer size
+#endif
+}
 
 // flags
 #define setFlag( flags, flag_to_set ) ( flags ) |= ( flag_to_set )
@@ -581,7 +612,7 @@ inline bool floatToleranceComparison( float a, float b )
 unsigned int getAlignmentOffset( const void* ptr, unsigned int alignment )
 {
 	assert( alignment != 0 && isPowerOfTwo( alignment ) );
-	unsigned int alignmentOffset = alignment - ( (tmut_uintptr)ptr ) & ( alignment - 1 );
+	unsigned int alignmentOffset = ( alignment - ( (tmut_uintptr)ptr ) ) & ( alignment - 1 );
 	assert_alignment( (char*)ptr + alignmentOffset, alignment );
 	return alignmentOffset;
 }
