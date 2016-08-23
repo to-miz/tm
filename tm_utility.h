@@ -1,5 +1,5 @@
 /*
-tm_utility v1.0.7 - public domain
+tm_utility v1.0.8 - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,8 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.0.8	23.08.16 changed min and max to use operator < instead of operator <= and added minmax
+			         removed assertion in strnicmp, because count >= 0 is always true
 	v1.0.7	12.08.16 added mapToRange
 	v1.0.6a	10.08.16 added paranthesis to getAlignmentOffset to make it clear that "-" has
 					 precedence over "&"
@@ -120,7 +122,11 @@ LICENSE
 #endif
 #ifndef TMUT_ABS
 	#include <cmath>
-	#define TMUT_ABS abs
+	#define TMUT_ABS fabsf
+#endif
+#ifndef TMUT_MOVE
+	#include <utility>
+	#define TMUT_MOVE std::move
 #endif
 
 // used to see if we are 64bit or 32bit
@@ -146,48 +152,65 @@ namespace utility
 {
 // function versions of min/max
 template< class T >
-inline const T& min( const T& a, const T& b ) { return ( a <= b ) ? ( a ) : ( b ); }
+inline const T& min( const T& a, const T& b ) { return ( a < b ) ? ( a ) : ( b ); }
 template< class T >
-inline const T& max( const T& a, const T& b ) { return ( a <= b ) ? ( b ) : ( a ); }
+inline const T& max( const T& a, const T& b ) { return ( a < b ) ? ( b ) : ( a ); }
 
 template< class T >
-inline const T& min( const T& a, const T& b, const T& c ) { return min( min( a, b ), c ); }
+inline const T& min( const T& a, const T& b, const T& c ) { return min( a, min( b, c ) ); }
 template< class T >
-inline const T& max( const T& a, const T& b, const T& c ) { return max( a, max( b, c ) ); }
+inline const T& max( const T& a, const T& b, const T& c ) { return max( max( a, b ), c ); }
+
+template< class T >
+struct MinMaxPair {
+	T min;
+	T max;
+};
+
+template < class T >
+inline MinMaxPair< const T& > minmax( const T& a, const T& b )
+{
+	return ( a < b ) ? ( MinMaxPair< const T& >{a, b} ) : ( MinMaxPair< const T& >{b, a} );
+}
+
+template < class T >
+inline MinMaxPair< const T& > minmax( const T& a, const T& b, const T& c )
+{
+	MinMaxPair< const T& > mm = minmax( a, c );
+	if( b < mm.min ) {
+		return MinMaxPair< const T& >{b, mm.max};
+	} else if( mm.max < b ) {
+		return MinMaxPair< const T& >{mm.min, b};
+	}
+	return mm;
+}
 
 template < class T >
 inline const T& median( const T& a, const T& b, const T& c )
 {
-	const T* a_, *b_;
-	if( a <= b ) {
-		a_ = &a;
-		b_ = &b;
-	} else {
-		b_ = &a;
-		a_ = &b;
-	}
-	if( *b_ <= c ) {
-		return *b_;
-	} else if( *a_ <= c ) {
+	MinMaxPair< const T& > mm = minmax( a, b );
+	if( mm.max < c ) {
+		return mm.max;
+	} else if( mm.min < c ) {
 		return c;
 	}
-	return *a_;
+	return mm.min;
 }
 }
 
 // min/max macros
 #ifndef TMUT_NO_MINMAX
-	#define MIN( a, b ) ( ( ( a ) <= ( b ) ) ? ( a ) : ( b ) )
-	#define MAX( a, b ) ( ( ( a ) <= ( b ) ) ? ( b ) : ( a ) )
+	#define MIN( a, b ) ( ( ( a ) < ( b ) ) ? ( a ) : ( b ) )
+	#define MAX( a, b ) ( ( ( a ) < ( b ) ) ? ( b ) : ( a ) )
 #endif
 
 #ifndef TMUT_NO_SWAP
 	template< class T >
 	void swap( T& a, T& b )
 	{
-		auto tmp = std::move( a );
-		a = std::move( b );
-		b = std::move( tmp );
+		auto tmp = TMUT_MOVE( a );
+		a = TMUT_MOVE( b );
+		b = TMUT_MOVE( tmp );
 	}
 #endif
 
@@ -277,7 +300,7 @@ float clamp( float val, float lower = 0, float upper = 1 );
 float safeDivide( float a, float b, float def = 0.0f );
 
 // returns value mapped to [min, max) almost fairly
-inline int32 mapToRange( int32 value, int32 min, int32 max )
+inline int mapToRange( int value, int min, int max )
 {
 #if TMUT_POINTER_SIZE == 8
 	// 64bit architecture
@@ -701,7 +724,6 @@ extern int stricmp( const char* a, const char* b )
 #ifndef TMUT_NO_STRNICMP
 extern int strnicmp( const char* a, const char* b, size_t count )
 {
-	TMUT_ASSERT( count >= 0 );
 	while( *a && *b && count-- ) {
 		auto aUpper = TMUT_TOUPPER( char_to_int( *a ) );
 		auto bUpper = TMUT_TOUPPER( char_to_int( *b ) );

@@ -14,7 +14,7 @@ NOTES
 #include <stdio.h>
 
 #ifdef __GNUC__
-	#define TM_UNREFERENCED_PARAM( x ) ( (void)0 )
+	#define TM_UNREFERENCED_PARAM( x ) ( (void)( x ) )
 #else
 	#define TM_UNREFERENCED_PARAM( x ) ( x )
 #endif

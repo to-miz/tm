@@ -93,7 +93,7 @@ int max_test11()
 int max_test12()
 {
 	int a = 1, b = 1;
-	return &max( a, b ) == &b;
+	return &max( a, b ) == &a;
 }
 int max_test13()
 {
@@ -128,7 +128,7 @@ int max_test18()
 int max_test19()
 {
 	int a = 1, b = 1, c = 1;
-	return &max( a, b, c ) == &c;
+	return &max( a, b, c ) == &a;
 }
 TM_TEST( max_tests )
 {
@@ -179,7 +179,7 @@ int min_test11()
 int min_test12()
 {
 	int a = 1, b = 1;
-	return &min( a, b ) == &a;
+	return &min( a, b ) == &b;
 }
 int min_test13()
 {
@@ -214,7 +214,7 @@ int min_test18()
 int min_test19()
 {
 	int a = 1, b = 1, c = 1;
-	return &min( a, b, c ) == &a;
+	return &min( a, b, c ) == &c;
 }
 TM_TEST( min_tests )
 {
@@ -239,6 +239,102 @@ TM_TEST( min_tests )
 	TM_RUN_TEST( min_test17 );
 	TM_RUN_TEST( min_test18 );
 	TM_RUN_TEST( min_test19 );
+	TM_END_TESTING();
+}
+
+bool equals( const MinMaxPair< const int& >& a, const MinMaxPair< const int& >& b )
+{
+	return a.min == b.min && a.max == b.max;
+}
+bool equalsRef( const MinMaxPair< const int& >& a, const MinMaxPair< const int& >& b )
+{
+	return &a.min == &b.min && &a.max == &b.max;
+}
+
+bool minmax_test0() { return equals( minmax( 0, 1 ), {0, 1} ); }
+bool minmax_test1() { return equals( minmax( 1, 0 ), {0, 1} ); }
+bool minmax_test2() { return equals( minmax( 1, 1 ), {1, 1} ); }
+bool minmax_test3() { return equals( minmax( 0, 1, 2 ), {0, 2} ); }
+bool minmax_test4() { return equals( minmax( 2, 1, 0 ), {0, 2} ); }
+bool minmax_test5() { return equals( minmax( 1, 2, 0 ), {0, 2} ); }
+bool minmax_test6() { return equals( minmax( 1, 0, 2 ), {0, 2} ); }
+bool minmax_test7() { return equals( minmax( 2, 0, 1 ), {0, 2} ); }
+bool minmax_test8() { return equals( minmax( 0, 2, 1 ), {0, 2} ); }
+bool minmax_test9() { return equals( minmax( 1, 1, 1 ), {1, 1} ); }
+
+bool minmax_test10()
+{
+	int a = 0, b = 1;
+	return equalsRef( minmax( a, b ), {a, b} );
+}
+bool minmax_test11()
+{
+	int a = 1, b = 0;
+	return equalsRef( minmax( a, b ), {b, a} );
+}
+bool minmax_test12()
+{
+	int a = 1, b = 1;
+	return equalsRef( minmax( a, b ), {b, a} );
+}
+bool minmax_test13()
+{
+	int a = 0, b = 1, c = 2;
+	return equalsRef( minmax( a, b, c ), {a, c} );
+}
+bool minmax_test14()
+{
+	int a = 2, b = 1, c = 0;
+	return equalsRef( minmax( a, b, c ), {c, a} );
+}
+bool minmax_test15()
+{
+	int a = 1, b = 2, c = 0;
+	return equalsRef( minmax( a, b, c ), {c, b} );
+}
+bool minmax_test16()
+{
+	int a = 1, b = 0, c = 2;
+	return equalsRef( minmax( a, b, c ), {b, c} );
+}
+bool minmax_test17()
+{
+	int a = 2, b = 0, c = 1;
+	return equalsRef( minmax( a, b, c ), {b, a} );
+}
+bool minmax_test18()
+{
+	int a = 0, b = 2, c = 1;
+	return equalsRef( minmax( a, b, c ), {a, b} );
+}
+bool minmax_test19()
+{
+	int a = 1, b = 1, c = 1;
+	return equalsRef( minmax( a, b, c ), {c, a} );
+}
+TM_TEST( minmax_tests )
+{
+	TM_BEGIN_TESTING();
+	TM_RUN_TEST( minmax_test0 );
+	TM_RUN_TEST( minmax_test1 );
+	TM_RUN_TEST( minmax_test2 );
+	TM_RUN_TEST( minmax_test3 );
+	TM_RUN_TEST( minmax_test4 );
+	TM_RUN_TEST( minmax_test5 );
+	TM_RUN_TEST( minmax_test6 );
+	TM_RUN_TEST( minmax_test7 );
+	TM_RUN_TEST( minmax_test8 );
+	TM_RUN_TEST( minmax_test9 );
+	TM_RUN_TEST( minmax_test10 );
+	TM_RUN_TEST( minmax_test11 );
+	TM_RUN_TEST( minmax_test12 );
+	TM_RUN_TEST( minmax_test13 );
+	TM_RUN_TEST( minmax_test14 );
+	TM_RUN_TEST( minmax_test15 );
+	TM_RUN_TEST( minmax_test16 );
+	TM_RUN_TEST( minmax_test17 );
+	TM_RUN_TEST( minmax_test18 );
+	TM_RUN_TEST( minmax_test19 );
 	TM_END_TESTING();
 }
 
@@ -315,6 +411,7 @@ int main( int argc, char const *argv[] )
 	TM_RUN_TESTS( median_tests );
 	TM_RUN_TESTS( max_tests );
 	TM_RUN_TESTS( min_tests );
+	TM_RUN_TESTS( minmax_tests );
 	TM_RUN_TESTS( unsignedof_tests );
 	TM_RUN_TESTS( promote_as_is_to_tests );
 	TM_END_RUN_TESTS();
