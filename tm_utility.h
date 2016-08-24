@@ -1,5 +1,5 @@
 /*
-tm_utility v1.0.9 - public domain
+tm_utility v1.0.9a - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,7 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.0.9a	24.08.16 changed countof to use tmut_size_t
 	v1.0.9	24.08.16 added countof, lerp and remap
 	v1.0.8	23.08.16 changed min and max to use operator < instead of operator <= and added minmax
 			         removed assertion in strnicmp, because count >= 0 is always true
@@ -264,8 +265,8 @@ TMUT_CONSTEXPR inline typename std::underlying_type< EnumType >::type valueof( E
 // countof returns the element count of static arrays
 // enable typechecked version of countof on debug builds or if TMUT_SAFE_COUNTOF is defined
 #if defined( TMUT_SAFE_COUNTOF ) || defined( _DEBUG )
-	template< class T, intmax N >
-	constexpr intmax countof( T (&array)[N] )
+	template< class T, tmut_size_t N >
+	constexpr tmut_size_t countof( T (&array)[N] )
 	{
 		return N;
 	}
