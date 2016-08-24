@@ -13,7 +13,7 @@ NOTES
 
 #include <stdio.h>
 
-#ifdef __GNUC__
+#if defined(  __GNUC__ ) || defined( __clang__ )
 	#define TM_UNREFERENCED_PARAM( x ) ( (void)( x ) )
 #else
 	#define TM_UNREFERENCED_PARAM( x ) ( x )

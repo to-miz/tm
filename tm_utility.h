@@ -1,5 +1,5 @@
 /*
-tm_utility v1.0.8 - public domain
+tm_utility v1.0.9 - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,7 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.0.9	24.08.16 added countof, lerp and remap
 	v1.0.8	23.08.16 changed min and max to use operator < instead of operator <= and added minmax
 			         removed assertion in strnicmp, because count >= 0 is always true
 	v1.0.7	12.08.16 added mapToRange
@@ -260,6 +261,23 @@ TMUT_CONSTEXPR inline typename std::underlying_type< EnumType >::type valueof( E
 	return static_cast< typename std::underlying_type< EnumType >::type >( value );
 }
 
+// countof returns the element count of static arrays
+// enable typechecked version of countof on debug builds or if TMUT_SAFE_COUNTOF is defined
+#if defined( TMUT_SAFE_COUNTOF ) || defined( _DEBUG )
+	template< class T, intmax N >
+	constexpr intmax countof( T (&array)[N] )
+	{
+		return N;
+	}
+	template < class T >
+	void countof( T )
+	{
+		static_assert( false, "countof can only be applied on static arrays" );
+	}
+#else
+	#define countof( x ) ( sizeof( x ) / sizeof( x[0] ) )
+#endif
+
 // returns value as unsigned version of its type
 template< class ValueType >
 auto unsignedof( ValueType value ) -> typename std::make_unsigned< ValueType >::type;
@@ -295,6 +313,24 @@ template < class T >
 T clamp( T val, T lower, T upper );
 // used most often with float, so a simple overload with default values
 float clamp( float val, float lower = 0, float upper = 1 );
+
+#ifndef TMUT_NO_LERP
+	// lerps using t in [0, 1]
+	template< class T >
+	T lerp( float t, T a, T b )
+	{
+		return a + t * ( b - a );
+	}
+#endif
+
+#ifndef TMUT_NO_REMAP
+	// remaps t in [tMin,tMax] to [a,b], basically lerping by normalizing t first
+	template < class T >
+	T remap( float t, float tMin, float tMax, T a, T b )
+	{
+		return a + ( ( t - tMin ) / ( tMax - tMin ) ) * ( b - a );
+	}
+#endif
 
 // returns a/b if b != 0, def otherwise
 float safeDivide( float a, float b, float def = 0.0f );
