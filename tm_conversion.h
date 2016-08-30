@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.2 - public domain
+tm_conversion.h v0.9.3 - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -7,8 +7,76 @@ no warranty; use at your own risk
 USAGE
 	This file works as both the header and implementation.
 	To implement the interfaces in this header,
-		#define TM_CONVERSION_IMPLEMENTATION
+	    #define TM_CONVERSION_IMPLEMENTATION
 	in ONE C or C++ source file before #including this header.
+	
+	See SWITCHES for more options.
+
+PURPOSE
+	The conversion functions in this library are designed with flexibility in mind.
+	They can be used to implement your own conversion functions (ie C library functions, printf...).
+	Note that the float/double conversion functions are not suitable for release/shipping code,
+	since they lose precision for big numbers (above/below +-1e19, see ISSUES).
+
+	There are some switches that enable overloads and convenience functions, those are more
+	suited to be used in usage code. See SWITCHES.
+
+WHY
+	The reason this library was written is because the standard libraries for both C and C++ are
+	lacking in regards to flexibility in their string conversion functionality.
+	Without going into specifics of why the standard libraries are lacking, here are the benefits
+	of using this library:
+		- Support for non nullterminated strings
+		  This not only allows you to write a string library that doesn't need to support
+		  nulltermination, but also it allows you to convert from string pieces without copying them
+		  into temporary nullterminated buffers
+		- A unified way of converting/printing values to strings.
+		  In C you would be using snprintf (which is actually fine as an api, escpecially with
+		  modern compilers that can do format checking at compile time) but it is one abstraction
+		  layer too high if all you want is to get the string representation of a single value.
+		  There is no standard way to do that, but a lot of non standard functions with different
+		  api's like itoa.
+		- Have default values for conversions in case a conversion from string to value wasn't
+		  successful. This is possible because the scan functions in this library only write the
+		  result into the out parameter on result.
+		  In C this is not possible with the strto_ family of functions without inspecting errno or
+		  inspecting the string before passing it into the strto_ functions.
+		  See examples for how to use default values with this library.
+
+SWITCHES
+	There are a couple of #define switches that enable some additional definitions to be included
+	or do something extra.
+	Those are:
+	    TMC_OWN_TYPES:
+	        define this if you want to change the typedefs used by this library
+		TMC_CONVENIENCE:
+			define this if you want to include some convenience functions that make it easier to
+			use in usage code.
+		TMC_CPP_OVERLOADS:
+			define this if you want cpp overloads for the conversion functions
+			that don't have the _n suffix
+		TMC_CPP_TEMPLATED:
+			define this if you want to include templated versions of the conversion functions
+		TMC_STRING_VIEW:
+			define this if you have some sort of string_view class and want overloads of the
+			conversion functions for it.
+			Needs TMC_CPP_OVERLOADS, TMC_STRING_VIEW_DATA( x ) and TMC_STRING_VIEW_SIZE( x ) to be
+			defined to work.
+			Define TMC_STRING_VIEW_NO_CONSTRUCTOR if your stringview can't be constructed from
+			a nullterminated string.
+			Example:
+				// assume we have a string_view class/struct like this: (simplified)
+				struct string_view {
+					const char* ptr;
+					size_t sz;
+					size_t data() { return ptr; }
+					size_t size() { return sz; }
+				};
+				// then define these so that this library can work with your string_view class
+				#define TMC_CPP_OVERLOADS
+				#define TMC_STRING_VIEW string_view
+				#define TMC_STRING_VIEW_DATA( str ) ( str ).data()
+				#define TMC_STRING_VIEW_SIZE( str ) ( str ).size()
 
 ISSUES
 	- PF_SCIENTIFIC does nothing at the moment
@@ -18,18 +86,226 @@ ISSUES
 	is beyond the scope of this library. Do not use these functions for big numbers.
 
 HISTORY
+	v0.9.3  30.08.16 added TMC_CPP_OVERLOADS and cpp overloads of functions
+	                 added TMC_STRING_VIEW for string view support of functions
+	                 added TMC_CONVENIENCE and convenience functions
+	                 added TMC_CPP_TEMPLATED
+	                 fixed compile error when using print_strnrev
+	                 added PURPOSE, WHY, SWITCHES, EXAMPLES
 	v0.9.2	07.08.16 fixed a bug in print_double not being able to print 10 (magnitude calculation
-			         was wrong)
-			         fixed a bug in print_double rounding wrong for 0.99 and precision 1
-	v0.9.1	10.07.16 strncasecmp to strnicmp & print_Reverse to print_strnrev
-	v0.9a	01.07.16 improved C99 conformity
-	v0.9	23.06.16 initial commit
+	                 was wrong)
+	                 fixed a bug in print_double rounding wrong for 0.99 and precision 1
+	v0.9.1  10.07.16 strncasecmp to strnicmp & print_Reverse to print_strnrev
+	v0.9a   01.07.16 improved C99 conformity
+	v0.9    23.06.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following
 	license: you are granted a perpetual, irrevocable license to copy, modify,
 	publish, and distribute this file as you see fit.
 */
+
+/*
+EXAMPLES
+Note that examples use <cstdio> and printf just to demonstrate that the outputs are correct
+*/
+
+#if 0
+// different ways to convert a string to int
+
+// main.cpp
+#define TM_CONVERSION_IMPLEMENTATION
+#define TMC_CONVENIENCE
+#define TMC_CPP_OVERLOADS
+#define TMC_CPP_TEMPLATED
+#include <tm_conversion.h>
+
+#include <cstdio>
+#include <cassert>
+
+int main()
+{
+	// initialize value to default
+	int value = -1;
+	// scan will not write to the out parameter, so value will be -1 on error in this case
+	scan_i32( "error", 10, &value );
+	assert( value == -1 );
+
+	// this version requires TMC_CPP_OVERLOADS
+	scan( "2016", 10, &value );
+
+	// this version requires TMC_CONVENIENCE and TMC_CPP_OVERLOADS, it is the same as the above
+	value = to_i32( "2016", Radix{10}, /*default value=*/-1 );
+
+	// convert_to requires TMC_CPP_TEMPLATED
+	value = convert_to( "2016", -1 ); // convert_to knows to convert to int because of the
+	                                  // default value (-1) that we supplied
+
+	// supplying the template parameter makes it more readable
+	value = convert_to< int >( "2016" ); // in this case we need to supply the return type as a
+	                                     // template parameter, because we do not supply a default
+	                                     // value. It will return 0 on error.
+
+	printf( "%d", value );
+	return 0;
+}
+
+// OUTPUT: 2016
+#endif
+
+#if 0
+// example of scanning multiple values in a row and how to advance to the next number using scan
+
+// main.cpp
+#define TM_CONVERSION_IMPLEMENTATION
+#include <tm_conversion.h>
+
+#include <cstdio>
+
+int main()
+{
+	const char* str = "1234 5678 0xFF not_a_number";
+	int base = 0;  // scan will attempt to determine base depending on input if base is 0
+	for( ;; ) {
+		// set a default value
+		int value = 0;
+		size_t consumed = scan_i32( str, base, &value );
+		str += consumed; // advance str by number of bytes consumed by scan
+		printf( "%d\n", value );
+		if( consumed == 0 ) {
+			// scan will not consume any bytes if input isn't a number
+			break;
+		}
+		if( *str ) {
+			++str; // skip space
+		} else {
+			break;
+		}
+	}
+	return 0;
+}
+
+/*
+OUTPUT:
+1234
+5678
+255
+0
+
+*/
+#endif
+
+#if 0
+// implementing a string_builder class that is similar to std::stringstream which has
+// C++ style operator<< overloads
+
+// main.cpp
+#define TM_CONVERSION_IMPLEMENTATION
+#define TMC_CONVENIENCE
+#define TMC_CPP_OVERLOADS
+#include <tm_conversion.h>
+
+#include <cstdio>
+#include <cstring>
+
+struct string_builder {
+	char* ptr;
+	size_t sz;
+	size_t cap;
+	PrintFormat format;
+
+	char* data() { return ptr; }
+	size_t size() { return sz; }
+	char* end() { return ptr + sz; }
+	size_t remaining() { return cap - sz; }
+
+	string_builder( char* ptr, size_t cap )
+	: ptr( ptr ), sz( 0 ), cap( cap ), format( defaultPrintFormat() )
+	{
+	}
+	template < class T >
+	string_builder& operator<<( T value )
+	{
+		sz += print( end(), remaining(), &format, value );
+		return *this;
+	}
+	string_builder& operator<<( const char* str )
+	{
+		auto len = strlen( str );
+		len      = ( len < remaining() ) ? ( len ) : ( remaining() );
+		memcpy( end(), str, len );
+		sz += len;
+		return *this;
+	}
+};
+
+int main()
+{
+	const size_t bufferSize = 10000;
+	char buffer[bufferSize];
+	string_builder builder = {buffer, bufferSize};
+	builder << "Hello World! " << 10 << " " << 3.1;
+
+	printf( "%.*s", (int)builder.size(), builder.data() );
+	return 0;
+}
+
+// OUTPUT: Hello World! 10 3.1
+#endif
+
+#if 0
+// demonstrates how to use a string_view class with the conversion functions
+
+// main.cpp
+#include <cstring> // strlen
+
+// extremely simplified string_view class just for demonstration
+// it represents non nullterminated views into strings
+struct string_view {
+	const char* ptr = nullptr;
+	size_t sz = 0;
+
+	string_view() = default;
+	string_view( const char* str ) : ptr( str ), sz( ( str ) ? ( strlen( str ) ) : ( 0 ) ) {}
+	string_view( const char* str, size_t len ) : ptr( str ), sz( len ) {}
+	const char* data() { return ptr; }
+	size_t size() { return sz; }
+	string_view substr( size_t pos, size_t len = (size_t)-1 )
+	{
+		if( pos > sz ) {
+			pos = sz;
+		}
+		if( len > sz - pos ) {
+			len = sz - pos;
+		}
+		return string_view( ptr + pos, len );
+	}
+};
+
+#define TM_CONVERSION_IMPLEMENTATION
+#define TMC_CPP_OVERLOADS
+#define TMC_CPP_TEMPLATED
+#define TMC_STRING_VIEW string_view
+#define TMC_STRING_VIEW_DATA( str ) ( str ).data()
+#define TMC_STRING_VIEW_SIZE( str ) ( str ).size()
+#include <tm_conversion.h>
+
+#include <cstdio>
+
+int main()
+{
+	string_view str = "12345678";
+	string_view sub0 = str.substr( 2, 4 ); // sub0 is "3456"
+	int value = convert_to< int >( sub0 );
+
+	printf( "%d\n", value ); 
+}
+/*
+OUTPUT:
+3456
+
+*/
+#endif
 
 #ifdef TM_CONVERSION_IMPLEMENTATION
 	// define these to avoid crt
@@ -86,7 +362,7 @@ LICENSE
 
 	#ifndef TMC_STRNREV
 		#define TMC_IMPLEMENT_STRNREV
-		#define TMC_STRNICMP print_strnrev
+		#define TMC_STRNREV print_strnrev
 	#endif
 #endif
 
@@ -102,6 +378,15 @@ LICENSE
 	typedef uint32_t tmc_uint32;
 	typedef int64_t tmc_int64;
 	typedef uint64_t tmc_uint64;
+	#ifdef __cplusplus
+		typedef bool tmc_bool;
+		#define TMC_TRUE true
+		#define TMC_FALSE false
+	#else
+		typedef int tmc_bool;
+		#define TMC_TRUE 1
+		#define TMC_FALSE 0
+	#endif
 
 	#define TMC_INT32_MAX INT32_MAX
 	#define TMC_UINT32_MAX UINT32_MAX
@@ -131,9 +416,9 @@ extern "C" {
 #endif
 
 /*
-These functions scan a value from a string and store it into out.
-Args:
-	nullterminated: a nullterminated string
+These functions scan a value from a string and store it into out on success.
+Params:
+	nullterminated: a nullterminated input string
 	base: the base to use when scanning, pass in 0 to guess base based on string
 	out: output value, will not be modified if an error occurs
 Return: number of bytes consumed, 0 if an error occurs
@@ -153,6 +438,8 @@ TMC_DEF tmc_size_t scan_float( const char* nullterminated, float* out );
 TMC_DEF tmc_size_t scan_float_n( const char* str, tmc_size_t len, float* out );
 TMC_DEF tmc_size_t scan_double( const char* nullterminated, double* out );
 TMC_DEF tmc_size_t scan_double_n( const char* str, tmc_size_t len, double* out );
+TMC_DEF tmc_size_t scan_bool( const char* nullterminated, tmc_bool* out );
+TMC_DEF tmc_size_t scan_bool_n( const char* str, tmc_size_t len, tmc_bool* out );
 
 enum PrintFormatFlags TMC_UNDERLYING_U32 {
 	PF_DEFAULT = 0,
@@ -164,15 +451,20 @@ enum PrintFormatFlags TMC_UNDERLYING_U32 {
 };
 
 typedef struct {
-	tmc_int32 base;
-	tmc_int32 precision;
-	tmc_int32 width;
-	tmc_uint32 flags;
+	int base;
+	int precision;
+	int width;
+	unsigned int flags;
 } PrintFormat;
+
+/* returns a PrintFormat struct initialized with default values:
+  base = 10, precision = 6, width = 0, flags = PF_DEFAULT
+*/
+PrintFormat defaultPrintFormat();
 
 /*
 These functions print a value into a destination buffer.
-Args:
+Params:
 	dest: destination buffer
 	maxlen: max length of buffer
 	format: optional, pointer to PrintFormat to specify how the value should be printed
@@ -185,18 +477,702 @@ TMC_DEF tmc_size_t print_i64( char* dest, tmc_size_t maxlen, PrintFormat* format
 TMC_DEF tmc_size_t print_u64( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_uint64 value );
 TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* format, double value );
 TMC_DEF tmc_size_t print_float( char* dest, tmc_size_t maxlen, PrintFormat* format, float value );
+TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_bool value );
 
+#ifdef TMC_CONVENIENCE
+	// we use a strong typedef for radix, so we don't accidentaly specify radix when wanting to
+	// specify a default value (only an issue in C++ mode, but this way the signatures are the same
+	// in both C/C++)
+	struct Radix {
+		int base;
+	};
 
-#ifdef __cplusplus
-TMC_DEF tmc_size_t scan_bool( const char* nullterminated, bool* out );
-TMC_DEF tmc_size_t scan_bool_n( const char* str, tmc_size_t len, bool* out );
-
-TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* format, bool value );
-#endif
+	/*
+	Convert a string to a value directly. Pass in a def value that gets returned if an error occurs.
+	Params:
+		nullterminated: a nullterminated input string
+		base: the base to use when scanning, pass in Radix{0} to guess base based on string
+		def: default value to return if an error occurs
+	Return: scanned value or def on error
+	*/
+	tmc_int32 to_i32( const char* nullterminated, Radix base, tmc_int32 def );
+	tmc_int32 to_i32_n( const char* str, tmc_size_t len, Radix base, tmc_int32 def );
+	tmc_uint32 to_u32( const char* nullterminated, Radix base, tmc_uint32 def );
+	tmc_uint32 to_u32_n( const char* str, tmc_size_t len, Radix base, tmc_uint32 def );
+	tmc_int64 to_i64( const char* nullterminated, Radix base, tmc_int64 def );
+	tmc_int64 to_i64_n( const char* str, tmc_size_t len, Radix base, tmc_int64 def );
+	tmc_uint64 to_u64( const char* nullterminated, Radix base, tmc_uint64 def );
+	tmc_uint64 to_u64_n( const char* str, tmc_size_t len, Radix base, tmc_uint64 def );
+	float to_float( const char* nullterminated, float def );
+	float to_float_n( const char* str, tmc_size_t len, float def );
+	double to_double( const char* nullterminated, double def );
+	double to_double_n( const char* str, tmc_size_t len, double def );
+	tmc_bool to_bool( const char* nullterminated, tmc_bool def );
+	tmc_bool to_bool_n( const char* str, tmc_size_t len, tmc_bool def );
+#endif // TMC_CONVENIENCE
 
 #ifdef __cplusplus
 }
 #endif
+
+// #define TMC_CPP_OVERLOADS if you want cpp overloads, see C versions further below for description
+// these are defined as inline further below
+#if defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+	/*
+	Overloads of scan, print functions. See C versions for documentation/usage
+	*/
+	tmc_size_t scan( const char* nullterminated, int base, tmc_int32* out );
+	tmc_size_t scan( const char* nullterminated, int base, tmc_uint32* out );
+	tmc_size_t scan( const char* nullterminated, int base, tmc_int64* out );
+	tmc_size_t scan( const char* nullterminated, int base, tmc_uint64* out );
+	tmc_size_t scan( const char* nullterminated, float* out );
+	tmc_size_t scan( const char* nullterminated, double* out );
+	tmc_size_t scan( const char* nullterminated, bool* out );
+
+	tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_int32* out );
+	tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_uint32* out );
+	tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_int64* out );
+	tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_uint64* out );
+	tmc_size_t scan( const char* str, tmc_size_t len, float* out );
+	tmc_size_t scan( const char* str, tmc_size_t len, double* out );
+	tmc_size_t scan( const char* str, tmc_size_t len, bool* out );
+
+	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_int32 value );
+	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_uint32 value );
+	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_int64 value );
+	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_uint64 value );
+	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, double value );
+	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, float value );
+	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_bool value );
+
+	tmc_size_t scan_i32( const char* str, tmc_size_t len, int base, tmc_int32* out );
+	tmc_size_t scan_u32( const char* str, tmc_size_t len, int base, tmc_uint32* out );
+	tmc_size_t scan_i64( const char* str, tmc_size_t len, int base, tmc_int64* out );
+	tmc_size_t scan_u64( const char* str, tmc_size_t len, int base, tmc_uint64* out );
+	tmc_size_t scan_float( const char* str, tmc_size_t len, float* out );
+	tmc_size_t scan_double( const char* str, tmc_size_t len, double* out );
+	tmc_size_t scan_bool( const char* str, tmc_size_t len, bool* out );
+	// overloads for some sort of string_view class
+	#ifdef TMC_STRING_VIEW
+		tmc_size_t scan_i32( TMC_STRING_VIEW str, int base, tmc_int32* out );
+		tmc_size_t scan_u32( TMC_STRING_VIEW str, int base, tmc_uint32* out );
+		tmc_size_t scan_i64( TMC_STRING_VIEW str, int base, tmc_int64* out );
+		tmc_size_t scan_u64( TMC_STRING_VIEW str, int base, tmc_uint64* out );
+		tmc_size_t scan_float( TMC_STRING_VIEW str, float* out );
+		tmc_size_t scan_double( TMC_STRING_VIEW str, double* out );
+		tmc_size_t scan_bool( TMC_STRING_VIEW str, bool* out );
+	#endif // TMC_STRING_VIEW
+#endif // defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+
+#if defined( TMC_CONVENIENCE ) && defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+	/*
+	Overloads of to_ functions. See C versions for documentation/usage
+	*/
+	// overloads with default values (Radix={10} and def={})
+	tmc_int32 to_i32( const char* nullterminated, tmc_int32 def = {} );
+	tmc_int32 to_i32( const char* str, tmc_size_t len, tmc_int32 def = {} );
+	tmc_uint32 to_u32( const char* nullterminated, tmc_uint32 def = {} );
+	tmc_uint32 to_u32( const char* str, tmc_size_t len, tmc_uint32 def = {} );
+	tmc_int64 to_i64( const char* nullterminated, tmc_int64 def = {} );
+	tmc_int64 to_i64( const char* str, tmc_size_t len, tmc_int64 def = {} );
+	tmc_uint64 to_u64( const char* nullterminated, tmc_uint64 def = {} );
+	tmc_uint64 to_u64( const char* str, tmc_size_t len, tmc_uint64 def = {} );
+	float to_float( const char* nullterminated );
+	float to_float( const char* str, tmc_size_t len, float def = {} );
+	double to_double( const char* nullterminated );
+	double to_double( const char* str, tmc_size_t len, double def = {} );
+	tmc_bool to_bool( const char* nullterminated );
+	tmc_bool to_bool( const char* str, tmc_size_t len, tmc_bool def = {} );
+
+	#ifdef TMC_STRING_VIEW
+		tmc_int32 to_i32( TMC_STRING_VIEW str, Radix base, tmc_int32 def = {} );
+		tmc_uint32 to_u32( TMC_STRING_VIEW str, Radix base, tmc_uint32 def = {} );
+		tmc_int64 to_i64( TMC_STRING_VIEW str, Radix base, tmc_int64 def = {} );
+		tmc_uint64 to_u64( TMC_STRING_VIEW str, Radix base, tmc_uint64 def = {} );
+		tmc_int32 to_i32( TMC_STRING_VIEW str, tmc_int32 def = {} );
+		tmc_uint32 to_u32( TMC_STRING_VIEW str, tmc_uint32 def = {} );
+		tmc_int64 to_i64( TMC_STRING_VIEW str, tmc_int64 def = {} );
+		tmc_uint64 to_u64( TMC_STRING_VIEW str, tmc_uint64 def = {} );
+		float to_float( TMC_STRING_VIEW str, float def = {} );
+		double to_double( TMC_STRING_VIEW str, double def = {} );
+		tmc_bool to_bool( TMC_STRING_VIEW str, tmc_bool def = {} );
+	#endif // TMC_STRING_VIEW
+	
+	/*
+	to_string functions
+	Turn value into string and store into dest.
+	Returns number of bytes written.
+	Similar to print, but does not require a PrintFormat structure to be passed in.
+	*/
+	tmc_size_t to_string( tmc_int32 value, char* dest, tmc_size_t maxlen, Radix base = Radix{10} );
+	tmc_size_t to_string( tmc_uint32 value, char* dest, tmc_size_t maxlen, Radix base = Radix{10} );
+	tmc_size_t to_string( tmc_int64 value, char* dest, tmc_size_t maxlen, Radix base = Radix{10} );
+	tmc_size_t to_string( tmc_uint64 value, char* dest, tmc_size_t maxlen, Radix base = Radix{10} );
+	tmc_size_t to_string( double value, char* dest, tmc_size_t maxlen, int precision = 6 );
+	tmc_size_t to_string( float value, char* dest, tmc_size_t maxlen, int precision = 6 );
+	tmc_size_t to_string( tmc_bool value, char* dest, tmc_size_t maxlen, tmc_bool asNumber = false );
+	#if defined TMC_STRING_VIEW && !defined( TMC_STRING_VIEW_NO_CONSTRUCTOR )
+		TMC_STRING_VIEW to_string( tmc_bool value );
+	#endif // TMC_STRING_VIEW
+
+	// output hex number and prepend 0x
+	tmc_size_t to_string_hex( tmc_uint32 value, char* dest, tmc_size_t maxlen );
+	tmc_size_t to_string_hex( tmc_uint64 value, char* dest, tmc_size_t maxlen );
+#endif // defined( TMC_CONVENIENCE ) && defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+
+#if defined( TMC_CPP_TEMPLATED ) && defined( __cplusplus )
+	/*
+	Similar to to_i32 etc, but take return type by template argument.
+	Enables you to write conversions like this:
+	auto value = convert_to< int >( str );
+	*/
+	template< class T > T convert_to( const char* str, T def = {} );
+	
+	#ifdef TMC_STRING_VIEW
+		template< class T > T convert_to( TMC_STRING_VIEW str, T def = {} );
+	#endif // TMC_STRING_VIEW
+#endif // defined( TMC_CPP_TEMPLATED ) && defined( __cplusplus )
+
+
+// inline implementations
+inline PrintFormat defaultPrintFormat()
+{
+	return PrintFormat{10, 6, 0, PF_DEFAULT};
+}
+
+#if defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+	inline tmc_size_t scan( const char* nullterminated, int base, tmc_int32* out )
+	{
+		return scan_i32( nullterminated, base, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, int base, tmc_uint32* out )
+	{
+		return scan_u32( nullterminated, base, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, int base, tmc_int64* out )
+	{
+		return scan_i64( nullterminated, base, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, int base, tmc_uint64* out )
+	{
+		return scan_u64( nullterminated, base, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, float* out )
+	{
+		return scan_float( nullterminated, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, double* out )
+	{
+		return scan_double( nullterminated, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, bool* out )
+	{
+		return scan_bool( nullterminated, out );
+	}
+
+	inline tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_int32* out )
+	{
+		return scan_i32_n( str, len, base, out );
+	}
+	inline tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_uint32* out )
+	{
+		return scan_u32_n( str, len, base, out );
+	}
+	inline tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_int64* out )
+	{
+		return scan_i64_n( str, len, base, out );
+	}
+	inline tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_uint64* out )
+	{
+		return scan_u64_n( str, len, base, out );
+	}
+	inline tmc_size_t scan( const char* str, tmc_size_t len, float* out )
+	{
+		return scan_float_n( str, len, out );
+	}
+	inline tmc_size_t scan( const char* str, tmc_size_t len, double* out )
+	{
+		return scan_double_n( str, len, out );
+	}
+	inline tmc_size_t scan( const char* str, tmc_size_t len, bool* out )
+	{
+		return scan_bool_n( str, len, out );
+	}
+
+	inline tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_int32 value )
+	{
+		return print_i32( dest, maxlen, format, value );
+	}
+	inline tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_uint32 value )
+	{
+		return print_u32( dest, maxlen, format, value );
+	}
+	inline tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_int64 value )
+	{
+		return print_i64( dest, maxlen, format, value );
+	}
+	inline tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_uint64 value )
+	{
+		return print_u64( dest, maxlen, format, value );
+	}
+	inline tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, double value )
+	{
+		return print_double( dest, maxlen, format, value );
+	}
+	inline tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, float value )
+	{
+		return print_float( dest, maxlen, format, value );
+	}
+	inline tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_bool value )
+	{
+		return print_bool( dest, maxlen, format, value );
+	}
+
+	inline tmc_size_t scan_i32( const char* str, tmc_size_t len, int base, tmc_int32* out )
+	{
+		return scan_i32_n( str, len, base, out );
+	}
+	inline tmc_size_t scan_u32( const char* str, tmc_size_t len, int base, tmc_uint32* out )
+	{
+		return scan_u32_n( str, len, base, out );
+	}
+	inline tmc_size_t scan_i64( const char* str, tmc_size_t len, int base, tmc_int64* out )
+	{
+		return scan_i64_n( str, len, base, out );
+	}
+	inline tmc_size_t scan_u64( const char* str, tmc_size_t len, int base, tmc_uint64* out )
+	{
+		return scan_u64_n( str, len, base, out );
+	}
+	inline tmc_size_t scan_float( const char* str, tmc_size_t len, float* out )
+	{
+		return scan_float_n( str, len, out );
+	}
+	inline tmc_size_t scan_double( const char* str, tmc_size_t len, double* out )
+	{
+		return scan_double_n( str, len, out );
+	}
+	inline tmc_size_t scan_bool( const char* str, tmc_size_t len, bool* out )
+	{
+		return scan_bool_n( str, len, out );
+	}
+#ifdef TMC_STRING_VIEW
+    inline tmc_size_t scan_i32( TMC_STRING_VIEW str, int base, tmc_int32* out )
+    {
+	    return scan_i32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
+    }
+    inline tmc_size_t scan_u32( TMC_STRING_VIEW str, int base, tmc_uint32* out )
+    {
+	    return scan_u32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
+    }
+    inline tmc_size_t scan_i64( TMC_STRING_VIEW str, int base, tmc_int64* out )
+    {
+	    return scan_i64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
+    }
+    inline tmc_size_t scan_u64( TMC_STRING_VIEW str, int base, tmc_uint64* out )
+    {
+	    return scan_u64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
+    }
+    inline tmc_size_t scan_float( TMC_STRING_VIEW str, float* out )
+    {
+	    return scan_float_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), out );
+    }
+    inline tmc_size_t scan_double( TMC_STRING_VIEW str, double* out )
+    {
+	    return scan_double_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), out );
+    }
+    inline tmc_size_t scan_bool( TMC_STRING_VIEW str, bool* out )
+    {
+	    return scan_bool_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), out );
+    }
+#endif  // TMC_STRING_VIEW
+#endif // defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef TMC_CONVENIENCE
+	inline tmc_int32 to_i32( const char* nullterminated, Radix base, tmc_int32 def )
+	{
+		tmc_int32 result = def;
+		scan_i32( nullterminated, base.base, &result );
+		return result;
+	}
+	inline tmc_int32 to_i32_n( const char* str, tmc_size_t len, Radix base, tmc_int32 def )
+	{
+		tmc_int32 result = def;
+		scan_i32_n( str, len, base.base, &result );
+		return result;
+	}
+	tmc_uint32 to_u32( const char* nullterminated, Radix base, tmc_uint32 def )
+	{
+		tmc_uint32 result = def;
+		scan_u32( nullterminated, base.base, &result );
+		return result;
+	}
+	inline tmc_uint32 to_u32_n( const char* str, tmc_size_t len, Radix base, tmc_uint32 def )
+	{
+		tmc_uint32 result = def;
+		scan_u32_n( str, len, base.base, &result );
+		return result;
+	}
+	inline tmc_int64 to_i64( const char* nullterminated, Radix base, tmc_int64 def )
+	{
+		tmc_int64 result = def;
+		scan_i64( nullterminated, base.base, &result );
+		return result;
+	}
+	inline tmc_int64 to_i64_n( const char* str, tmc_size_t len, Radix base, tmc_int64 def )
+	{
+		tmc_int64 result = def;
+		scan_i64_n( str, len, base.base, &result );
+		return result;
+	}
+	inline tmc_uint64 to_u64( const char* nullterminated, Radix base, tmc_uint64 def )
+	{
+		tmc_uint64 result = def;
+		scan_u64( nullterminated, base.base, &result );
+		return result;
+	}
+	inline tmc_uint64 to_u64_n( const char* str, tmc_size_t len, Radix base, tmc_uint64 def )
+	{
+		tmc_uint64 result = def;
+		scan_u64_n( str, len, base.base, &result );
+		return result;
+	}
+	inline float to_float( const char* nullterminated, float def )
+	{
+		float result = def;
+		scan_float( nullterminated, &result );
+		return result;
+	}
+	inline float to_float_n( const char* str, tmc_size_t len, float def )
+	{
+		float result = def;
+		scan_float_n( str, len, &result );
+		return result;
+	}
+	inline double to_double( const char* nullterminated, double def )
+	{
+		double result = def;
+		scan_double( nullterminated, &result );
+		return result;
+	}
+	inline double to_double_n( const char* str, tmc_size_t len, double def )
+	{
+		double result = def;
+		scan_double_n( str, len, &result );
+		return result;
+	}
+	inline tmc_bool to_bool( const char* nullterminated, tmc_bool def )
+	{
+		tmc_bool result = def;
+		scan_bool( nullterminated, &result );
+		return result;
+	}
+	inline tmc_bool to_bool_n( const char* str, tmc_size_t len, tmc_bool def )
+	{
+		tmc_bool result = def;
+		scan_bool_n( str, len, &result );
+		return result;
+	}
+#endif // TMC_CONVENIENCE
+
+#ifdef __cplusplus
+}
+#endif
+
+#if defined( TMC_CONVENIENCE ) && defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+	inline tmc_int32 to_i32( const char* nullterminated, tmc_int32 def )
+	{
+		tmc_int32 result = def;
+		scan_i32( nullterminated, 10, &result );
+		return result;
+	}
+	inline tmc_int32 to_i32( const char* str, tmc_size_t len, tmc_int32 def )
+	{
+		tmc_int32 result = def;
+		scan_i32_n( str, len, 10, &result );
+		return result;
+	}
+	inline tmc_uint32 to_u32( const char* nullterminated, tmc_uint32 def )
+	{
+		tmc_uint32 result = def;
+		scan_u32( nullterminated, 10, &result );
+		return result;
+	}
+	inline tmc_uint32 to_u32( const char* str, tmc_size_t len, tmc_uint32 def )
+	{
+		tmc_uint32 result = def;
+		scan_u32_n( str, len, 10, &result );
+		return result;
+	}
+	inline tmc_int64 to_i64( const char* nullterminated, tmc_int64 def )
+	{
+		tmc_int64 result = def;
+		scan_i64( nullterminated, 10, &result );
+		return result;
+	}
+	inline tmc_int64 to_i64( const char* str, tmc_size_t len, tmc_int64 def )
+	{
+		tmc_int64 result = def;
+		scan_i64_n( str, len, 10, &result );
+		return result;
+	}
+	inline tmc_uint64 to_u64( const char* nullterminated, tmc_uint64 def )
+	{
+		tmc_uint64 result = def;
+		scan_u64( nullterminated, 10, &result );
+		return result;
+	}
+	inline tmc_uint64 to_u64( const char* str, tmc_size_t len, tmc_uint64 def )
+	{
+		tmc_uint64 result = def;
+		scan_u64_n( str, len, 10, &result );
+		return result;
+	}
+	inline float to_float( const char* nullterminated )
+	{
+		float result = 0;
+		scan_float( nullterminated, &result );
+		return result;
+	}
+	inline float to_float( const char* str, tmc_size_t len, float def )
+	{
+		float result = def;
+		scan_float_n( str, len, &result );
+		return result;
+	}
+	inline double to_double( const char* nullterminated )
+	{
+		double result = 0;
+		scan_double( nullterminated, &result );
+		return result;
+	}
+	inline double to_double( const char* str, tmc_size_t len, double def )
+	{
+		double result = def;
+		scan_double_n( str, len, &result );
+		return result;
+	}
+	inline tmc_bool to_bool( const char* nullterminated )
+	{
+		tmc_bool result = TMC_FALSE;
+		scan_bool( nullterminated, &result );
+		return result;
+	}
+	inline tmc_bool to_bool( const char* str, tmc_size_t len, tmc_bool def )
+	{
+		tmc_bool result = def;
+		scan_bool_n( str, len, &result );
+		return result;
+	}
+
+	#ifdef TMC_STRING_VIEW
+		inline tmc_int32 to_i32( TMC_STRING_VIEW str, Radix base, tmc_int32 def )
+		{
+			tmc_int32 result = def;
+			scan_i32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base.base, &result );
+			return result;
+		}
+		inline tmc_uint32 to_u32( TMC_STRING_VIEW str, Radix base, tmc_uint32 def )
+		{
+			tmc_uint32 result = def;
+			scan_u32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base.base, &result );
+			return result;
+		}
+		inline tmc_int64 to_i64( TMC_STRING_VIEW str, Radix base, tmc_int64 def )
+		{
+			tmc_int64 result = def;
+			scan_i64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base.base, &result );
+			return result;
+		}
+		inline tmc_uint64 to_u64( TMC_STRING_VIEW str, Radix base, tmc_uint64 def )
+		{
+			tmc_uint64 result = def;
+			scan_u64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base.base, &result );
+			return result;
+		}
+		inline tmc_int32 to_i32( TMC_STRING_VIEW str, tmc_int32 def )
+		{
+			tmc_int32 result = def;
+			scan_i32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, &result );
+			return result;
+		}
+		inline tmc_uint32 to_u32( TMC_STRING_VIEW str, tmc_uint32 def )
+		{
+			tmc_uint32 result = def;
+			scan_u32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, &result );
+			return result;
+		}
+		inline tmc_int64 to_i64( TMC_STRING_VIEW str, tmc_int64 def )
+		{
+			tmc_int64 result = def;
+			scan_i64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, &result );
+			return result;
+		}
+		inline tmc_uint64 to_u64( TMC_STRING_VIEW str, tmc_uint64 def )
+		{
+			tmc_uint64 result = def;
+			scan_u64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, &result );
+			return result;
+		}
+		inline float to_float( TMC_STRING_VIEW str, float def )
+		{
+			float result = def;
+			scan_float_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), &result );
+			return result;
+		}
+		inline double to_double( TMC_STRING_VIEW str, double def )
+		{
+			double result = def;
+			scan_double_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), &result );
+			return result;
+		}
+		inline tmc_bool to_bool( TMC_STRING_VIEW str, tmc_bool def )
+		{
+			tmc_bool result = def;
+			scan_bool_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), &result );
+			return result;
+		}
+	#endif // TMC_STRING_VIEW
+	
+	// to_string functions
+	inline tmc_size_t to_string( tmc_int32 value, char* dest, tmc_size_t maxlen, Radix base )
+	{
+		PrintFormat format = PrintFormat{base.base};
+		return print_i32( dest, maxlen, &format, value );
+	}
+	inline tmc_size_t to_string( tmc_uint32 value, char* dest, tmc_size_t maxlen, Radix base )
+	{
+		PrintFormat format = PrintFormat{base.base};
+		return print_u32( dest, maxlen, &format, value );
+	}
+	inline tmc_size_t to_string( tmc_int64 value, char* dest, tmc_size_t maxlen, Radix base )
+	{
+		PrintFormat format = PrintFormat{base.base};
+		return print_i64( dest, maxlen, &format, value );
+	}
+	inline tmc_size_t to_string( tmc_uint64 value, char* dest, tmc_size_t maxlen, Radix base )
+	{
+		PrintFormat format = PrintFormat{base.base};
+		return print_u64( dest, maxlen, &format, value );
+	}
+	inline tmc_size_t to_string( double value, char* dest, tmc_size_t maxlen, int precision )
+	{
+		PrintFormat format = PrintFormat{};
+		format.precision = precision;
+		return print_double( dest, maxlen, &format, value );
+	}
+	inline tmc_size_t to_string( float value, char* dest, tmc_size_t maxlen, int precision )
+	{
+		PrintFormat format = PrintFormat{};
+		format.precision = precision;
+		return print_float( dest, maxlen, &format, value );
+	}
+	inline tmc_size_t to_string( tmc_bool value, char* dest, tmc_size_t maxlen, tmc_bool asNumber )
+	{
+		PrintFormat format = PrintFormat{};
+		format.flags = ( asNumber ) ? ( PF_BOOL_AS_NUMBER ) : ( 0 );
+		return print_bool( dest, maxlen, &format, value );
+	}
+	#if defined TMC_STRING_VIEW && !defined( TMC_STRING_VIEW_NO_CONSTRUCTOR )
+		TMC_STRING_VIEW to_string( tmc_bool value )
+		{
+			return ( value ) ? ( TMC_STRING_VIEW( "true" ) ) : ( TMC_STRING_VIEW( "false" ) );
+		}
+	#endif // defined TMC_STRING_VIEW && !defined( TMC_STRING_VIEW_NO_CONSTRUCTOR )
+#endif // defined( TMC_CONVENIENCE ) && defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+
+#if defined( TMC_CPP_TEMPLATED ) && defined( __cplusplus )
+	template<> tmc_int32 convert_to< tmc_int32 >( const char* str, tmc_int32 def )
+	{
+		auto result = def;
+		scan_i32( str, 10, &result );
+		return result;
+	}
+	template<> tmc_uint32 convert_to< tmc_uint32 >( const char* str, tmc_uint32 def )
+	{
+		auto result = def;
+		scan_u32( str, 10, &result );
+		return result;
+	}
+	template<> tmc_int64 convert_to< tmc_int64 >( const char* str, tmc_int64 def )
+	{
+		auto result = def;
+		scan_i64( str, 10, &result );
+		return result;
+	}
+	template<> tmc_uint64 convert_to< tmc_uint64 >( const char* str, tmc_uint64 def )
+	{
+		auto result = def;
+		scan_u64( str, 10, &result );
+		return result;
+	}
+	template<> float convert_to< float >( const char* str, float def )
+	{
+		auto result = def;
+		scan_float( str, &result );
+		return result;
+	}
+	template<> double convert_to< double >( const char* str, double def )
+	{
+		auto result = def;
+		scan_double( str, &result );
+		return result;
+	}
+	template<> bool convert_to< bool >( const char* str, bool def )
+	{
+		auto result = def;
+		scan_bool( str, &result );
+		return result;
+	}
+	#ifdef TMC_STRING_VIEW
+		template<> tmc_int32 convert_to< tmc_int32 >( TMC_STRING_VIEW str, tmc_int32 def )
+		{
+			auto result = def;
+			scan_i32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, &result );
+			return result;
+		}
+		template<> tmc_uint32 convert_to< tmc_uint32 >( TMC_STRING_VIEW str, tmc_uint32 def )
+		{
+			auto result = def;
+			scan_u32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, &result );
+			return result;
+		}
+		template<> tmc_int64 convert_to< tmc_int64 >( TMC_STRING_VIEW str, tmc_int64 def )
+		{
+			auto result = def;
+			scan_i64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, &result );
+			return result;
+		}
+		template<> tmc_uint64 convert_to< tmc_uint64 >( TMC_STRING_VIEW str, tmc_uint64 def )
+		{
+			auto result = def;
+			scan_u64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, &result );
+			return result;
+		}
+		template<> float convert_to< float >( TMC_STRING_VIEW str, float def )
+		{
+			auto result = def;
+			scan_float_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), &result );
+			return result;
+		}
+		template<> double convert_to< double >( TMC_STRING_VIEW str, double def )
+		{
+			auto result = def;
+			scan_double_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), &result );
+			return result;
+		}
+		template<> bool convert_to< bool >( TMC_STRING_VIEW str, bool def )
+		{
+			auto result = def;
+			scan_bool_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), &result );
+			return result;
+		}
+	#endif // TMC_STRING_VIEW
+#endif // defined( TMC_CPP_TEMPLATED ) && defined( __cplusplus )
 
 #endif
 
@@ -279,8 +1255,8 @@ TMC_DEF tmc_size_t scan_i32( const char* nullterminated, int base, tmc_int32* ou
 		}
 	}
 	tmc_size_t dist = ( tmc_size_t )( p - start );
-	if( sign && dist == 1 ) {
-		// we only scanned a sign character, no actual value
+	// did we scan anything or just a sign?
+	if( dist == 0 || ( sign && dist == 1 ) ) {
 		return 0;
 	}
 	if( out ) {
@@ -371,8 +1347,8 @@ TMC_DEF tmc_size_t scan_i32_n( const char* str, tmc_size_t len, int base, tmc_in
 		}
 	}
 	tmc_size_t dist = ( tmc_size_t )( p - start );
-	if( sign && dist == 1 ) {
-		// we only scanned a sign character, no actual value
+	// did we scan anything or just a sign?
+	if( dist == 0 || ( sign && dist == 1 ) ) {
 		return 0;
 	}
 	if( out ) {
@@ -441,8 +1417,8 @@ TMC_DEF tmc_size_t scan_u32( const char* nullterminated, int base, tmc_uint32* o
 		}
 	}
 	tmc_size_t dist = ( tmc_size_t )( p - start );
-	if( sign && dist == 1 ) {
-		// we only scanned a sign character, no actual value
+	// did we scan anything or just a sign?
+	if( dist == 0 || ( sign && dist == 1 ) ) {
 		return 0;
 	}
 	if( out ) {
@@ -520,8 +1496,8 @@ TMC_DEF tmc_size_t scan_u32_n( const char* str, tmc_size_t len, int base, tmc_ui
 		}
 	}
 	tmc_size_t dist = ( tmc_size_t )( p - start );
-	if( sign && dist == 1 ) {
-		// we only scanned a sign character, no actual value
+	// did we scan anything or just a sign?
+	if( dist == 0 || ( sign && dist == 1 ) ) {
 		return 0;
 	}
 	if( out ) {
@@ -600,8 +1576,8 @@ TMC_DEF tmc_size_t scan_i64( const char* nullterminated, int base, tmc_int64* ou
 		}
 	}
 	tmc_size_t dist = ( tmc_size_t )( p - start );
-	if( sign && dist == 1 ) {
-		// we only scanned a sign character, no actual value
+	// did we scan anything or just a sign?
+	if( dist == 0 || ( sign && dist == 1 ) ) {
 		return 0;
 	}
 	if( out ) {
@@ -690,8 +1666,8 @@ TMC_DEF tmc_size_t scan_i64_n( const char* str, tmc_size_t len, int base, tmc_in
 		}
 	}
 	tmc_size_t dist = ( tmc_size_t )( p - start );
-	if( sign && dist == 1 ) {
-		// we only scanned a sign character, no actual value
+	// did we scan anything or just a sign?
+	if( dist == 0 || ( sign && dist == 1 ) ) {
 		return 0;
 	}
 	if( out ) {
@@ -760,8 +1736,8 @@ TMC_DEF tmc_size_t scan_u64( const char* nullterminated, int base, tmc_uint64* o
 		}
 	}
 	tmc_size_t dist = ( tmc_size_t )( p - start );
-	if( sign && dist == 1 ) {
-		// we only scanned a sign character, no actual value
+	// did we scan anything or just a sign?
+	if( dist == 0 || ( sign && dist == 1 ) ) {
 		return 0;
 	}
 	if( out ) {
@@ -839,8 +1815,8 @@ TMC_DEF tmc_size_t scan_u64_n( const char* str, tmc_size_t len, int base, tmc_ui
 		}
 	}
 	tmc_size_t dist = ( tmc_size_t )( p - start );
-	if( sign && dist == 1 ) {
-		// we only scanned a sign character, no actual value
+	// did we scan anything or just a sign?
+	if( dist == 0 || ( sign && dist == 1 ) ) {
 		return 0;
 	}
 	if( out ) {
@@ -1224,22 +2200,22 @@ TMC_DEF tmc_size_t scan_bool( const char* nullterminated, bool* out )
 {
 	if( *nullterminated == '1' ) {
 		if( out ) {
-			*out = true;
+			*out = TMC_TRUE;
 		}
 		return 1;
 	} else if( *nullterminated == '0' ) {
 		if( out ) {
-			*out = false;
+			*out = TMC_FALSE;
 		}
 		return 1;
 	} else if( TMC_STRNICMP( nullterminated, "true", 4 ) == 0 ) {
 		if( out ) {
-			*out = true;
+			*out = TMC_TRUE;
 		}
 		return 4;
 	} else if( TMC_STRNICMP( nullterminated, "false", 5 ) == 0 ) {
 		if( out ) {
-			*out = false;
+			*out = TMC_FALSE;
 		}
 		return 5;
 	}
@@ -1253,22 +2229,22 @@ TMC_DEF tmc_size_t scan_bool_n( const char* str, tmc_size_t len, bool* out )
 	}
 	if( *str == '1' ) {
 		if( out ) {
-			*out = true;
+			*out = TMC_TRUE;
 		}
 		return 1;
 	} else if( *str == '0' ) {
 		if( out ) {
-			*out = false;
+			*out = TMC_FALSE;
 		}
 		return 1;
 	} else if( TMC_STRNICMP( str, "true", len ) == 0 ) {
 		if( out ) {
-			*out = true;
+			*out = TMC_TRUE;
 		}
 		return 4;
 	} else if( TMC_STRNICMP( str, "false", len ) == 0 ) {
 		if( out ) {
-			*out = false;
+			*out = TMC_FALSE;
 		}
 		return 5;
 	}
@@ -1336,12 +2312,12 @@ static tmc_int32 print_magnitude( double value )
 }
 
 #ifdef TMC_IMPLEMENT_STRNREV
-static void print_strnrev( char* dest, size_t l )
+static char* print_strnrev( char* str, size_t count )
 {
 	for( size_t i = 0, j = count - 1; i < j; ++i, --j ) {
-		char tmp = dest[i];
-		dest[i] = dest[j];
-		dest[j] = tmp;
+		char tmp = str[i];
+		str[i] = str[j];
+		str[j] = tmp;
 	}
 	return str;
 }
@@ -1678,5 +2654,50 @@ tmc_size_t print_float( char* dest, tmc_size_t maxlen, PrintFormat* format, floa
 #ifdef __cplusplus
 }
 #endif
+
+#if defined( TMC_CONVENIENCE ) && defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
+tmc_size_t to_string_hex( tmc_uint32 value, char* dest, tmc_size_t maxlen )
+{
+	switch( maxlen ) {
+		case 0: {
+			return 0;
+		}
+		case 1: {
+			dest[0] = '0';
+			return 1;
+		}
+		case 2: {
+			dest[0] = '0';
+			dest[1] = 'x';
+			return 2;
+		}
+	}
+	dest[0] = '0';
+	dest[1] = 'x';
+	PrintFormat format = PrintFormat{16};
+	return print_u32( dest + 2, maxlen - 2, &format, value ) + 2;
+}
+tmc_size_t to_string_hex( tmc_uint64 value, char* dest, tmc_size_t maxlen )
+{
+	switch( maxlen ) {
+		case 0: {
+			return 0;
+		}
+		case 1: {
+			dest[0] = '0';
+			return 1;
+		}
+		case 2: {
+			dest[0] = '0';
+			dest[1] = 'x';
+			return 2;
+		}
+	}
+	dest[0] = '0';
+	dest[1] = 'x';
+	PrintFormat format = PrintFormat{16};
+	return print_u64( dest + 2, maxlen - 2, &format, value ) + 2;
+}
+#endif // defined( TMC_CONVENIENCE ) && defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
 
 #endif  // TM_CONVERSION_IMPLEMENTATION

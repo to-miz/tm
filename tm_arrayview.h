@@ -1,5 +1,5 @@
 /*
-tm_arrayview.h v1.1a - public domain
+tm_arrayview.h v1.1b - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -24,9 +24,10 @@ NOTES
 	GridView treats memory as a two dimensional array, you access elements by row/column indices.
 
 HISTORY
-	v1.1a	11.07.16 fixed a bug with preventing sign extensions not actually doing anything
-	v1.1	11.07.16 added GridView
-	v1.0	10.07.16 initial commit
+	v1.1b   25.08.16 fixed a couple of typos in macro definitions
+	v1.1a   11.07.16 fixed a bug with preventing sign extensions not actually doing anything
+	v1.1    11.07.16 added GridView
+	v1.0    10.07.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following
@@ -55,7 +56,7 @@ LICENSE
 
 // define this to redefine types used by this library
 // see comments at tma_make_unsigned for valid types for tma_size_t
-#ifndef TM_USE_OWN_TYPES
+#ifndef TMA_USE_OWN_TYPES
 	typedef size_t tma_size_t;
 	typedef struct {
 		tma_size_t x;
@@ -63,7 +64,7 @@ LICENSE
 	} tma_point;
 #endif
 
-#ifndef TM_NO_STD_ITERATOR
+#ifndef TMA_NO_STD_ITERATOR
 	#include <iterator>
 #endif
 
@@ -105,7 +106,7 @@ struct ArrayView {
 	typedef const T* const_pointer;
 	typedef T* iterator;
 	typedef const T* const_iterator;
-#ifndef TM_NO_STD_ITERATOR
+#ifndef TMA_NO_STD_ITERATOR
 	typedef std::reverse_iterator< iterator > reverse_iterator;
 	typedef std::reverse_iterator< const_iterator > const_reverse_iterator;
 #endif
@@ -119,7 +120,7 @@ struct ArrayView {
 		return const_iterator( ptr + tma_get_index( sz ) );
 	}
 
-#ifndef TM_NO_STD_ITERATOR
+#ifndef TMA_NO_STD_ITERATOR
 	inline reverse_iterator rbegin() const
 	{
 		return reverse_iterator( ptr + tma_get_index( sz ) );
@@ -314,7 +315,7 @@ struct UninitializedArrayView
 	typedef const T* const_pointer;
 	typedef T* iterator;
 	typedef const T* const_iterator;
-#ifndef TM_NO_STD_ITERATOR
+#ifndef TMA_NO_STD_ITERATOR
 	typedef std::reverse_iterator< iterator > reverse_iterator;
 	typedef std::reverse_iterator< const_iterator > const_reverse_iterator;
 #endif
@@ -328,7 +329,7 @@ struct UninitializedArrayView
 		return const_iterator( ptr + tma_get_index( sz ) );
 	}
 
-#ifndef TM_NO_STD_ITERATOR
+#ifndef TMA_NO_STD_ITERATOR
 	inline reverse_iterator rbegin() const
 	{
 		return reverse_iterator( ptr + tma_get_index( sz ) );
@@ -574,7 +575,7 @@ struct GridView {
 	typedef const T* const_pointer;
 	typedef T* iterator;
 	typedef const T* const_iterator;
-#ifndef TM_NO_STD_ITERATOR
+#ifndef TMA_NO_STD_ITERATOR
 	typedef std::reverse_iterator< iterator > reverse_iterator;
 	typedef std::reverse_iterator< const_iterator > const_reverse_iterator;
 #endif
