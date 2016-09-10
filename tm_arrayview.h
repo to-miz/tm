@@ -1,5 +1,5 @@
 /*
-tm_arrayview.h v1.1c - public domain
+tm_arrayview.h v1.1.1 - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -24,6 +24,10 @@ NOTES
 	GridView treats memory as a two dimensional array, you access elements by row/column indices.
 
 SWITCHES
+	TMA_INT64_ACCOSSORS:
+	    define this if tma_size_t is a 32bit value and you also want 64bit accessors
+	    (ie operator[]). Also requires a typedef in the form:
+	        typedef long long int tma_index_t;
 	TMA_EMPLACE_BACK_RETURNS_POINTER:
 	    changed the return type of emplace_back in UninitializedArrayView to return a pointer to the
 	    newly emplaced back entry. Otherwise the return type is reference or T&, which is how C++1z
@@ -32,8 +36,9 @@ SWITCHES
 	    std::container usage and UninitializedArrayView usage will require code changes.
 
 HISTORY
+	v1.1.1  10.09.16 fixed a couple of typos in macro definitions
+	                 added TMA_INT64_ACCOSSORS
 	v1.1c   10.09.16 added TMA_EMPLACE_BACK_RETURNS_POINTER
-	v1.1b   25.08.16 fixed a couple of typos in macro definitions
 	v1.1a   11.07.16 fixed a bug with preventing sign extensions not actually doing anything
 	v1.1    11.07.16 added GridView
 	v1.0    10.07.16 initial commit
@@ -71,6 +76,12 @@ LICENSE
 		tma_size_t x;
 		tma_size_t y;
 	} tma_point;
+#endif
+
+// define these if tma_size_t is a 32bit value and you also want 64bit accessors (ie operator[])
+#if 0
+	#define TMA_INT64_ACCOSSORS
+	typedef long long int tma_index_t;
 #endif
 
 #ifndef TMA_NO_STD_ITERATOR
@@ -180,6 +191,40 @@ struct ArrayView {
 		TMA_ASSERT( i < sz );
 		return ptr[tma_get_index( i )];
 	}
+
+#ifdef TMA_INT64_ACCOSSORS
+	inline reference operator[]( tma_index_t i )
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( i >= 0 );
+		TMA_ASSERT( i < (tma_index_t)sz );
+		return ptr[i];
+	}
+
+	inline const_reference operator[]( tma_index_t i ) const
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( i >= 0 );
+		TMA_ASSERT( i < (tma_index_t)sz );
+		return ptr[i];
+	}
+
+	inline reference at( tma_index_t i )
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( i >= 0 );
+		TMA_ASSERT( i < (tma_index_t)sz );
+		return ptr[i];
+	}
+
+	inline const_reference at( tma_index_t i ) const
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( i >= 0 );
+		TMA_ASSERT( i < (tma_index_t)sz );
+		return ptr[i];
+	}
+#endif // TMA_INT64_ACCOSSORS
 
 	inline reference back()
 	{
@@ -393,6 +438,40 @@ struct UninitializedArrayView
 		return ptr[tma_get_index( i )];
 	}
 
+#ifdef TMA_INT64_ACCOSSORS
+	inline reference operator[]( tma_index_t i )
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( i >= 0 );
+		TMA_ASSERT( i < (tma_index_t)sz );
+		return ptr[i];
+	}
+
+	inline const_reference operator[]( tma_index_t i ) const
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( i >= 0 );
+		TMA_ASSERT( i < (tma_index_t)sz );
+		return ptr[i];
+	}
+
+	inline reference at( tma_index_t i )
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( i >= 0 );
+		TMA_ASSERT( i < (tma_index_t)sz );
+		return ptr[i];
+	}
+
+	inline const_reference at( tma_index_t i ) const
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( i >= 0 );
+		TMA_ASSERT( i < (tma_index_t)sz );
+		return ptr[i];
+	}
+#endif // TMA_INT64_ACCOSSORS
+
 	inline reference back()
 	{
 		TMA_ASSERT( ptr );
@@ -426,7 +505,7 @@ struct UninitializedArrayView
 		++sz;
 	}
 	inline void pop_back() { --sz; TMA_ASSERT( sz >= 0 ); }
-
+	
 	// define TMA_EMPLACE_BACK_RETURNS_POINTER if you want emplace_back to return a pointer instead
 	// of reference. The reference version is how std containers in C++1z implement emplace_back.
 #ifdef TMA_EMPLACE_BACK_RETURNS_POINTER
