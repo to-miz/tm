@@ -370,6 +370,24 @@ TM_TEST( uarray_insert_tests )
 	TM_END_TESTING();
 }
 
+int uarray_emplace_test0()
+{
+	int arrayData[10];
+	auto array = makeUninitializedArrayView( arrayData );
+	array.emplace_back() = 1;
+	array.emplace_back() = 2;
+	array.emplace_back() = 3;
+	array.emplace_back() = 4;
+	auto expected = {1, 2, 3, 4};
+	return equal( array, expected );
+}
+TM_TEST( uarray_emplace_test )
+{
+	TM_BEGIN_TESTING();
+	TM_RUN_TEST( uarray_emplace_test0 );
+	TM_END_TESTING();
+}
+
 int main( int argc, char const *argv[] )
 {
 	TM_UNREFERENCED_PARAM( argc );
@@ -381,6 +399,7 @@ int main( int argc, char const *argv[] )
 	TM_RUN_TESTS( array_iteration_tests );
 	TM_RUN_TESTS( uarray_assign_tests );
 	TM_RUN_TESTS( uarray_erase_tests );
+	TM_RUN_TESTS( uarray_emplace_test );
 	TM_END_RUN_TESTS();
 
 	return 0;

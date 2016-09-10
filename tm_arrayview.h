@@ -1,5 +1,5 @@
 /*
-tm_arrayview.h v1.1b - public domain
+tm_arrayview.h v1.1c - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -23,7 +23,16 @@ NOTES
 	push_back and erase (no resizing/reallocation of memory takes place).
 	GridView treats memory as a two dimensional array, you access elements by row/column indices.
 
+SWITCHES
+	TMA_EMPLACE_BACK_RETURNS_POINTER:
+	    changed the return type of emplace_back in UninitializedArrayView to return a pointer to the
+	    newly emplaced back entry. Otherwise the return type is reference or T&, which is how C++1z
+	    std containers implement emplace_back. So #defining TMA_EMPLACE_BACK_RETURNS_POINTER will
+	    make UninitializedArrayView's interface incompatible to std containers, so switching from/to
+	    std::container usage and UninitializedArrayView usage will require code changes.
+
 HISTORY
+	v1.1c   10.09.16 added TMA_EMPLACE_BACK_RETURNS_POINTER
 	v1.1b   25.08.16 fixed a couple of typos in macro definitions
 	v1.1a   11.07.16 fixed a bug with preventing sign extensions not actually doing anything
 	v1.1    11.07.16 added GridView
@@ -148,7 +157,7 @@ struct ArrayView {
 		return ptr[tma_get_index( i )];
 	}
 
-	inline const reference operator[]( size_type i ) const
+	inline const_reference operator[]( size_type i ) const
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
@@ -164,7 +173,7 @@ struct ArrayView {
 		return ptr[tma_get_index( i )];
 	}
 
-	inline const reference at( size_type i ) const
+	inline const_reference at( size_type i ) const
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
@@ -417,6 +426,10 @@ struct UninitializedArrayView
 		++sz;
 	}
 	inline void pop_back() { --sz; TMA_ASSERT( sz >= 0 ); }
+
+	// define TMA_EMPLACE_BACK_RETURNS_POINTER if you want emplace_back to return a pointer instead
+	// of reference. The reference version is how std containers in C++1z implement emplace_back.
+#ifdef TMA_EMPLACE_BACK_RETURNS_POINTER
 	inline pointer emplace_back()
 	{
 		TMA_ASSERT( ptr );
@@ -424,6 +437,15 @@ struct UninitializedArrayView
 		++sz;
 		return &ptr[tma_get_index( sz - 1 )];
 	}
+#else
+	inline reference emplace_back()
+	{
+		TMA_ASSERT( ptr );
+		TMA_ASSERT( sz + 1 <= cap );
+		++sz;
+		return ptr[tma_get_index( sz - 1 )];
+	}
+#endif
 
 	inline void clear() { sz = 0; }
 	inline void resize( size_type sz )
