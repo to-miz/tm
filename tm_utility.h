@@ -231,7 +231,7 @@ inline const T& median( const T& a, const T& b, const T& c )
 	#define TMUT_ALIGNOF( x ) alignof( x )
 #endif
 
-TMUT_CONSTEXPR inline  bool isPowerOfTwo( unsigned int x ) { return x && !( x & ( x - 1 ) ); }
+TMUT_CONSTEXPR inline bool isPowerOfTwo( unsigned int x ) { return x && !( x & ( x - 1 ) ); }
 
 // returns how much ptr needs to be offset to be aligned to alignment
 unsigned int getAlignmentOffset( const void* ptr, unsigned int alignment );
