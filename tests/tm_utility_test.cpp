@@ -8,6 +8,8 @@ using namespace utility;
 #include <cstdio>
 #include <cstdint>
 
+bool int_comp( int a, int b ) { return a < b; }
+
 int median_test0() { return median( 0, 1, 2 ) == 1; }
 int median_test1() { return median( 2, 1, 0 ) == 1; }
 int median_test2() { return median( 1, 2, 0 ) == 1; }
@@ -67,6 +69,68 @@ TM_TEST( median_tests )
 	TM_RUN_TEST( median_test11 );
 	TM_RUN_TEST( median_test12 );
 	TM_RUN_TEST( median_test13 );
+	TM_END_TESTING();
+}
+
+int median_comp_test0() { return median( 0, 1, 2, int_comp ) == 1; }
+int median_comp_test1() { return median( 2, 1, 0, int_comp ) == 1; }
+int median_comp_test2() { return median( 1, 2, 0, int_comp ) == 1; }
+int median_comp_test3() { return median( 1, 0, 2, int_comp ) == 1; }
+int median_comp_test4() { return median( 2, 0, 1, int_comp ) == 1; }
+int median_comp_test5() { return median( 0, 2, 1, int_comp ) == 1; }
+int median_comp_test6() { return median( 1, 1, 1, int_comp ) == 1; }
+int median_comp_test7()
+{
+	int a = 0, b = 1, c = 2;
+	return &median( a, b, c, int_comp ) == &b;
+}
+int median_comp_test8()
+{
+	int a = 2, b = 1, c = 0;
+	return &median( a, b, c, int_comp ) == &b;
+}
+int median_comp_test9()
+{
+	int a = 1, b = 2, c = 0;
+	return &median( a, b, c, int_comp ) == &a;
+}
+int median_comp_test10()
+{
+	int a = 1, b = 0, c = 2;
+	return &median( a, b, c, int_comp ) == &a;
+}
+int median_comp_test11()
+{
+	int a = 2, b = 0, c = 1;
+	return &median( a, b, c, int_comp ) == &c;
+}
+int median_comp_test12()
+{
+	int a = 0, b = 2, c = 1;
+	return &median( a, b, c, int_comp ) == &c;
+}
+int median_comp_test13()
+{
+	int a = 1, b = 1, c = 1;
+	return &median( a, b, c, int_comp ) == &b;
+}
+TM_TEST( median_comp_tests )
+{
+	TM_BEGIN_TESTING();
+	TM_RUN_TEST( median_comp_test0 );
+	TM_RUN_TEST( median_comp_test1 );
+	TM_RUN_TEST( median_comp_test2 );
+	TM_RUN_TEST( median_comp_test3 );
+	TM_RUN_TEST( median_comp_test4 );
+	TM_RUN_TEST( median_comp_test5 );
+	TM_RUN_TEST( median_comp_test6 );
+	TM_RUN_TEST( median_comp_test7 );
+	TM_RUN_TEST( median_comp_test8 );
+	TM_RUN_TEST( median_comp_test9 );
+	TM_RUN_TEST( median_comp_test10 );
+	TM_RUN_TEST( median_comp_test11 );
+	TM_RUN_TEST( median_comp_test12 );
+	TM_RUN_TEST( median_comp_test13 );
 	TM_END_TESTING();
 }
 
@@ -156,6 +220,92 @@ TM_TEST( max_tests )
 	TM_END_TESTING();
 }
 
+int max_comp_test0() { return max( 0, 1, int_comp ) == 1; }
+int max_comp_test1() { return max( 1, 0, int_comp ) == 1; }
+int max_comp_test2() { return max( 1, 1, int_comp ) == 1; }
+int max_comp_test3() { return max( 0, 1, 2, int_comp ) == 2; }
+int max_comp_test4() { return max( 0, 2, 1, int_comp ) == 2; }
+int max_comp_test5() { return max( 2, 0, 1, int_comp ) == 2; }
+int max_comp_test6() { return max( 2, 1, 0, int_comp ) == 2; }
+int max_comp_test7() { return max( 1, 2, 0, int_comp ) == 2; }
+int max_comp_test8() { return max( 1, 0, 2, int_comp ) == 2; }
+int max_comp_test9() { return max( 1, 1, 1, int_comp ) == 1; }
+int max_comp_test10()
+{
+	int a = 0, b = 1;
+	return &max( a, b, int_comp ) == &b;
+}
+int max_comp_test11()
+{
+	int a = 1, b = 0;
+	return &max( a, b, int_comp ) == &a;
+}
+int max_comp_test12()
+{
+	int a = 1, b = 1;
+	return &max( a, b, int_comp ) == &a;
+}
+int max_comp_test13()
+{
+	int a = 0, b = 1, c = 2;
+	return &max( a, b, c, int_comp ) == &c;
+}
+int max_comp_test14()
+{
+	int a = 0, b = 2, c = 1;
+	return &max( a, b, c, int_comp ) == &b;
+}
+int max_comp_test15()
+{
+	int a = 2, b = 0, c = 1;
+	return &max( a, b, c, int_comp ) == &a;
+}
+int max_comp_test16()
+{
+	int a = 2, b = 1, c = 0;
+	return &max( a, b, c, int_comp ) == &a;
+}
+int max_comp_test17()
+{
+	int a = 1, b = 2, c = 0;
+	return &max( a, b, c, int_comp ) == &b;
+}
+int max_comp_test18()
+{
+	int a = 1, b = 0, c = 2;
+	return &max( a, b, c, int_comp ) == &c;
+}
+int max_comp_test19()
+{
+	int a = 1, b = 1, c = 1;
+	return &max( a, b, c, int_comp ) == &a;
+}
+TM_TEST( max_comp_tests )
+{
+	TM_BEGIN_TESTING();
+	TM_RUN_TEST( max_comp_test0 );
+	TM_RUN_TEST( max_comp_test1 );
+	TM_RUN_TEST( max_comp_test2 );
+	TM_RUN_TEST( max_comp_test3 );
+	TM_RUN_TEST( max_comp_test4 );
+	TM_RUN_TEST( max_comp_test5 );
+	TM_RUN_TEST( max_comp_test6 );
+	TM_RUN_TEST( max_comp_test7 );
+	TM_RUN_TEST( max_comp_test8 );
+	TM_RUN_TEST( max_comp_test9 );
+	TM_RUN_TEST( max_comp_test10 );
+	TM_RUN_TEST( max_comp_test11 );
+	TM_RUN_TEST( max_comp_test12 );
+	TM_RUN_TEST( max_comp_test13 );
+	TM_RUN_TEST( max_comp_test14 );
+	TM_RUN_TEST( max_comp_test15 );
+	TM_RUN_TEST( max_comp_test16 );
+	TM_RUN_TEST( max_comp_test17 );
+	TM_RUN_TEST( max_comp_test18 );
+	TM_RUN_TEST( max_comp_test19 );
+	TM_END_TESTING();
+}
+
 int min_test0() { return min( 0, 1 ) == 0; }
 int min_test1() { return min( 1, 0 ) == 0; }
 int min_test2() { return min( 1, 1 ) == 1; }
@@ -239,6 +389,92 @@ TM_TEST( min_tests )
 	TM_RUN_TEST( min_test17 );
 	TM_RUN_TEST( min_test18 );
 	TM_RUN_TEST( min_test19 );
+	TM_END_TESTING();
+}
+
+int min_comp_test0() { return min( 0, 1, int_comp ) == 0; }
+int min_comp_test1() { return min( 1, 0, int_comp ) == 0; }
+int min_comp_test2() { return min( 1, 1, int_comp ) == 1; }
+int min_comp_test3() { return min( 0, 1, 2, int_comp ) == 0; }
+int min_comp_test4() { return min( 0, 2, 1, int_comp ) == 0; }
+int min_comp_test5() { return min( 2, 0, 1, int_comp ) == 0; }
+int min_comp_test6() { return min( 2, 1, 0, int_comp ) == 0; }
+int min_comp_test7() { return min( 1, 2, 0, int_comp ) == 0; }
+int min_comp_test8() { return min( 1, 0, 2, int_comp ) == 0; }
+int min_comp_test9() { return min( 1, 1, 1, int_comp ) == 1; }
+int min_comp_test10()
+{
+	int a = 0, b = 1;
+	return &min( a, b, int_comp ) == &a;
+}
+int min_comp_test11()
+{
+	int a = 1, b = 0;
+	return &min( a, b, int_comp ) == &b;
+}
+int min_comp_test12()
+{
+	int a = 1, b = 1;
+	return &min( a, b, int_comp ) == &b;
+}
+int min_comp_test13()
+{
+	int a = 0, b = 1, c = 2;
+	return &min( a, b, c, int_comp ) == &a;
+}
+int min_comp_test14()
+{
+	int a = 0, b = 2, c = 1;
+	return &min( a, b, c, int_comp ) == &a;
+}
+int min_comp_test15()
+{
+	int a = 2, b = 0, c = 1;
+	return &min( a, b, c, int_comp ) == &b;
+}
+int min_comp_test16()
+{
+	int a = 2, b = 1, c = 0;
+	return &min( a, b, c, int_comp ) == &c;
+}
+int min_comp_test17()
+{
+	int a = 1, b = 2, c = 0;
+	return &min( a, b, c, int_comp ) == &c;
+}
+int min_comp_test18()
+{
+	int a = 1, b = 0, c = 2;
+	return &min( a, b, c, int_comp ) == &b;
+}
+int min_comp_test19()
+{
+	int a = 1, b = 1, c = 1;
+	return &min( a, b, c, int_comp ) == &c;
+}
+TM_TEST( min_comp_tests )
+{
+	TM_BEGIN_TESTING();
+	TM_RUN_TEST( min_comp_test0 );
+	TM_RUN_TEST( min_comp_test1 );
+	TM_RUN_TEST( min_comp_test2 );
+	TM_RUN_TEST( min_comp_test3 );
+	TM_RUN_TEST( min_comp_test4 );
+	TM_RUN_TEST( min_comp_test5 );
+	TM_RUN_TEST( min_comp_test6 );
+	TM_RUN_TEST( min_comp_test7 );
+	TM_RUN_TEST( min_comp_test8 );
+	TM_RUN_TEST( min_comp_test9 );
+	TM_RUN_TEST( min_comp_test10 );
+	TM_RUN_TEST( min_comp_test11 );
+	TM_RUN_TEST( min_comp_test12 );
+	TM_RUN_TEST( min_comp_test13 );
+	TM_RUN_TEST( min_comp_test14 );
+	TM_RUN_TEST( min_comp_test15 );
+	TM_RUN_TEST( min_comp_test16 );
+	TM_RUN_TEST( min_comp_test17 );
+	TM_RUN_TEST( min_comp_test18 );
+	TM_RUN_TEST( min_comp_test19 );
 	TM_END_TESTING();
 }
 
@@ -338,6 +574,93 @@ TM_TEST( minmax_tests )
 	TM_END_TESTING();
 }
 
+bool minmax_comp_test0() { return equals( minmax( 0, 1, int_comp ), {0, 1} ); }
+bool minmax_comp_test1() { return equals( minmax( 1, 0, int_comp ), {0, 1} ); }
+bool minmax_comp_test2() { return equals( minmax( 1, 1, int_comp ), {1, 1} ); }
+bool minmax_comp_test3() { return equals( minmax( 0, 1, 2, int_comp ), {0, 2} ); }
+bool minmax_comp_test4() { return equals( minmax( 2, 1, 0, int_comp ), {0, 2} ); }
+bool minmax_comp_test5() { return equals( minmax( 1, 2, 0, int_comp ), {0, 2} ); }
+bool minmax_comp_test6() { return equals( minmax( 1, 0, 2, int_comp ), {0, 2} ); }
+bool minmax_comp_test7() { return equals( minmax( 2, 0, 1, int_comp ), {0, 2} ); }
+bool minmax_comp_test8() { return equals( minmax( 0, 2, 1, int_comp ), {0, 2} ); }
+bool minmax_comp_test9() { return equals( minmax( 1, 1, 1, int_comp ), {1, 1} ); }
+
+bool minmax_comp_test10()
+{
+	int a = 0, b = 1;
+	return equalsRef( minmax( a, b, int_comp ), {a, b} );
+}
+bool minmax_comp_test11()
+{
+	int a = 1, b = 0;
+	return equalsRef( minmax( a, b, int_comp ), {b, a} );
+}
+bool minmax_comp_test12()
+{
+	int a = 1, b = 1;
+	return equalsRef( minmax( a, b, int_comp ), {b, a} );
+}
+bool minmax_comp_test13()
+{
+	int a = 0, b = 1, c = 2;
+	return equalsRef( minmax( a, b, c, int_comp ), {a, c} );
+}
+bool minmax_comp_test14()
+{
+	int a = 2, b = 1, c = 0;
+	return equalsRef( minmax( a, b, c, int_comp ), {c, a} );
+}
+bool minmax_comp_test15()
+{
+	int a = 1, b = 2, c = 0;
+	return equalsRef( minmax( a, b, c, int_comp ), {c, b} );
+}
+bool minmax_comp_test16()
+{
+	int a = 1, b = 0, c = 2;
+	return equalsRef( minmax( a, b, c, int_comp ), {b, c} );
+}
+bool minmax_comp_test17()
+{
+	int a = 2, b = 0, c = 1;
+	return equalsRef( minmax( a, b, c, int_comp ), {b, a} );
+}
+bool minmax_comp_test18()
+{
+	int a = 0, b = 2, c = 1;
+	return equalsRef( minmax( a, b, c, int_comp ), {a, b} );
+}
+bool minmax_comp_test19()
+{
+	int a = 1, b = 1, c = 1;
+	return equalsRef( minmax( a, b, c, int_comp ), {c, a} );
+}
+TM_TEST( minmax_comp_tests )
+{
+	TM_BEGIN_TESTING();
+	TM_RUN_TEST( minmax_comp_test0 );
+	TM_RUN_TEST( minmax_comp_test1 );
+	TM_RUN_TEST( minmax_comp_test2 );
+	TM_RUN_TEST( minmax_comp_test3 );
+	TM_RUN_TEST( minmax_comp_test4 );
+	TM_RUN_TEST( minmax_comp_test5 );
+	TM_RUN_TEST( minmax_comp_test6 );
+	TM_RUN_TEST( minmax_comp_test7 );
+	TM_RUN_TEST( minmax_comp_test8 );
+	TM_RUN_TEST( minmax_comp_test9 );
+	TM_RUN_TEST( minmax_comp_test10 );
+	TM_RUN_TEST( minmax_comp_test11 );
+	TM_RUN_TEST( minmax_comp_test12 );
+	TM_RUN_TEST( minmax_comp_test13 );
+	TM_RUN_TEST( minmax_comp_test14 );
+	TM_RUN_TEST( minmax_comp_test15 );
+	TM_RUN_TEST( minmax_comp_test16 );
+	TM_RUN_TEST( minmax_comp_test17 );
+	TM_RUN_TEST( minmax_comp_test18 );
+	TM_RUN_TEST( minmax_comp_test19 );
+	TM_END_TESTING();
+}
+
 int unsignedof_test0() { return unsignedof( -1 ) == 0xFFFFFFFF; }
 int unsignedof_test1() { return unsignedof( (int64_t)-1 ) == 0xFFFFFFFFFFFFFFFFull; }
 int unsignedof_test2() { return unsignedof( 12ull ) == 12; }
@@ -409,9 +732,13 @@ int main( int argc, char const *argv[] )
 
 	TM_BEGIN_RUN_TESTS();
 	TM_RUN_TESTS( median_tests );
+	TM_RUN_TESTS( median_comp_tests );
 	TM_RUN_TESTS( max_tests );
+	TM_RUN_TESTS( max_comp_tests );
 	TM_RUN_TESTS( min_tests );
+	TM_RUN_TESTS( min_comp_tests );
 	TM_RUN_TESTS( minmax_tests );
+	TM_RUN_TESTS( minmax_comp_tests );
 	TM_RUN_TESTS( unsignedof_tests );
 	TM_RUN_TESTS( promote_as_is_to_tests );
 	TM_END_RUN_TESTS();

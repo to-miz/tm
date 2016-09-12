@@ -1,5 +1,5 @@
 /*
-tm_utility v1.0.9a - public domain
+tm_utility v1.1.0 - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,26 +14,28 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
-	v1.0.9a	24.08.16 changed countof to use tmut_size_t
-	v1.0.9	24.08.16 added countof, lerp and remap
-	v1.0.8	23.08.16 changed min and max to use operator < instead of operator <= and added minmax
-			         removed assertion in strnicmp, because count >= 0 is always true
-	v1.0.7	12.08.16 added mapToRange
-	v1.0.6a	10.08.16 added paranthesis to getAlignmentOffset to make it clear that "-" has
-					 precedence over "&"
-	v1.0.6	15.07.16 fixed floatEqZero & floatEqZeroSoft, they now use TMUT_ABS instead of abs
-					 added floatEqSoft & floatEq
-					 changed toleranceComparison name to floatToleranceComparison
-					 changed SCOPED macro to take __VA_ARGS__ instead of a single expression
-	v1.0.5a	12.07.16 fixed a bug in promote_as_is_to, template arguments were reversed
-	v1.0.5	12.07.16 added min_3/max_3 and median
-	v1.0.4a	12.07.16 fixed bug with min/max where both would return the same value on equality
-	v1.0.4	12.07.16 added WITH and SCOPED macros
-	v1.0.3	10.07.16 added unsignedof and promote_as_is_to
-	v1.0.2	10.07.16 added swap, alignment, isPowerOfTwo, isMemoryZero
-	v1.0.1	10.07.16 added crt extension functions
-	v1.0a	10.07.16 added flags, float, endian related stuff
-	v1.0	10.07.16 initial commit
+	v1.1.0  12.09.16 added isAligned
+	                 added versions of min/max/minmax/median that take a Compare functor
+	v1.0.9a 24.08.16 changed countof to use tmut_size_t
+	v1.0.9  24.08.16 added countof, lerp and remap
+	v1.0.8  23.08.16 changed min and max to use operator < instead of operator <= and added minmax
+	                 removed assertion in strnicmp, because count >= 0 is always true
+	v1.0.7  12.08.16 added mapToRange
+	v1.0.6a 10.08.16 added paranthesis to getAlignmentOffset to make it clear that "-" has
+	                 precedence over "&"
+	v1.0.6  15.07.16 fixed floatEqZero & floatEqZeroSoft, they now use TMUT_ABS instead of abs
+	                 added floatEqSoft & floatEq
+	                 changed toleranceComparison name to floatToleranceComparison
+	                 changed SCOPED macro to take __VA_ARGS__ instead of a single expression
+	v1.0.5a  12.07.16 fixed a bug in promote_as_is_to, template arguments were reversed
+	v1.0.5   12.07.16 added min_3/max_3 and median
+	v1.0.4a  12.07.16 fixed bug with min/max where both would return the same value on equality
+	v1.0.4   12.07.16 added WITH and SCOPED macros
+	v1.0.3   10.07.16 added unsignedof and promote_as_is_to
+	v1.0.2   10.07.16 added swap, alignment, isPowerOfTwo, isMemoryZero
+	v1.0.1   10.07.16 added crt extension functions
+	v1.0a    10.07.16 added flags, float, endian related stuff
+	v1.0     10.07.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following
@@ -150,18 +152,50 @@ LICENSE
 
 static_assert( sizeof( tmut_uintptr ) == sizeof( void* ), "uintptr is not pointer size" );
 
+// compatibility macros
+#ifdef _MSC_VER
+	#if _MSC_VER <= 1800
+		#define TMUT_ALIGNOF( x ) __alignof( x )
+		#define TMUT_CONSTEXPR
+	#else
+		#define TMUT_ALIGNOF( x ) alignof( x )
+		#define TMUT_CONSTEXPR constexpr
+	#endif
+#else
+	// TODO: more compilers
+	#define TMUT_CONSTEXPR constexpr
+	#define TMUT_ALIGNOF( x ) alignof( x )
+#endif
+
 namespace utility
 {
 // function versions of min/max
 template< class T >
-inline const T& min( const T& a, const T& b ) { return ( a < b ) ? ( a ) : ( b ); }
+inline TMUT_CONSTEXPR const T& min( const T& a, const T& b ) { return ( a < b ) ? ( a ) : ( b ); }
 template< class T >
-inline const T& max( const T& a, const T& b ) { return ( a < b ) ? ( b ) : ( a ); }
+inline TMUT_CONSTEXPR const T& max( const T& a, const T& b ) { return ( a < b ) ? ( b ) : ( a ); }
 
 template< class T >
-inline const T& min( const T& a, const T& b, const T& c ) { return min( a, min( b, c ) ); }
+inline TMUT_CONSTEXPR const T& min( const T& a, const T& b, const T& c ) { return min( a, min( b, c ) ); }
 template< class T >
 inline const T& max( const T& a, const T& b, const T& c ) { return max( max( a, b ), c ); }
+
+// function versions of min/max taking a compare functor
+template< class T, class Compare >
+inline TMUT_CONSTEXPR const T& min( const T& a, const T& b, Compare comp ) { return comp( a, b ) ? ( a ) : ( b ); }
+template< class T, class Compare >
+inline TMUT_CONSTEXPR const T& max( const T& a, const T& b, Compare comp ) { return comp( a, b ) ? ( b ) : ( a ); }
+
+template < class T, class Compare >
+inline TMUT_CONSTEXPR const T& min( const T& a, const T& b, const T& c, Compare comp )
+{
+	return min( a, min( b, c, comp ), comp );
+}
+template < class T, class Compare >
+inline TMUT_CONSTEXPR const T& max( const T& a, const T& b, const T& c, Compare comp )
+{
+	return max( max( a, b, comp ), c, comp );
+}
 
 template< class T >
 struct MinMaxPair {
@@ -170,9 +204,15 @@ struct MinMaxPair {
 };
 
 template < class T >
-inline MinMaxPair< const T& > minmax( const T& a, const T& b )
+inline TMUT_CONSTEXPR MinMaxPair< const T& > minmax( const T& a, const T& b )
 {
 	return ( a < b ) ? ( MinMaxPair< const T& >{a, b} ) : ( MinMaxPair< const T& >{b, a} );
+}
+
+template < class T, class Compare >
+inline TMUT_CONSTEXPR MinMaxPair< const T& > minmax( const T& a, const T& b, Compare comp )
+{
+	return comp( a, b ) ? ( MinMaxPair< const T& >{a, b} ) : ( MinMaxPair< const T& >{b, a} );
 }
 
 template < class T >
@@ -187,6 +227,18 @@ inline MinMaxPair< const T& > minmax( const T& a, const T& b, const T& c )
 	return mm;
 }
 
+template < class T, class Compare >
+inline MinMaxPair< const T& > minmax( const T& a, const T& b, const T& c, Compare comp )
+{
+	MinMaxPair< const T& > mm = minmax( a, c, comp );
+	if( comp( b, mm.min ) ) {
+		return MinMaxPair< const T& >{b, mm.max};
+	} else if( mm.max < b ) {
+		return MinMaxPair< const T& >{mm.min, b};
+	}
+	return mm;
+}
+
 template < class T >
 inline const T& median( const T& a, const T& b, const T& c )
 {
@@ -194,6 +246,17 @@ inline const T& median( const T& a, const T& b, const T& c )
 	if( mm.max < c ) {
 		return mm.max;
 	} else if( mm.min < c ) {
+		return c;
+	}
+	return mm.min;
+}
+template < class T, class Compare >
+inline const T& median( const T& a, const T& b, const T& c, Compare comp )
+{
+	MinMaxPair< const T& > mm = minmax( a, b, comp );
+	if( comp( mm.max, c ) ) {
+		return mm.max;
+	} else if( comp( mm.min, c ) ) {
 		return c;
 	}
 	return mm.min;
@@ -216,28 +279,17 @@ inline const T& median( const T& a, const T& b, const T& c )
 	}
 #endif
 
-// compatibility macros
-#ifdef _MSC_VER
-	#if _MSC_VER <= 1800
-		#define TMUT_ALIGNOF( x ) __alignof( x )
-		#define TMUT_CONSTEXPR
-	#else
-		#define TMUT_ALIGNOF( x ) alignof( x )
-		#define TMUT_CONSTEXPR constexpr
-	#endif
-#else
-	// TODO: more compilers
-	#define TMUT_CONSTEXPR constexpr
-	#define TMUT_ALIGNOF( x ) alignof( x )
-#endif
-
 TMUT_CONSTEXPR inline bool isPowerOfTwo( unsigned int x ) { return x && !( x & ( x - 1 ) ); }
 
 // returns how much ptr needs to be offset to be aligned to alignment
 unsigned int getAlignmentOffset( const void* ptr, unsigned int alignment );
 
-#define assert_alignment( ptr, alignment ) \
-	TMUT_ASSERT( ( ( ( tmut_uintptr )( ptr ) ) % ( alignment ) ) == 0 )
+template< class T >
+TMUT_CONSTEXPR bool isAligned( const T* p, unsigned int alignment = TMUT_ALIGNOF( T ) )
+{
+	return ( (tmut_uintptr)p % alignment ) == 0;
+}
+#define assert_alignment( ptr, alignment ) TMUT_ASSERT( isAligned( ptr, alignment ) )
 
 // cast the bit representation to another type
 // useful to get bit representation of a float or double into an unsigned integral
@@ -598,21 +650,21 @@ inline float safeDivide( float a, float b, float def )
 template < class T >
 inline void copy( T* dest, const void* src, size_t count )
 {
-	assert_alignment( dest, TMUT_ALIGNOF( T ) );
+	TMUT_ASSERT( isAligned( dest ) );
 	TMUT_MEMCPY( dest, src, count * sizeof( T ) );
 }
 
 template < class T >
 inline void move( T* dest, const void* src, size_t count )
 {
-	assert_alignment( dest, TMUT_ALIGNOF( T ) );
+	TMUT_ASSERT( isAligned( dest ) );
 	TMUT_MEMMOVE( dest, src, count * sizeof( T ) );
 }
 
 template < class T >
 inline void fill( T* dest, const T& value, size_t count )
 {
-	assert_alignment( dest, TMUT_ALIGNOF( T ) );
+	TMUT_ASSERT( isAligned( dest ) );
 	for( ; count > 0; --count, ++dest ) {
 		*dest = value;
 	}
@@ -647,7 +699,7 @@ inline int compare( const T* a, const T* b, size_t count )
 template < class T >
 inline void zeroMemory( T* dest, size_t count )
 {
-	assert_alignment( dest, TMUT_ALIGNOF( T ) );
+	TMUT_ASSERT( isAligned( dest ) );
 	TMUT_MEMSET( dest, 0, count * sizeof( T ) );
 }
 
