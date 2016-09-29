@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.3 - public domain
+tm_conversion.h v0.9.4a - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -86,6 +86,13 @@ ISSUES
 	is beyond the scope of this library. Do not use these functions for big numbers.
 
 HISTORY
+	v0.9.4a 29.09.16 made PrintFormat forward declarable
+	v0.9.4  24.09.16 optimized base 10 and base 16 conversion paths based on the talk
+	                 "Three Optimization Tips for C++" by Andrei Alexandrescu.
+	                 added print_decimal_* and print_hex_* functions.
+	                 renamed PF_PADDING_ZEROES to PF_TRAILING_ZEROES
+	                 fixed a bug in print_bool where it would print the wrong string if bool was
+	                 printed as "true"/"false" and outputted a nullterminator
 	v0.9.3  30.08.16 added TMC_CPP_OVERLOADS and cpp overloads of functions
 	                 added TMC_STRING_VIEW for string view support of functions
 	                 added TMC_CONVENIENCE and convenience functions
@@ -442,15 +449,18 @@ TMC_DEF tmc_size_t scan_bool( const char* nullterminated, tmc_bool* out );
 TMC_DEF tmc_size_t scan_bool_n( const char* str, tmc_size_t len, tmc_bool* out );
 
 enum PrintFormatFlags TMC_UNDERLYING_U32 {
-	PF_DEFAULT = 0,
 	PF_SIGN = ( 1 << 0 ),
 	PF_LOWERCASE = ( 1 << 1 ),
-	PF_PADDING_ZEROES = ( 1 << 2 ),
+	PF_TRAILING_ZEROES = ( 1 << 2 ),
 	PF_BOOL_AS_NUMBER = ( 1 << 3 ),
 	PF_SCIENTIFIC = ( 1 << 4 ),  // not implemented yet
+
+	PF_DEFAULT = 0,
+
+	PF_COUNT = 5, // 5 flags in total
 };
 
-typedef struct {
+typedef struct PrintFormatStruct {
 	int base;
 	int precision;
 	int width;
@@ -478,6 +488,28 @@ TMC_DEF tmc_size_t print_u64( char* dest, tmc_size_t maxlen, PrintFormat* format
 TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* format, double value );
 TMC_DEF tmc_size_t print_float( char* dest, tmc_size_t maxlen, PrintFormat* format, float value );
 TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_bool value );
+
+/*
+Specialized printing functions that perform faster than the generic versions from above
+*/
+/* prints base 10 number and returns length */
+TMC_DEF tmc_size_t print_decimal_i32( char* dest, tmc_size_t maxlen, tmc_int32 value );
+TMC_DEF tmc_size_t print_decimal_u32( char* dest, tmc_size_t maxlen, tmc_uint32 value );
+TMC_DEF tmc_size_t print_decimal_i64( char* dest, tmc_size_t maxlen, tmc_int64 value );
+TMC_DEF tmc_size_t print_decimal_u64( char* dest, tmc_size_t maxlen, tmc_uint64 value );
+
+/*
+prints base 16 number and returns length, does not prepend 0x before the number
+Params:
+	dest: destination buffer
+	maxlen: max length of buffer
+	lower: whether to use lowercase or uppercase to output hexadecimal digits A-F
+	value: value to be printed
+*/
+TMC_DEF tmc_size_t print_hex_i32( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_int32 value );
+TMC_DEF tmc_size_t print_hex_u32( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_uint32 value );
+TMC_DEF tmc_size_t print_hex_i64( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_int64 value );
+TMC_DEF tmc_size_t print_hex_u64( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_uint64 value );
 
 #ifdef TMC_CONVENIENCE
 	// we use a strong typedef for radix, so we don't accidentaly specify radix when wanting to
@@ -604,10 +636,14 @@ TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* forma
 	Returns number of bytes written.
 	Similar to print, but does not require a PrintFormat structure to be passed in.
 	*/
-	tmc_size_t to_string( tmc_int32 value, char* dest, tmc_size_t maxlen, Radix base = Radix{10} );
-	tmc_size_t to_string( tmc_uint32 value, char* dest, tmc_size_t maxlen, Radix base = Radix{10} );
-	tmc_size_t to_string( tmc_int64 value, char* dest, tmc_size_t maxlen, Radix base = Radix{10} );
-	tmc_size_t to_string( tmc_uint64 value, char* dest, tmc_size_t maxlen, Radix base = Radix{10} );
+	tmc_size_t to_string( tmc_int32 value, char* dest, tmc_size_t maxlen, Radix base );
+	tmc_size_t to_string( tmc_uint32 value, char* dest, tmc_size_t maxlen, Radix base );
+	tmc_size_t to_string( tmc_int64 value, char* dest, tmc_size_t maxlen, Radix base );
+	tmc_size_t to_string( tmc_uint64 value, char* dest, tmc_size_t maxlen, Radix base );
+	tmc_size_t to_string( tmc_int32 value, char* dest, tmc_size_t maxlen );
+	tmc_size_t to_string( tmc_uint32 value, char* dest, tmc_size_t maxlen );
+	tmc_size_t to_string( tmc_int64 value, char* dest, tmc_size_t maxlen );
+	tmc_size_t to_string( tmc_uint64 value, char* dest, tmc_size_t maxlen );
 	tmc_size_t to_string( double value, char* dest, tmc_size_t maxlen, int precision = 6 );
 	tmc_size_t to_string( float value, char* dest, tmc_size_t maxlen, int precision = 6 );
 	tmc_size_t to_string( tmc_bool value, char* dest, tmc_size_t maxlen, tmc_bool asNumber = false );
@@ -615,7 +651,7 @@ TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* forma
 		TMC_STRING_VIEW to_string( tmc_bool value );
 	#endif // TMC_STRING_VIEW
 
-	// output hex number and prepend 0x
+	// output hex number and prepend 0x, uses uppercase digits
 	tmc_size_t to_string_hex( tmc_uint32 value, char* dest, tmc_size_t maxlen );
 	tmc_size_t to_string_hex( tmc_uint64 value, char* dest, tmc_size_t maxlen );
 #endif // defined( TMC_CONVENIENCE ) && defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
@@ -1058,6 +1094,22 @@ extern "C" {
 	{
 		PrintFormat format = PrintFormat{base.base};
 		return print_u64( dest, maxlen, &format, value );
+	}
+	inline tmc_size_t to_string( tmc_int32 value, char* dest, tmc_size_t maxlen )
+	{
+		return print_decimal_i32( dest, maxlen, value );
+	}
+	inline tmc_size_t to_string( tmc_uint32 value, char* dest, tmc_size_t maxlen )
+	{
+		return print_decimal_u32( dest, maxlen, value );
+	}
+	inline tmc_size_t to_string( tmc_int64 value, char* dest, tmc_size_t maxlen )
+	{
+		return print_decimal_i64( dest, maxlen, value );
+	}
+	inline tmc_size_t to_string( tmc_uint64 value, char* dest, tmc_size_t maxlen )
+	{
+		return print_decimal_u64( dest, maxlen, value );
 	}
 	inline tmc_size_t to_string( double value, char* dest, tmc_size_t maxlen, int precision )
 	{
@@ -2256,8 +2308,8 @@ TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* forma
 	if( format && ( format->flags & PF_BOOL_AS_NUMBER ) ) {
 		return print_string( dest, maxlen, ( value ) ? ( "1" ) : ( "0" ), 1 );
 	} else {
-		static const char* strings[] = {"true", "false"};
-		static tmc_size_t lengths[] = {sizeof( "true" ), sizeof( "false" )};
+		static const char* strings[] = {"false", "true"};
+		static tmc_size_t lengths[] = {sizeof( "false" ) - 1, sizeof( "true" ) - 1};
 		size_t index = value != 0;
 		return print_string( dest, maxlen, strings[index], lengths[index] );
 	}
@@ -2266,9 +2318,27 @@ TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* forma
 
 // print implementation
 
-static const char print_NumberToCharTable[] = {
-	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-	'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'};
+static const char print_NumberToCharTableUpper[] = {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+    'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'};
+static const char print_NumberToCharTableLower[] = {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+    'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
+
+// table of double digit chars from 00 to 99
+static const char print_DoubleDigitsToCharTable[200] = {
+    '0', '0', '0', '1', '0', '2', '0', '3', '0', '4', '0', '5', '0', '6', '0', '7', '0', '8', '0',
+    '9', '1', '0', '1', '1', '1', '2', '1', '3', '1', '4', '1', '5', '1', '6', '1', '7', '1', '8',
+    '1', '9', '2', '0', '2', '1', '2', '2', '2', '3', '2', '4', '2', '5', '2', '6', '2', '7', '2',
+    '8', '2', '9', '3', '0', '3', '1', '3', '2', '3', '3', '3', '4', '3', '5', '3', '6', '3', '7',
+    '3', '8', '3', '9', '4', '0', '4', '1', '4', '2', '4', '3', '4', '4', '4', '5', '4', '6', '4',
+    '7', '4', '8', '4', '9', '5', '0', '5', '1', '5', '2', '5', '3', '5', '4', '5', '5', '5', '6',
+    '5', '7', '5', '8', '5', '9', '6', '0', '6', '1', '6', '2', '6', '3', '6', '4', '6', '5', '6',
+    '6', '6', '7', '6', '8', '6', '9', '7', '0', '7', '1', '7', '2', '7', '3', '7', '4', '7', '5',
+    '7', '6', '7', '7', '7', '8', '7', '9', '8', '0', '8', '1', '8', '2', '8', '3', '8', '4', '8',
+    '5', '8', '6', '8', '7', '8', '8', '8', '9', '9', '0', '9', '1', '9', '2', '9', '3', '9', '4',
+    '9', '5', '9', '6', '9', '7', '9', '8', '9', '9'
+};
 
 static const double print_PowersOfTen[] = {1,	 10,	100,   1.0e3, 1.0e4,
 										   1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9};
@@ -2323,6 +2393,318 @@ static char* print_strnrev( char* str, size_t count )
 }
 #endif
 
+static tmc_size_t numberOfDigits64( tmc_uint64 number )
+{
+	constexpr tmc_uint64 P01 = 10;
+	constexpr tmc_uint64 P02 = 100;
+	constexpr tmc_uint64 P03 = 1000;
+	constexpr tmc_uint64 P04 = 10000;
+	constexpr tmc_uint64 P05 = 100000;
+	constexpr tmc_uint64 P06 = 1000000;
+	constexpr tmc_uint64 P07 = 10000000;
+	constexpr tmc_uint64 P08 = 100000000;
+	constexpr tmc_uint64 P09 = 1000000000;
+	constexpr tmc_uint64 P10 = 10000000000;
+	constexpr tmc_uint64 P11 = 100000000000;
+	constexpr tmc_uint64 P12 = 1000000000000;
+	if( number < P01 ) {
+		return 1;
+	}
+	if( number < P02 ) {
+		return 2;
+	}
+	if( number < P03 ) {
+		return 3;
+	}
+	if( number < P12 ) {
+		if( number < P08 ) {
+			if( number < P06 ) {
+				if( number < P04 ) {
+					return 4;
+				}
+				return 5 + ( number >= P05 );
+			}
+			return 7 + ( number >= P07 );
+		}
+		if( number < P10 ) {
+			return 9 + ( number >= P09 );
+		}
+		return 11 + ( number >= P11 );
+	}
+	return 12 + numberOfDigits64( number / P12 );
+}
+static tmc_uint32 numberOfDigits32( tmc_uint32 number )
+{
+	constexpr tmc_uint32 P01 = 10;
+	constexpr tmc_uint32 P02 = 100;
+	constexpr tmc_uint32 P03 = 1000;
+	constexpr tmc_uint32 P04 = 10000;
+	constexpr tmc_uint32 P05 = 100000;
+	constexpr tmc_uint32 P06 = 1000000;
+	constexpr tmc_uint32 P07 = 10000000;
+	constexpr tmc_uint32 P08 = 100000000;
+	constexpr tmc_uint32 P09 = 1000000000;
+	if( number < P01 ) {
+		return 1;
+	}
+	if( number < P02 ) {
+		return 2;
+	}
+	if( number < P03 ) {
+		return 3;
+	}
+	if( number < P08 ) {
+		if( number < P06 ) {
+			if( number < P04 ) {
+				return 4;
+			}
+			return 5 + ( number >= P05 );
+		}
+		return 7 + ( number >= P07 );
+	}
+	return 9 + ( number >= P09 );
+}
+
+static tmc_size_t print_decimal_u32_impl( char* dest, tmc_size_t maxlen, int width,
+                                          tmc_uint32 value )
+{
+	TMC_ASSERT( width >= 0 );
+	tmc_size_t len = numberOfDigits32( value );
+	if( len > maxlen ) {
+		len = maxlen;
+	}
+	char* p = dest;
+	if( len < (tmc_size_t)width ) {
+		tmc_size_t count = maxlen - ( (tmc_size_t)width - len );
+		for( tmc_size_t i = 0; i < count; ++i ) {
+			*p = '0';
+			++p;
+		}
+		len = (tmc_size_t)width;
+	}
+	p = dest + len - 1;
+	while( value >= 100 && maxlen >= 2 ) {
+		tmc_uint32 index = ( value % 100 ) * 2;
+		TMC_ASSERT( index < 200 );
+		value /= 100;
+		*p         = print_DoubleDigitsToCharTable[index + 1];
+		*( p - 1 ) = print_DoubleDigitsToCharTable[index];
+		p -= 2;
+		maxlen -= 2;
+	}
+	// Handle last 1-2 digits
+	if( value < 10 ) {
+		if( maxlen ) {
+			*p = (char)( '0' + tmc_uint32( value ) );
+		}
+	} else {
+		// make sure that value is within 0-99, otherwise the index calculation below will go out of
+		// bounds. Value might not be within 0-99 if the loop terminated because maxlen >= 2 failed.
+		if( value >= 100 ) {
+			value %= 100;
+		}
+		tmc_uint32 index = tmc_uint32( value ) * 2;
+		TMC_ASSERT( index < 200 );
+		if( maxlen ) {
+			*p = print_DoubleDigitsToCharTable[index + 1];
+		}
+		if( maxlen > 1 ) {
+			*( p - 1 ) = print_DoubleDigitsToCharTable[index];
+		}
+	}
+	return len;
+}
+static tmc_size_t print_decimal_i32_impl( char* dest, tmc_size_t maxlen, int width, tmc_int32 value )
+{
+	tmc_size_t ret = 0;
+	if( value < 0 ) {
+		*dest++ = '-';
+		--maxlen;
+		++ret;
+		value = -value;
+	}
+	ret += print_decimal_u32_impl( dest, maxlen, width, value );
+	return ret;
+}
+static tmc_size_t print_decimal_u64_impl( char* dest, tmc_size_t maxlen, int width, tmc_uint64 value )
+{
+	TMC_ASSERT( width >= 0 );
+	tmc_size_t len = numberOfDigits64( value );
+	if( len > maxlen ) {
+		len = maxlen;
+	}
+	char* p = dest;
+	if( len < (tmc_size_t)width ) {
+		tmc_size_t count = maxlen - ( (tmc_size_t)width - len );
+		for( tmc_size_t i = 0; i < count; ++i ) {
+			*p = '0';
+			++p;
+		}
+		len = (tmc_size_t)width;
+	}
+	p = dest + len - 1;
+	while( value >= 100 && maxlen >= 2 ) {
+		tmc_uint32 index = ( value % 100 ) * 2;
+		TMC_ASSERT( index < 200 );
+		value /= 100;
+		*p         = print_DoubleDigitsToCharTable[index + 1];
+		*( p - 1 ) = print_DoubleDigitsToCharTable[index];
+		p -= 2;
+		maxlen -= 2;
+	}
+	// Handle last 1-2 digits
+	if( value < 10 ) {
+		if( maxlen ) {
+			*p = (char)( '0' + tmc_uint32( value ) );
+		}
+	} else {
+		// make sure that value is within 0-99, otherwise the index calculation below will go out of
+		// bounds. Value might not be within 0-99 if the loop terminated because maxlen >= 2 failed.
+		if( value >= 100 ) {
+			value %= 100;
+		}
+		tmc_uint32 index = tmc_uint32( value ) * 2;
+		TMC_ASSERT( index < 200 );
+		if( maxlen ) {
+			*p = print_DoubleDigitsToCharTable[index + 1];
+		}
+		if( maxlen > 1 ) {
+			*( p - 1 ) = print_DoubleDigitsToCharTable[index];
+		}
+	}
+	return len;
+}
+static tmc_size_t print_decimal_i64_impl( char* dest, tmc_size_t maxlen, int width, tmc_int64 value )
+{
+	tmc_size_t ret = 0;
+	if( value < 0 ) {
+		*dest++ = '-';
+		--maxlen;
+		++ret;
+		value = -value;
+	}
+	ret += print_decimal_u64_impl( dest, maxlen, width, value );
+	return ret;
+}
+
+TMC_DEF tmc_size_t print_decimal_i32( char* dest, tmc_size_t maxlen, tmc_int32 value )
+{
+	return print_decimal_i32_impl( dest, maxlen, 0, value );
+}
+TMC_DEF tmc_size_t print_decimal_u32( char* dest, tmc_size_t maxlen, tmc_uint32 value )
+{
+	return print_decimal_u32_impl( dest, maxlen, 0, value );
+}
+TMC_DEF tmc_size_t print_decimal_i64( char* dest, tmc_size_t maxlen, tmc_int64 value )
+{
+	return print_decimal_i64_impl( dest, maxlen, 0, value );
+}
+TMC_DEF tmc_size_t print_decimal_u64( char* dest, tmc_size_t maxlen, tmc_uint64 value )
+{
+	return print_decimal_u64_impl( dest, maxlen, 0, value );
+}
+
+static tmc_size_t numberOfHexDigits32( tmc_uint32 value )
+{
+	tmc_size_t result = 0;
+	while( value ) {
+		value >>= 4;
+		++result;
+	}
+	return result;
+}
+static tmc_size_t numberOfHexDigits64( tmc_uint64 value )
+{
+	tmc_size_t result = 0;
+	while( value ) {
+		value >>= 4;
+		++result;
+	}
+	return result;
+}
+
+static tmc_size_t print_hex_u32_impl( char* dest, tmc_size_t maxlen, int width, tmc_bool lower,
+                                      tmc_uint32 value )
+{
+	const char* table =
+	    ( lower ) ? ( print_NumberToCharTableLower ) : ( print_NumberToCharTableUpper );
+	tmc_size_t len = numberOfHexDigits32( value );
+	if( len > maxlen ) {
+		len = maxlen;
+	}
+	char* p = dest;
+	if( len < (tmc_size_t)width ) {
+		tmc_size_t count = maxlen - ( (tmc_size_t)width - len );
+		for( tmc_size_t i = 0; i < count; ++i ) {
+			*p = '0';
+			++p;
+		}
+		len = (tmc_size_t)width;
+	}
+	p = dest + len - 1;
+	while( maxlen >= 2 && value ) {
+		*p         = table[value & 0x0F];
+		*( p - 1 ) = table[( value >> 4 ) & 0x0F];
+		value >>= 8;
+		p -= 2;
+		maxlen -= 2;
+	}
+	// if the loop terminated because of maxlen >= 2, check whether we can output one more digit
+	if( maxlen && value ) {
+		*p = table[value & 0x0F];
+	}
+	return len;
+}
+static tmc_size_t print_hex_u64_impl( char* dest, tmc_size_t maxlen, int width, tmc_bool lower,
+                                      tmc_uint64 value )
+{
+	const char* table =
+	    ( lower ) ? ( print_NumberToCharTableLower ) : ( print_NumberToCharTableUpper );
+	tmc_size_t len = numberOfHexDigits64( value );
+	if( len > maxlen ) {
+		len = maxlen;
+	}
+	char* p = dest;
+	if( len < (tmc_size_t)width ) {
+		tmc_size_t count = maxlen - ( (tmc_size_t)width - len );
+		for( tmc_size_t i = 0; i < count; ++i ) {
+			*p = '0';
+			++p;
+		}
+		len = (tmc_size_t)width;
+	}
+	p = dest + len - 1;
+	while( maxlen >= 2 && value ) {
+		*p         = table[value & 0x0F];
+		*( p - 1 ) = table[( value >> 4 ) & 0x0F];
+		value >>= 8;
+		p -= 2;
+		maxlen -= 2;
+	}
+	// if the loop terminated because of maxlen >= 2, check whether we can output one more digit
+	if( maxlen && value ) {
+		*p = table[value & 0x0F];
+	}
+	return len;
+}
+
+TMC_DEF tmc_size_t print_hex_i32( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_int32 value )
+{
+	return print_hex_u32_impl( dest, maxlen, 0, lower, (tmc_uint32)value );
+}
+TMC_DEF tmc_size_t print_hex_u32( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_uint32 value )
+{
+	return print_hex_u32_impl( dest, maxlen, 0, lower, (tmc_uint32)value );
+}
+TMC_DEF tmc_size_t print_hex_i64( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_int64 value )
+{
+	return print_hex_u64_impl( dest, maxlen, 0, lower, (tmc_uint64)value );
+}
+TMC_DEF tmc_size_t print_hex_u64( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_uint64 value )
+{
+	return print_hex_u64_impl( dest, maxlen, 0, lower, (tmc_uint64)value );
+}
+
 TMC_DEF tmc_size_t print_i32( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_int32 value )
 {
 	TMC_ASSERT( dest );
@@ -2338,7 +2720,15 @@ TMC_DEF tmc_size_t print_i32( char* dest, tmc_size_t maxlen, PrintFormat* format
 		base = format->base;
 		flags = format->flags;
 	}
+	if( base <= 1 ) {
+		base = 10;
+	} else if( base > 16 ) {
+		base = 16;
+	}
 	if( value < 0 && base == 10 ) {
+		if( maxlen <= 1 ) {
+			return 0;
+		}
 		*dest++ = '-';
 		--maxlen;
 		++ret;
@@ -2389,36 +2779,48 @@ TMC_DEF tmc_size_t print_u32( char* dest, tmc_size_t maxlen, PrintFormat* format
 		*dest++ = '+';
 		--maxlen;
 	}
-
-	char* p = dest;
-	if( value ) {
-		while( maxlen && value ) {
-			*p++ = print_NumberToCharTable[value % base];
-			--maxlen;
-			value /= base;
+	switch( base ) {
+		case 10: {
+			int width = ( format ) ? ( format->width ) : ( 0 );
+			maxlen -= print_decimal_u32_impl( dest, maxlen, width, value );
+			return start - maxlen;
 		}
-	} else {
-		*p++ = '0';
-		--maxlen;
-	}
+		case 16: {
+			int width = ( format ) ? ( format->width ) : ( 0 );
+			tmc_bool lower = ( format ) ? ( ( format->flags & PF_LOWERCASE ) != 0 ) : ( 0 );
+			return print_hex_u32_impl( dest, maxlen, width, lower, value );
+		}
+		default: {
+			// slow path
+			const char* table = print_NumberToCharTableUpper;
+			if( base > 10 && format && ( format->flags & PF_LOWERCASE ) ) {
+				table = print_NumberToCharTableLower;
+			}
 
-	tmc_size_t len = start - maxlen;
-	if( format && format->width ) {
-		len = format->width;
-	}
-	if( !sign ) {
-		TMC_STRNREV( dest, len );
-	} else {
-		TMC_STRNREV( dest, len - 1 );
-	}
+			char* p = dest;
+			if( value ) {
+				while( maxlen && value ) {
+					*p++ = table[value % base];
+					--maxlen;
+					value /= base;
+				}
+			} else {
+				*p++ = '0';
+				--maxlen;
+			}
 
-	if( base > 10 && format && ( format->flags & PF_LOWERCASE ) ) {
-		// we use size_t here directly because we iterate over dest
-		for( size_t i = 0; i < (size_t)len; ++i ) {
-			dest[i] = (char)tolower( tmc_char_to_i32( dest[i] ) );
+			tmc_size_t len = start - maxlen;
+			if( format && format->width ) {
+				len = format->width;
+			}
+			if( !sign ) {
+				TMC_STRNREV( dest, len );
+			} else {
+				TMC_STRNREV( dest, len - 1 );
+			}
+			return len;
 		}
 	}
-	return len;
 }
 TMC_DEF tmc_size_t print_i64( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_int64 value )
 {
@@ -2435,7 +2837,15 @@ TMC_DEF tmc_size_t print_i64( char* dest, tmc_size_t maxlen, PrintFormat* format
 		base = format->base;
 		flags = format->flags;
 	}
+	if( base <= 1 ) {
+		base = 10;
+	} else if( base > 16 ) {
+		base = 16;
+	}
 	if( value < 0 && base == 10 ) {
+		if( maxlen <= 1 ) {
+			return 0;
+		}
 		*dest++ = '-';
 		--maxlen;
 		++ret;
@@ -2486,36 +2896,48 @@ TMC_DEF tmc_size_t print_u64( char* dest, tmc_size_t maxlen, PrintFormat* format
 		*dest++ = '+';
 		--maxlen;
 	}
-
-	char* p = dest;
-	if( value ) {
-		while( maxlen && value ) {
-			*p++ = print_NumberToCharTable[value % base];
-			--maxlen;
-			value /= base;
+	switch( base ) {
+		case 10: {
+			int width = ( format ) ? ( format->width ) : ( 0 );
+			maxlen -= print_decimal_u64_impl( dest, maxlen, width, value );
+			return start - maxlen;
 		}
-	} else {
-		*p++ = '0';
-		--maxlen;
-	}
+		case 16: {
+			int width = ( format ) ? ( format->width ) : ( 0 );
+			tmc_bool lower = ( format ) ? ( ( format->flags & PF_LOWERCASE ) != 0 ) : ( 0 );
+			return print_hex_u64_impl( dest, maxlen, width, lower, value );
+		}
+		default: {
+			// slow path
+			const char* table = print_NumberToCharTableUpper;
+			if( base > 10 && format && ( format->flags & PF_LOWERCASE ) ) {
+				table = print_NumberToCharTableLower;
+			}
 
-	tmc_size_t len = start - maxlen;
-	if( format && format->width ) {
-		len = format->width;
-	}
-	if( !sign ) {
-		TMC_STRNREV( dest, len );
-	} else {
-		TMC_STRNREV( dest, len - 1 );
-	}
+			char* p = dest;
+			if( value ) {
+				while( maxlen && value ) {
+					*p++ = table[value % base];
+					--maxlen;
+					value /= base;
+				}
+			} else {
+				*p++ = '0';
+				--maxlen;
+			}
 
-	if( base > 10 && format && ( format->flags & PF_LOWERCASE ) ) {
-		// we use size_t here directly because we iterate over dest
-		for( size_t i = 0; i < (size_t)len; ++i ) {
-			dest[i] = (char)tolower( tmc_char_to_i32( dest[i] ) );
+			tmc_size_t len = start - maxlen;
+			if( format && format->width ) {
+				len = format->width;
+			}
+			if( !sign ) {
+				TMC_STRNREV( dest, len );
+			} else {
+				TMC_STRNREV( dest, len - 1 );
+			}
+			return len;
 		}
 	}
-	return len;
 }
 TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* format, double value )
 {
@@ -2581,7 +3003,7 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 	if( magnitude >= scan_MaxExponent ) {
 		magnitude = scan_MaxExponent - 1;
 	}
-	PrintFormat uint32Format = {10};
+	int printWidth = 0;
 	while( magnitude > 0 && maxlen ) {
 		double part;
 		if( magnitude > 9 ) {
@@ -2590,11 +3012,11 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 		} else {
 			part = value;
 			value -= (double)( (tmc_uint32)value );
-			uint32Format.width = magnitude;
+			printWidth = magnitude;
 		}
 		tmc_uint32 digits = (tmc_uint32)part;
-		tmc_size_t len = print_u32( dest, maxlen, &uint32Format, digits );
-		uint32Format.width = 9;
+		tmc_size_t len = print_decimal_u32_impl( dest, maxlen, printWidth, digits );
+		printWidth = 9;
 		magnitude -= 9;
 		maxlen -= len;
 		dest += len;
@@ -2602,7 +3024,7 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 	double fractionalPart = value;
 
 	if( precision ) {
-		uint32Format.width = precision;
+		printWidth = precision;
 		// fractionalPart is positive, so we can round by adding 0.5 before truncating
 		tmc_uint32 fractionalDigits =
 			( tmc_uint32 )( ( fractionalPart * print_PowersOfTen[precision] ) + 0.5 );
@@ -2610,22 +3032,22 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 			if( maxlen ) {
 				*dest++ = '.';
 				--maxlen;
-				if( format && !( format->flags & PF_PADDING_ZEROES ) ) {
+				if( format && !( format->flags & PF_TRAILING_ZEROES ) ) {
 					// get rid of trailing zeroes
 					for( ;; ) {
 						tmc_uint32 digit = fractionalDigits % 10;
 						if( !digit ) {
 							fractionalDigits /= 10;
-							--uint32Format.width;
+							--printWidth;
 						} else {
 							break;
 						}
 					}
 				}
 				// check whether we got rid of all digits when trimming trailing zeroes
-				if( uint32Format.width > 0 ) {
+				if( printWidth > 0 ) {
 					tmc_size_t fractionalLen =
-						print_u32( dest, maxlen, &uint32Format, fractionalDigits );
+					    print_decimal_u32_impl( dest, maxlen, printWidth, fractionalDigits );
 					maxlen -= fractionalLen;
 					dest += fractionalLen;
 				} else {
@@ -2634,7 +3056,7 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 					--maxlen;
 				}
 			}
-		} else if( format && ( format->flags & PF_PADDING_ZEROES ) && maxlen > 1 ) {
+		} else if( format && ( format->flags & PF_TRAILING_ZEROES ) && maxlen > 1 ) {
 			*dest++ = '.';
 			--maxlen;
 			while( precision-- && maxlen ) {
@@ -2674,8 +3096,7 @@ tmc_size_t to_string_hex( tmc_uint32 value, char* dest, tmc_size_t maxlen )
 	}
 	dest[0] = '0';
 	dest[1] = 'x';
-	PrintFormat format = PrintFormat{16};
-	return print_u32( dest + 2, maxlen - 2, &format, value ) + 2;
+	return print_hex_u32( dest, maxlen, false, value ) + 2;
 }
 tmc_size_t to_string_hex( tmc_uint64 value, char* dest, tmc_size_t maxlen )
 {
@@ -2695,8 +3116,7 @@ tmc_size_t to_string_hex( tmc_uint64 value, char* dest, tmc_size_t maxlen )
 	}
 	dest[0] = '0';
 	dest[1] = 'x';
-	PrintFormat format = PrintFormat{16};
-	return print_u64( dest + 2, maxlen - 2, &format, value ) + 2;
+	return print_hex_u64( dest, maxlen, false, value ) + 2;
 }
 #endif // defined( TMC_CONVENIENCE ) && defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus )
 
