@@ -1,5 +1,5 @@
 /*
-tm_utility v1.1.0 - public domain
+tm_utility v1.1.0a - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,7 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.1.0a 15.09.16 added an alternate implementation of countof
 	v1.1.0  12.09.16 added isAligned
 	                 added versions of min/max/minmax/median that take a Compare functor
 	v1.0.9a 24.08.16 changed countof to use tmut_size_t
@@ -317,15 +318,27 @@ TMUT_CONSTEXPR inline typename std::underlying_type< EnumType >::type valueof( E
 // countof returns the element count of static arrays
 // enable typechecked version of countof on debug builds or if TMUT_SAFE_COUNTOF is defined
 #if defined( TMUT_SAFE_COUNTOF ) || defined( _DEBUG )
+	// implementation of countof that uses the comma operator to validate
+	// has the benefit that the return type is a const literal and thus will not generate truncation
+	// warnings when assigned to smaller integers, if the size fits without truncation
+	template < class T >
+	TMUT_CONSTEXPR inline void internal_is_array( const T& v )
+	{
+		static_assert( std::is_array< T >::value, "not static array" );
+	}
+	#define countof( x ) ( internal_is_array( ( x ) ), sizeof( ( x ) ) / sizeof( *( x ) ) )
+#elif ( defined( TMUT_SAFE_COUNTOF_ALT ) || defined( _DEBUG ) ) && !defined( TMUT_SAFE_COUNTOF )
+	// alternate implementation of countof that always returns the size in tmut_size_t
 	template< class T, tmut_size_t N >
-	constexpr tmut_size_t countof( T (&array)[N] )
+	TMUT_CONSTEXPR tmut_size_t countof( T (&array)[N] )
 	{
 		return N;
 	}
 	template < class T >
-	void countof( T )
+	tmut_size_t countof( T )
 	{
 		static_assert( false, "countof can only be applied on static arrays" );
+		return 0;
 	}
 #else
 	#define countof( x ) ( sizeof( x ) / sizeof( x[0] ) )
@@ -431,13 +444,13 @@ static const float RelTolerance = 0.000001f;
 // zero tests
 #define floatEqZero( x ) ( TMUT_ABS( x ) < Float::Epsilon )
 #define floatEqZeroSoft( x ) ( TMUT_ABS( x ) < Float::BigEpsilon )
-#define floatGtZeroSoft( x ) ( x > Float::BigEpsilon )
-#define floatLtZeroSoft( x ) ( x < Float::BigEpsilon )
+#define floatGtZeroSoft( x ) ( ( x ) > Float::BigEpsilon )
+#define floatLtZeroSoft( x ) ( ( x ) < Float::BigEpsilon )
 #define floatEqZeroSoft( x ) ( TMUT_ABS( x ) < Float::BigEpsilon )
 // NOTE: you should know when it is appropriate to use the following two macros, if you are not sure
 // use floatToleranceComparison instead
-#define floatEq( a, b ) floatEqZero( a - b )
-#define floatEqSoft( a, b ) floatEqZeroSoft( a - b )
+#define floatEq( a, b ) floatEqZero( ( a ) - ( b ) )
+#define floatEqSoft( a, b ) floatEqZeroSoft( ( a ) - ( b ) )
 bool floatToleranceComparison( float a, float b );
 
 // endian
