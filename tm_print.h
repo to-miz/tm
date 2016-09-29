@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.4 - public domain
+tm_print.h v0.0.4a - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -33,6 +33,7 @@ ISSUES
 	sized)
 
 HISTORY
+	v0.0.4a 29.09.16 fixed a bug where inputting an escaped {{ was resulting in an infinite loop
 	v0.0.4  29.09.16 added signed/unsigned char, short and long handling
 	                 fixed compiler errors when compiling with clang
 	v0.0.3  27.09.16 added printing custom types by overloading snprint
@@ -844,6 +845,8 @@ static void print_impl( const char* format, size_t formatLen, const PrintFormat&
 		++p;
 		if( *p == '{' ) {
 			printout( "{", 1 );
+			++p;
+			formatFirst = p;
 			continue;
 		}
 
