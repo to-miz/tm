@@ -1,5 +1,5 @@
 /*
-tm_utility v1.1.0a - public domain
+tm_utility v1.1.1 - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,7 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.1.1  02.10.16 added TMUT_NO_CSTYLE_TAGGED_UNION_MACROS and c-style tagged union macros
 	v1.1.0a 15.09.16 added an alternate implementation of countof
 	v1.1.0  12.09.16 added isAligned
 	                 added versions of min/max/minmax/median that take a Compare functor
@@ -317,7 +318,7 @@ TMUT_CONSTEXPR inline typename std::underlying_type< EnumType >::type valueof( E
 
 // countof returns the element count of static arrays
 // enable typechecked version of countof on debug builds or if TMUT_SAFE_COUNTOF is defined
-#if defined( TMUT_SAFE_COUNTOF ) || defined( _DEBUG )
+#if ( defined( TMUT_SAFE_COUNTOF ) || defined( _DEBUG ) ) && !defined( TMUT_SAFE_COUNTOF_ALT )
 	// implementation of countof that uses the comma operator to validate
 	// has the benefit that the return type is a const literal and thus will not generate truncation
 	// warnings when assigned to smaller integers, if the size fits without truncation
@@ -327,7 +328,7 @@ TMUT_CONSTEXPR inline typename std::underlying_type< EnumType >::type valueof( E
 		static_assert( std::is_array< T >::value, "not static array" );
 	}
 	#define countof( x ) ( internal_is_array( ( x ) ), sizeof( ( x ) ) / sizeof( *( x ) ) )
-#elif ( defined( TMUT_SAFE_COUNTOF_ALT ) || defined( _DEBUG ) ) && !defined( TMUT_SAFE_COUNTOF )
+#elif defined( TMUT_SAFE_COUNTOF_ALT ) || defined( _DEBUG )
 	// alternate implementation of countof that always returns the size in tmut_size_t
 	template< class T, tmut_size_t N >
 	TMUT_CONSTEXPR tmut_size_t countof( T (&array)[N] )
@@ -342,6 +343,42 @@ TMUT_CONSTEXPR inline typename std::underlying_type< EnumType >::type valueof( E
 	}
 #else
 	#define countof( x ) ( sizeof( x ) / sizeof( x[0] ) )
+#endif
+
+/* macros to work with c-style tagged unions, but with c++ enabled safety
+define a tagged union like this:
+struct tagged_union {
+	enum { type_entry0, type_entry1 } type; // enum entries have the exact same name as the
+	                                        // union entries, but prefixed with "type_"
+	union {
+		Entry0 entry0;
+		Entry1 entry1;
+	};
+};
+
+Usage:
+	tagged_union tagged = ...;
+
+	// set currently selected entry + initialize
+	set_variant( tagged, entry0 ) = ...;
+	// set currently selected entry and get reference
+	auto& entry0 = set_variant( tagged, entry0 );
+	// get entry by name, will runtime assert that it is actually selected
+	auto& entry0 = get_variant( tagged, entry0 );
+	// query entry by name, will return nullptr if it is not selected
+	auto entry0 = query_variant( tagged, entry0 );
+	// get entry by name or default, will return default if entry is not selected
+	auto entry0 = get_variant_or_default( tagged, entry0, {} );
+*/
+#ifndef TMUT_NO_CSTYLE_TAGGED_UNION_MACROS
+	#define get_variant( tagged, name ) \
+		( assert( ( tagged ).type == typeof( tagged )::type_##name ), ( tagged ).name )
+	#define query_variant( tagged, name ) \
+		( ( ( tagged ).type == typeof( tagged )::type_##name ) ? ( &(tagged).name ) : ( nullptr ) )
+	#define set_variant( tagged, name ) \
+		( ( ( tagged ).type = typeof( tagged )::type_##name ), ( tagged ).name )
+	#define get_variant_or_default( tagged, name, def ) \
+		( ( ( tagged ).type == typeof( tagged )::type_##name ) ? ( ( tagged ).name ) : ( def ) )
 #endif
 
 // returns value as unsigned version of its type
