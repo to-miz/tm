@@ -1,5 +1,5 @@
 /*
-tm_json.h v.0.1.1 - public domain
+tm_json.h v.0.1.1a - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -105,6 +105,7 @@ ISSUES
 	- missing documentation and example usage code
 
 HISTORY
+	v0.1.1a 07.10.16 removed usage of unsigned arithmetic when tmj_size_t is signed
 	v0.1.1  13.09.16 changed JsonValue interface to have operator[] overloads for convenience
 	                 added more string_view support through TMJ_STRING_VIEW
 	v0.1    11.09.16 initial commit
@@ -201,7 +202,6 @@ LICENSE
 #ifndef TMJ_OWN_TYPES
 	#include <stddef.h>
 	typedef size_t tmj_size_t;
-	typedef size_t tmj_usize_t;
 	typedef signed char tmj_int8;
 	// tmj_uintptr needs to be an unsigned integral as big as a pointer
 	typedef size_t tmj_uintptr;
@@ -1369,7 +1369,7 @@ static tmj_bool readNumberEx( JsonReader* reader )
 	if( reader->flags & JSON_READER_EXTENDED_FLOATS ) {
 		if( reader->size ) {
 			const char* start = reader->data;
-			tmj_usize_t size = (tmj_usize_t)reader->size;
+			tmj_size_t size = reader->size;
 			int offset = 0;
 			if( *start == '-' ) {
 				++start;
@@ -1407,13 +1407,13 @@ static tmj_bool readNumberEx( JsonReader* reader )
 }
 static JsonTokenType readValue( JsonReader* reader )
 {
-	if( compareString( reader->data, (tmj_usize_t)reader->size, "true", 4 ) ) {
+	if( compareString( reader->data, reader->size, "true", 4 ) ) {
 		reader->valueType = JVAL_BOOL;
 		return advanceValue( reader, 4 );
-	} else if( compareString( reader->data, (tmj_usize_t)reader->size, "false", 5 ) ) {
+	} else if( compareString( reader->data, reader->size, "false", 5 ) ) {
 		reader->valueType = JVAL_BOOL;
 		return advanceValue( reader, 5 );
-	} else if( compareString( reader->data, (tmj_usize_t)reader->size, "null", 4 ) ) {
+	} else if( compareString( reader->data, reader->size, "null", 4 ) ) {
 		reader->valueType = JVAL_NULL;
 		return advanceValue( reader, 4 );
 	} else if( readNumber( reader ) ) {
@@ -1426,25 +1426,24 @@ static JsonTokenType readValue( JsonReader* reader )
 static JsonTokenType readValueEx( JsonReader* reader )
 {
 	if( reader->flags & JSON_READER_IGNORE_CASE_KEYWORDS ) {
-		if( compareStringIgnoreCase( reader->data, (tmj_usize_t)reader->size, "TRUE", 4 ) ) {
+		if( compareStringIgnoreCase( reader->data, reader->size, "TRUE", 4 ) ) {
 			reader->valueType = JVAL_BOOL;
 			return advanceValue( reader, 4 );
-		} else if( compareStringIgnoreCase( reader->data, (tmj_usize_t)reader->size, "FALSE",
-		                                    5 ) ) {
+		} else if( compareStringIgnoreCase( reader->data, reader->size, "FALSE", 5 ) ) {
 			reader->valueType = JVAL_BOOL;
 			return advanceValue( reader, 5 );
-		} else if( compareStringIgnoreCase( reader->data, (tmj_usize_t)reader->size, "NULL", 4 ) ) {
+		} else if( compareStringIgnoreCase( reader->data, reader->size, "NULL", 4 ) ) {
 			reader->valueType = JVAL_NULL;
 			return advanceValue( reader, 4 );
 		}
 	} else {
-		if( compareString( reader->data, (tmj_usize_t)reader->size, "true", 4 ) ) {
+		if( compareString( reader->data, reader->size, "true", 4 ) ) {
 			reader->valueType = JVAL_BOOL;
 			return advanceValue( reader, 4 );
-		} else if( compareString( reader->data, (tmj_usize_t)reader->size, "false", 5 ) ) {
+		} else if( compareString( reader->data, reader->size, "false", 5 ) ) {
 			reader->valueType = JVAL_BOOL;
 			return advanceValue( reader, 5 );
-		} else if( compareString( reader->data, (tmj_usize_t)reader->size, "null", 4 ) ) {
+		} else if( compareString( reader->data, reader->size, "null", 4 ) ) {
 			reader->valueType = JVAL_NULL;
 			return advanceValue( reader, 4 );
 		}
@@ -1982,7 +1981,7 @@ static tmj_bool jsonParseCppRawString( JsonReader* reader, JsonContext currentCo
 				}
 				// get delimeter
 				char delim[17];
-				size_t delimSize = 0;
+				tmj_size_t delimSize = 0;
 				while( reader->size && jsonIsValidDelimChar( reader->data[0] ) && delimSize < 16 ) {
 					jsonAdvance( reader );
 					delim[delimSize] = reader->data[0];
@@ -2612,7 +2611,7 @@ static JsonErrorType jsonReadObject( JsonReader* reader, JsonStackAllocator* all
 	}
 	out->count = memberCount;
 
-	size_t nodesIndex = 0;
+	tmj_size_t nodesIndex = 0;
 	run = 1;
 	do {
 		JsonTokenType token = jsonNextTokenImplicit( reader, JSON_CONTEXT_OBJECT );
@@ -2900,7 +2899,7 @@ static JsonErrorType jsonReadObjectEx( JsonReader* reader, JsonStackAllocator* a
 	}
 	out->count = memberCount;
 
-	size_t nodesIndex = 0;
+	tmj_size_t nodesIndex = 0;
 	run = 1;
 	do {
 		JsonTokenType token = jsonNextTokenImplicitEx( reader, JSON_CONTEXT_OBJECT );

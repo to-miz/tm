@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.4a - public domain
+tm_conversion.h v0.9.4b - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -86,6 +86,7 @@ ISSUES
 	is beyond the scope of this library. Do not use these functions for big numbers.
 
 HISTORY
+	v0.9.4b 07.10.16 typos
 	v0.9.4a 29.09.16 made PrintFormat forward declarable
 	v0.9.4  24.09.16 optimized base 10 and base 16 conversion paths based on the talk
 	                 "Three Optimization Tips for C++" by Andrei Alexandrescu.
@@ -2310,7 +2311,7 @@ TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* forma
 	} else {
 		static const char* strings[] = {"false", "true"};
 		static tmc_size_t lengths[] = {sizeof( "false" ) - 1, sizeof( "true" ) - 1};
-		size_t index = value != 0;
+		int index = value != 0;
 		return print_string( dest, maxlen, strings[index], lengths[index] );
 	}
 }

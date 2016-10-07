@@ -1,5 +1,5 @@
 /*
-tm_arrayview.h v1.1.1 - public domain
+tm_arrayview.h v1.1.2 - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -36,6 +36,7 @@ SWITCHES
 	    std::container usage and UninitializedArrayView usage will require code changes.
 
 HISTORY
+	v1.1.2  07.10.16 removed get_index and unsigned int arithmetic when tma_size_t is signed
 	v1.1.1  10.09.16 fixed a couple of typos in macro definitions
 	                 added TMA_INT64_ACCOSSORS
 	v1.1c   10.09.16 added TMA_EMPLACE_BACK_RETURNS_POINTER
@@ -90,61 +91,34 @@ LICENSE
 
 #include <initializer_list>
 
-// helpers to get an index in register size without sign extending
-template< class T > struct tma_make_unsigned{};
-// only these types are supported as index types (tma_size_t), typedefing tma_size_t to something
-// else will result in an error here
-#ifndef TMA_NO_INT64
-template<> struct tma_make_unsigned< long long >{ typedef unsigned long long type; };
-template<> struct tma_make_unsigned< unsigned long long >{ typedef unsigned long long type; };
-#endif
-template<> struct tma_make_unsigned< int >{ typedef unsigned int type; };
-template<> struct tma_make_unsigned< unsigned int >{ typedef unsigned int type; };
-template< class T >
-inline size_t tma_get_index( T value )
-{
-	// this only has an effect on 64bit machines and if tma_size_t is a 32bit signed int
-	// we want to turn value into a register size int without emitting sign extension code
-	// so we first turn value into an unsigned value of the same size and then cast it to size_t.
-	// on all other architectures this will be a no-op
-	return static_cast< size_t >( static_cast< typename tma_make_unsigned< T >::type >( value ) );
-}
-inline size_t tma_get_index( size_t value ) { return value; }
+	template < class T >
+	struct ArrayView {
+		typedef tma_size_t size_type;
 
-template< class T >
-struct ArrayView {
-	typedef tma_size_t size_type;
+		T* ptr;
+		size_type sz;
 
-	T* ptr;
-	size_type sz;
-
-	// STL container stuff
-	typedef T value_type;
-	typedef T& reference;
-	typedef const T& const_reference;
-	typedef T* pointer;
-	typedef const T* const_pointer;
-	typedef T* iterator;
-	typedef const T* const_iterator;
+		// STL container stuff
+		typedef T value_type;
+		typedef T& reference;
+		typedef const T& const_reference;
+		typedef T* pointer;
+		typedef const T* const_pointer;
+		typedef T* iterator;
+		typedef const T* const_iterator;
 #ifndef TMA_NO_STD_ITERATOR
-	typedef std::reverse_iterator< iterator > reverse_iterator;
-	typedef std::reverse_iterator< const_iterator > const_reverse_iterator;
+		typedef std::reverse_iterator< iterator > reverse_iterator;
+		typedef std::reverse_iterator< const_iterator > const_reverse_iterator;
 #endif
-	typedef size_type difference_type;
+		typedef size_type difference_type;
 
-	inline iterator begin() const { return iterator( ptr ); }
-	inline iterator end() const { return iterator( ptr + tma_get_index( sz ) ); }
-	inline const_iterator cbegin() const { return const_iterator( ptr ); }
-	inline const_iterator cend() const
-	{
-		return const_iterator( ptr + tma_get_index( sz ) );
-	}
+		inline iterator begin() const { return iterator( ptr ); }
+		inline iterator end() const { return iterator( ptr + sz ); }
+		inline const_iterator cbegin() const { return const_iterator( ptr ); }
+	inline const_iterator cend() const { return const_iterator( ptr + sz ); }
 
 #ifndef TMA_NO_STD_ITERATOR
-	inline reverse_iterator rbegin() const
-	{
-		return reverse_iterator( ptr + tma_get_index( sz ) );
-	}
+	inline reverse_iterator rbegin() const { return reverse_iterator( ptr + sz ); }
 	inline reverse_iterator rend() const { return reverse_iterator( ptr ); }
 	inline const_reverse_iterator crbegin() const { return const_reverse_iterator( ptr + sz ); }
 	inline const_reverse_iterator crend() const { return const_reverse_iterator( ptr ); }
@@ -165,7 +139,7 @@ struct ArrayView {
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < sz );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 	inline const_reference operator[]( size_type i ) const
@@ -173,7 +147,7 @@ struct ArrayView {
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < sz );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 	inline reference at( size_type i )
@@ -181,7 +155,7 @@ struct ArrayView {
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < sz );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 	inline const_reference at( size_type i ) const
@@ -189,7 +163,7 @@ struct ArrayView {
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < sz );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 #ifdef TMA_INT64_ACCOSSORS
@@ -224,19 +198,19 @@ struct ArrayView {
 		TMA_ASSERT( i < (tma_index_t)sz );
 		return ptr[i];
 	}
-#endif // TMA_INT64_ACCOSSORS
+#endif  // TMA_INT64_ACCOSSORS
 
 	inline reference back()
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( sz );
-		return ptr[tma_get_index( sz - 1 )];
+		return ptr[sz - 1];
 	}
 	inline const_reference back() const
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( sz );
-		return ptr[tma_get_index( sz - 1 )];
+		return ptr[sz - 1];
 	}
 	inline reference front()
 	{
@@ -256,43 +230,43 @@ struct ArrayView {
 		TMA_ASSERT( first <= last );
 		TMA_ASSERT( static_cast< size_type >( last - first ) == sz );
 		TMA_ASSERT( &*first != begin() );
-		TMA_MEMCPY( ptr, first, tma_get_index( sz * sizeof( value_type ) ) );
+		TMA_MEMCPY( ptr, first, sz * sizeof( value_type ) );
 	}
 	inline void assign( const ArrayView other )
 	{
 		TMA_ASSERT( other.size() == size() );
 		TMA_ASSERT( other.begin() != begin() );
-		TMA_MEMCPY( ptr, other.ptr, tma_get_index( sz * sizeof( value_type ) ) );
+		TMA_MEMCPY( ptr, other.ptr, sz * sizeof( value_type ) );
 	}
 	inline void assign( const std::initializer_list< T >& list )
 	{
-		TMA_ASSERT( list.size() == tma_get_index( sz ) );
-		TMA_MEMCPY( ptr, list.begin(), tma_get_index( sz * sizeof( value_type ) ) );
+		TMA_ASSERT( list.size() == sz );
+		TMA_MEMCPY( ptr, list.begin(), sz * sizeof( value_type ) );
 	}
 };
 
-template< class T >
+template < class T >
 ArrayView< T > makeArrayView( T* ptr, tma_size_t sz )
 {
 	return {ptr, sz};
 }
-template< class T >
+template < class T >
 ArrayView< T > makeArrayView( T* first, T* last )
 {
 	TMA_ASSERT( first >= last );
 	return {first, static_cast< tma_size_t >( last - first )};
 }
-template< class Container >
+template < class Container >
 ArrayView< typename Container::value_type > makeArrayView( Container& container )
 {
 	return {container.data(), static_cast< tma_size_t >( container.size() )};
 }
-template< class T, size_t N >
+template < class T, size_t N >
 ArrayView< T > makeArrayView( T ( &array )[N] )
 {
 	return {array, static_cast< tma_size_t >( N )};
 }
-template< class T >
+template < class T >
 ArrayView< const T > makeArrayView( const std::initializer_list< T >& list )
 {
 	return {list.begin(), static_cast< tma_size_t >( list.size() )};
@@ -300,26 +274,26 @@ ArrayView< const T > makeArrayView( const std::initializer_list< T >& list )
 
 // makeRangeView family of functions
 // returns ArrayView of the subsequence [start, end) of the original container
-template< class Container >
-ArrayView< typename Container::value_type > makeRangeView( Container& container, tma_size_t start )
+template < class Container >
+ArrayView< typename Container::value_type > makeRangeView( Container& container,
+														   tma_size_t start )
 {
 	TMA_ASSERT( start >= 0 );
-	if( tma_get_index( start ) >= container.size() ) {
+	if( start >= container.size() ) {
 		start = static_cast< tma_size_t >( container.size() );
 	}
-	return {container.data() + start,
-			static_cast< tma_size_t >( container.size() - tma_get_index( start ) )};
+	return {container.data() + start, static_cast< tma_size_t >( container.size() - start )};
 }
 template < class Container >
-ArrayView< typename Container::value_type > makeRangeView( Container& container, tma_size_t start,
-														   tma_size_t end )
+ArrayView< typename Container::value_type > makeRangeView( Container& container,
+														   tma_size_t start, tma_size_t end )
 {
 	TMA_ASSERT( start >= 0 );
 	TMA_ASSERT( end >= 0 );
-	if( tma_get_index( start ) >= container.size() ) {
+	if( start >= container.size() ) {
 		start = static_cast< tma_size_t >( container.size() );
 	}
-	if( tma_get_index( end ) >= container.size() ) {
+	if( end >= container.size() ) {
 		end = static_cast< tma_size_t >( container.size() );
 	}
 	TMA_ASSERT( start <= end );
@@ -327,23 +301,23 @@ ArrayView< typename Container::value_type > makeRangeView( Container& container,
 }
 
 template < class T, size_t N >
-ArrayView< T > makeRangeView( T( &array )[N], tma_size_t start )
+ArrayView< T > makeRangeView( T ( &array )[N], tma_size_t start )
 {
 	TMA_ASSERT( start >= 0 );
-	if( tma_get_index( start ) >= N ) {
+	if( start >= N ) {
 		start = static_cast< tma_size_t >( N );
 	}
-	return {array + start, static_cast< tma_size_t >( N - tma_get_index( start ) )};
+	return {array + start, static_cast< tma_size_t >( N - start )};
 }
 template < class T, size_t N >
-ArrayView< T > makeRangeView( T( &array )[N], tma_size_t start, tma_size_t end )
+ArrayView< T > makeRangeView( T ( &array )[N], tma_size_t start, tma_size_t end )
 {
 	TMA_ASSERT( start >= 0 );
 	TMA_ASSERT( end >= 0 );
-	if( tma_get_index( start ) >= N ) {
+	if( start >= N ) {
 		start = static_cast< tma_size_t >( N );
 	}
-	if( tma_get_index( end ) >= N ) {
+	if( end >= N ) {
 		end = static_cast< tma_size_t >( N );
 	}
 	TMA_ASSERT( start <= end );
@@ -352,9 +326,8 @@ ArrayView< T > makeRangeView( T( &array )[N], tma_size_t start, tma_size_t end )
 
 // UninitializedArrayView
 
-template< class T >
-struct UninitializedArrayView
-{
+template < class T >
+struct UninitializedArrayView {
 	typedef tma_size_t size_type;
 
 	T* ptr;
@@ -376,23 +349,14 @@ struct UninitializedArrayView
 	typedef tma_size_t difference_type;
 
 	inline iterator begin() const { return iterator( ptr ); }
-	inline iterator end() const { return iterator( ptr + tma_get_index( sz ) ); }
+	inline iterator end() const { return iterator( ptr + sz ); }
 	inline const_iterator cbegin() const { return const_iterator( ptr ); }
-	inline const_iterator cend() const
-	{
-		return const_iterator( ptr + tma_get_index( sz ) );
-	}
+	inline const_iterator cend() const { return const_iterator( ptr + sz ); }
 
 #ifndef TMA_NO_STD_ITERATOR
-	inline reverse_iterator rbegin() const
-	{
-		return reverse_iterator( ptr + tma_get_index( sz ) );
-	}
+	inline reverse_iterator rbegin() const { return reverse_iterator( ptr + sz ); }
 	inline reverse_iterator rend() const { return reverse_iterator( ptr ); }
-	inline const_reverse_iterator crbegin() const
-	{
-		return const_reverse_iterator( ptr + tma_get_index( sz ) );
-	}
+	inline const_reverse_iterator crbegin() const { return const_reverse_iterator( ptr + sz ); }
 	inline const_reverse_iterator crend() const { return const_reverse_iterator( ptr ); }
 #endif
 
@@ -411,7 +375,7 @@ struct UninitializedArrayView
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < sz );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 	inline const_reference operator[]( size_type i ) const
@@ -419,7 +383,7 @@ struct UninitializedArrayView
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < sz );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 	inline reference at( size_type i )
@@ -427,7 +391,7 @@ struct UninitializedArrayView
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < sz );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 	inline const_reference at( size_type i ) const
@@ -435,7 +399,7 @@ struct UninitializedArrayView
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < sz );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 #ifdef TMA_INT64_ACCOSSORS
@@ -470,19 +434,19 @@ struct UninitializedArrayView
 		TMA_ASSERT( i < (tma_index_t)sz );
 		return ptr[i];
 	}
-#endif // TMA_INT64_ACCOSSORS
+#endif  // TMA_INT64_ACCOSSORS
 
 	inline reference back()
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( sz );
-		return ptr[tma_get_index( sz - 1 )];
+		return ptr[sz - 1];
 	}
 	inline const_reference back() const
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( sz );
-		return ptr[tma_get_index( sz - 1 )];
+		return ptr[sz - 1];
 	}
 	inline reference front()
 	{
@@ -501,29 +465,33 @@ struct UninitializedArrayView
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( sz + 1 <= cap );
-		ptr[tma_get_index( sz )] = elem;
+		ptr[sz] = elem;
 		++sz;
 	}
-	inline void pop_back() { --sz; TMA_ASSERT( sz >= 0 ); }
-	
-	// define TMA_EMPLACE_BACK_RETURNS_POINTER if you want emplace_back to return a pointer instead
-	// of reference. The reference version is how std containers in C++1z implement emplace_back.
+	inline void pop_back()
+	{
+		--sz;
+		TMA_ASSERT( sz >= 0 );
+	}
+
+// define TMA_EMPLACE_BACK_RETURNS_POINTER if you want emplace_back to return a pointer instead
+// of reference. The reference version is how std containers in C++1z implement emplace_back.
 #ifdef TMA_EMPLACE_BACK_RETURNS_POINTER
 	inline pointer emplace_back()
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( sz + 1 <= cap );
 		++sz;
-		return &ptr[tma_get_index( sz - 1 )];
+		return &ptr[sz - 1];
 	}
 #else
-	inline reference emplace_back()
-	{
-		TMA_ASSERT( ptr );
-		TMA_ASSERT( sz + 1 <= cap );
-		++sz;
-		return ptr[tma_get_index( sz - 1 )];
-	}
+inline reference emplace_back()
+{
+	TMA_ASSERT( ptr );
+	TMA_ASSERT( sz + 1 <= cap );
+	++sz;
+	return ptr[sz - 1];
+}
 #endif
 
 	inline void clear() { sz = 0; }
@@ -541,10 +509,11 @@ struct UninitializedArrayView
 	inline void assign( UninitializedArrayView other ) { assign( other.begin(), other.end() ); }
 	void assign( const_iterator first, const_iterator last )
 	{
-		TMA_ASSERT( ( first < begin() || first >= end() ) && ( last < begin() || last >= end() ) );
+		TMA_ASSERT( ( first < begin() || first >= end() )
+					&& ( last < begin() || last >= end() ) );
 		sz = static_cast< size_type >( last - first );
 		TMA_ASSERT( sz <= cap );
-		TMA_MEMCPY( ptr, first, tma_get_index( sz * sizeof( value_type ) ) );
+		TMA_MEMCPY( ptr, first, sz * sizeof( value_type ) );
 	}
 	void assign( const_iterator first, size_type length )
 	{
@@ -553,16 +522,16 @@ struct UninitializedArrayView
 					&& ( first + length < begin() || first + length >= end() ) );
 
 		sz = length;
-		TMA_MEMCPY( ptr, first, tma_get_index( sz * sizeof( value_type ) ) );
+		TMA_MEMCPY( ptr, first, sz * sizeof( value_type ) );
 	}
 	void assign( size_type n, const value_type& val )
 	{
 		TMA_ASSERT( n >= 0 );
 		TMA_ASSERT( ptr );
-		n = ( n < cap ) ? ( n ) : ( cap );
-		sz = n;
-		auto count = tma_get_index( n );
-		for( size_t i = 0; i < count; ++i ) {
+		n          = ( n < cap ) ? ( n ) : ( cap );
+		sz         = n;
+		auto count = n;
+		for( tma_size_t i = 0; i < count; ++i ) {
 			ptr[i] = val;
 		}
 	}
@@ -572,11 +541,11 @@ struct UninitializedArrayView
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( position >= begin() && position <= end() );
 
-		size_t rem = tma_get_index( remaining() );
-		size_t count = ( tma_get_index( n ) < rem ) ? tma_get_index( n ) : ( rem );
-		size_t suffix = tma_get_index( end() - position );
+		size_t rem    = remaining();
+		size_t count  = ( n < rem ) ? n : ( rem );
+		size_t suffix = end() - position;
 		if( count > 0 ) {
-			auto tmp = val; // in case val is inside sequence
+			auto tmp = val;  // in case val is inside sequence
 			// make room for insertion by moving suffix
 			TMA_MEMMOVE( position + count, position, suffix * sizeof( value_type ) );
 
@@ -593,12 +562,13 @@ struct UninitializedArrayView
 		TMA_ASSERT( ptr || first == last );
 		TMA_ASSERT( position >= begin() && position <= end() );
 
-		auto rem = tma_get_index( remaining() );
+		auto rem     = remaining();
 		size_t count = static_cast< size_t >( last - first );
 		TMA_ASSERT( rem >= count );
 		if( count > 0 && count <= rem ) {
 			// range fits move entries to make room and copy
-			TMA_MEMMOVE( position + count, position, ( end() - position ) * sizeof( value_type ) );
+			TMA_MEMMOVE( position + count, position,
+						 ( end() - position ) * sizeof( value_type ) );
 			TMA_MEMCPY( position, first, count * sizeof( value_type ) );
 			sz += static_cast< size_type >( count );
 		}
@@ -609,7 +579,10 @@ struct UninitializedArrayView
 	{
 		return insert( end(), first, last );
 	}
-	inline iterator append( size_type n, const value_type& val ) { return insert( end(), n, val ); }
+	inline iterator append( size_type n, const value_type& val )
+	{
+		return insert( end(), n, val );
+	}
 
 	iterator erase( iterator position )
 	{
@@ -641,7 +614,8 @@ UninitializedArrayView< T > makeUninitializedArrayView( T* ptr, tma_size_t capac
 	return {ptr, 0, capacity};
 }
 template < class T >
-UninitializedArrayView< T > makeInitializedArrayView( T* ptr, tma_size_t size, tma_size_t capacity )
+UninitializedArrayView< T > makeInitializedArrayView( T* ptr, tma_size_t size,
+													  tma_size_t capacity )
 {
 	return {ptr, size, capacity};
 }
@@ -650,13 +624,13 @@ UninitializedArrayView< T > makeInitializedArrayView( T* ptr, tma_size_t size )
 {
 	return {ptr, size, size};
 }
-template< class T, size_t N >
-UninitializedArrayView< T > makeUninitializedArrayView( T (&array)[N] )
+template < class T, size_t N >
+UninitializedArrayView< T > makeUninitializedArrayView( T ( &array )[N] )
 {
 	return {array, 0, static_cast< tma_size_t >( N )};
 }
-template< class T, size_t N >
-UninitializedArrayView< T > makeInitializedArrayView( T (&array)[N] )
+template < class T, size_t N >
+UninitializedArrayView< T > makeInitializedArrayView( T ( &array )[N] )
 {
 	return {array, static_cast< tma_size_t >( N ), static_cast< tma_size_t >( N )};
 }
@@ -713,21 +687,21 @@ struct GridView {
 	inline T* data() const { return ptr; }
 	inline T* begin() const { return ptr; }
 	inline const T* cbegin() const { return ptr; }
-	inline T* end() const { return ptr + tma_get_index( width * height ); }
+	inline T* end() const { return ptr + width * height; }
 
 	inline reference at( tma_size_t i )
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < size() );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 	inline const_reference at( tma_size_t i ) const
 	{
 		TMA_ASSERT( ptr );
 		TMA_ASSERT( i >= 0 );
 		TMA_ASSERT( i < size() );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 	inline T& at( tma_size_t x, tma_size_t y )
@@ -736,7 +710,7 @@ struct GridView {
 		TMA_ASSERT( isInBounds( x, y ) );
 		auto i = x + y * width;
 		TMA_ASSERT( i < size() );
-		return ptr[tma_get_index( i )];
+		return ptr[i];
 	}
 
 	inline T& at( tma_point p ) { return at( p.x, p.y ); }
@@ -745,7 +719,7 @@ struct GridView {
 	{
 		T* ret = nullptr;
 		if( index >= 0 && index < size() ) {
-			ret = ptr + tma_get_index( index );
+			ret = ptr + index;
 		}
 		return ret;
 	}
@@ -753,7 +727,7 @@ struct GridView {
 	{
 		T* ret = nullptr;
 		if( isInBounds( x, y ) ) {
-			ret = ptr + tma_get_index( x + y * width );
+			ret = ptr + x + y * width;
 		}
 		return ret;
 	}
@@ -763,7 +737,7 @@ struct GridView {
 	inline const_reference operator[]( tma_size_t i ) const { return at( i ); }
 };
 
-template< class T >
+template < class T >
 GridView< T > makeGridView( T* ptr, tma_size_t width, tma_size_t height )
 {
 	return {ptr, width, height};

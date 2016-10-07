@@ -1,5 +1,5 @@
 /*
-tm_bin_packing.h v1.0 - public domain
+tm_bin_packing.h v1.0a - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -209,6 +209,7 @@ SAMPLES
 		}
 
 HISTORY
+	v1.0a   07.10.16 removed using forced unsigned arithmetic when tmbp_size_t is signed
 	v1.0	20.07.16 initial commit
 
 LICENSE
@@ -237,7 +238,6 @@ LICENSE
 	} tmbp_rect_;
 	typedef tmbp_rect_ tmbp_rect;
 	typedef size_t tmbp_size_t;
-	typedef size_t tmbp_usize_t; // unsigned type with the same size of tmbp_size_t
 	typedef struct {
 		int width, height;
 	} tmbp_dim_;
@@ -471,20 +471,14 @@ inline tmbp_bool maxRectsHeuristicIsValidResult( const tmbp_int scores[2] )
 {
 	return scores[0] != TMBP_INVALID_SCORE || scores[1] != TMBP_INVALID_SCORE;
 }
-inline tmbp_size_t guillotineFreeRectsSize( tmbp_size_t binCount )
-{
-	return binCount * 2;
-}
-inline tmbp_size_t maxRectsFreeRectsSize( tmbp_size_t binCount )
-{
-	return binCount * 5;
-}
+inline tmbp_size_t guillotineFreeRectsSize( tmbp_size_t binCount ) { return binCount * 2; }
+inline tmbp_size_t maxRectsFreeRectsSize( tmbp_size_t binCount ) { return binCount * 5; }
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _TM_BIN_PACKING_H_INCLUDED_
+#endif  // _TM_BIN_PACKING_H_INCLUDED_
 
 #ifdef TM_BIN_PACKING_IMPLEMENTATION
 
@@ -501,22 +495,22 @@ static tmbp_rect* tmbp_push( tmbp_rect_array* array, BinPackReallocator* realloc
 	if( array->size >= array->capacity ) {
 		if( reallocator->reallocate ) {
 			array->data = reallocator->reallocate( reallocator->state, array->data, array->capacity,
-												   array->capacity * 2 );
+			                                       array->capacity * 2 );
 			array->capacity *= 2;
 		} else {
 			TMBP_ASSERT( 0 && "OutOfMemory" );
 		}
 	}
 
-	return &array->data[(tmbp_usize_t)( array->size++ )];
+	return &array->data[array->size++];
 }
 /*static void tmbp_pop( tmbp_rect_array* array )
 {
-	TMBP_ASSERT( array );
-	TMBP_ASSERT( array->data );
-	TMBP_ASSERT( array->size > 0 );
-	TMBP_ASSERT( array->size <= array->capacity );
-	--array->size;
+    TMBP_ASSERT( array );
+    TMBP_ASSERT( array->data );
+    TMBP_ASSERT( array->size > 0 );
+    TMBP_ASSERT( array->size <= array->capacity );
+    --array->size;
 }*/
 static void tmbp_erase( tmbp_rect_array* array, size_t index )
 {
@@ -539,19 +533,19 @@ static void tmbp_clear( tmbp_rect_array* array )
 }
 
 TMBP_DEF BinPack binPackCreate( tmbp_int width, tmbp_int height, void* allocatorState,
-								BinPackAllocate* allocateFunc, BinPackReallocate* reallocateFunc )
+                                BinPackAllocate* allocateFunc, BinPackReallocate* reallocateFunc )
 {
 	BinPack result;
-	tmbp_size_t rectsCount = 16;
-	result.freeRects.data = allocateFunc( allocatorState, (tmbp_usize_t)rectsCount );
-	result.freeRects.size = 0;
+	tmbp_size_t rectsCount    = 16;
+	result.freeRects.data     = allocateFunc( allocatorState, rectsCount );
+	result.freeRects.size     = 0;
 	result.freeRects.capacity = rectsCount;
 
-	result.usedRects.data = allocateFunc( allocatorState, (tmbp_usize_t)rectsCount );
-	result.usedRects.size = 0;
+	result.usedRects.data     = allocateFunc( allocatorState, rectsCount );
+	result.usedRects.size     = 0;
 	result.usedRects.capacity = rectsCount;
 
-	result.reallocator.state = allocatorState;
+	result.reallocator.state      = allocatorState;
 	result.reallocator.reallocate = reallocateFunc;
 
 	binPackInit( &result, width, height );
@@ -560,42 +554,43 @@ TMBP_DEF BinPack binPackCreate( tmbp_int width, tmbp_int height, void* allocator
 TMBP_DEF void binPackDestroy( BinPack* pack, void* allocatorState, BinPackFree* freeFunc )
 {
 	freeFunc( allocatorState, pack->freeRects.data, pack->freeRects.size );
-	pack->freeRects.data = NULL;
-	pack->freeRects.size = 0;
+	pack->freeRects.data     = NULL;
+	pack->freeRects.size     = 0;
 	pack->freeRects.capacity = 0;
 	freeFunc( allocatorState, pack->usedRects.data, pack->usedRects.size );
-	pack->usedRects.data = NULL;
-	pack->usedRects.size = 0;
+	pack->usedRects.data     = NULL;
+	pack->usedRects.size     = 0;
 	pack->usedRects.capacity = 0;
 }
 TMBP_DEF void binPackFitToSize( BinPack* pack )
 {
 	pack->freeRects.data =
-		pack->reallocator.reallocate( pack->reallocator.state, pack->freeRects.data,
-									  pack->freeRects.capacity, pack->freeRects.size );
+	    pack->reallocator.reallocate( pack->reallocator.state, pack->freeRects.data,
+	                                  pack->freeRects.capacity, pack->freeRects.size );
 	pack->freeRects.capacity = pack->freeRects.size;
 	pack->usedRects.data =
-		pack->reallocator.reallocate( pack->reallocator.state, pack->usedRects.data,
-									  pack->usedRects.capacity, pack->usedRects.size );
+	    pack->reallocator.reallocate( pack->reallocator.state, pack->usedRects.data,
+	                                  pack->usedRects.capacity, pack->usedRects.size );
 	pack->usedRects.capacity = pack->usedRects.size;
 }
 TMBP_DEF BinPack binPackCreateStatic( tmbp_int width, tmbp_int height, tmbp_rect* freeRects,
-									  tmbp_size_t freeRectsCount, tmbp_rect* usedRects,
-									  tmbp_size_t usedRectsCount )
+                                      tmbp_size_t freeRectsCount, tmbp_rect* usedRects,
+                                      tmbp_size_t usedRectsCount )
 {
 	// assert that arrays do not overlap
-	TMBP_ASSERT( freeRects >= usedRects + usedRectsCount || freeRects + freeRectsCount <= usedRects );
+	TMBP_ASSERT( freeRects >= usedRects + usedRectsCount
+	             || freeRects + freeRectsCount <= usedRects );
 
 	BinPack result;
-	result.freeRects.data = freeRects;
-	result.freeRects.size = 0;
+	result.freeRects.data     = freeRects;
+	result.freeRects.size     = 0;
 	result.freeRects.capacity = freeRectsCount;
 
-	result.usedRects.data = usedRects;
-	result.usedRects.size = 0;
+	result.usedRects.data     = usedRects;
+	result.usedRects.size     = 0;
 	result.usedRects.capacity = usedRectsCount;
 
-	result.reallocator.state = NULL;
+	result.reallocator.state      = NULL;
 	result.reallocator.reallocate = NULL;
 	binPackInit( &result, width, height );
 	return result;
@@ -604,18 +599,18 @@ TMBP_DEF void binPackInit( BinPack* pack, tmbp_int width, tmbp_int height )
 {
 	TMBP_ASSERT( pack );
 
-	pack->width = width;
-	pack->height = height;
+	pack->width    = width;
+	pack->height   = height;
 	pack->usedArea = 0;
 
 	tmbp_clear( &pack->usedRects );
 
 	tmbp_clear( &pack->freeRects );
 	tmbp_rect* added = tmbp_push( &pack->freeRects, &pack->reallocator );
-	added->left = 0;
-	added->top = 0;
-	added->width = width;
-	added->height = height;
+	added->left      = 0;
+	added->top       = 0;
+	added->width     = width;
+	added->height    = height;
 }
 
 inline static tmbp_int tmbp_abs( tmbp_int val ) { return ( val < 0 ) ? ( -val ) : ( val ); }
@@ -623,137 +618,137 @@ inline static tmbp_int tmbp_abs( tmbp_int val ) { return ( val < 0 ) ? ( -val ) 
 #define tmbp_max( a, b ) ( ( ( a ) < ( b ) ) ? ( b ) : ( a ) )
 
 static tmbp_int guillotineScoreBestAreaFit( tmbp_int width, tmbp_int height,
-											const tmbp_rect* freeRect )
+                                            const tmbp_rect* freeRect )
 {
 	return freeRect->width * freeRect->height - width * height;
 }
 static tmbp_int guillotineScoreBestShortSideFit( tmbp_int width, tmbp_int height,
-												 const tmbp_rect* freeRect )
+                                                 const tmbp_rect* freeRect )
 {
 	tmbp_int leftoverHoriz = tmbp_abs( freeRect->width - width );
-	tmbp_int leftoverVert = tmbp_abs( freeRect->height - height );
-	tmbp_int leftover = tmbp_min( leftoverHoriz, leftoverVert );
+	tmbp_int leftoverVert  = tmbp_abs( freeRect->height - height );
+	tmbp_int leftover      = tmbp_min( leftoverHoriz, leftoverVert );
 	return leftover;
 }
 static tmbp_int guillotineScoreBestLongSideFit( tmbp_int width, tmbp_int height,
-												const tmbp_rect* freeRect )
+                                                const tmbp_rect* freeRect )
 {
 	tmbp_int leftoverHoriz = tmbp_abs( freeRect->width - width );
-	tmbp_int leftoverVert = tmbp_abs( freeRect->height - height );
-	tmbp_int leftover = tmbp_max( leftoverHoriz, leftoverVert );
+	tmbp_int leftoverVert  = tmbp_abs( freeRect->height - height );
+	tmbp_int leftover      = tmbp_max( leftoverHoriz, leftoverVert );
 	return leftover;
 }
 
-TMBP_DEF GuillotineHeuristicResult
-guillotineBestAreaFit( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF GuillotineHeuristicResult guillotineBestAreaFit( BinPack* pack, tmbp_int width,
+                                                          tmbp_int height )
 {
 	GuillotineHeuristicResult result = {0, TMBP_INVALID_SCORE, 0};
 
-	size_t count = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < count; ++i ) {
+	tmbp_size_t count = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < count; ++i ) {
 		tmbp_rect* current = &pack->freeRects.data[i];
 		if( width == current->width && height == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 0;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 0;
 			break;
 		} else if( height == current->width && width == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 1;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 1;
 			break;
 		} else if( width <= current->width && height <= current->height ) {
 			tmbp_int score = guillotineScoreBestAreaFit( width, height, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 0;
+				result.score         = score;
+				result.flipped       = 0;
 			}
 		} else if( height <= current->width && width <= current->height ) {
 			tmbp_int score = guillotineScoreBestAreaFit( height, width, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 1;
+				result.score         = score;
+				result.flipped       = 1;
 			}
 		}
 	}
 	return result;
 }
-TMBP_DEF GuillotineHeuristicResult
-guillotineBestShortSideFit( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF GuillotineHeuristicResult guillotineBestShortSideFit( BinPack* pack, tmbp_int width,
+                                                               tmbp_int height )
 {
 	GuillotineHeuristicResult result = {0, TMBP_INVALID_SCORE, 0};
 
-	size_t count = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < count; ++i ) {
+	tmbp_size_t count = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < count; ++i ) {
 		tmbp_rect* current = &pack->freeRects.data[i];
 		if( width == current->width && height == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 0;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 0;
 			break;
 		} else if( height == current->width && width == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 1;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 1;
 			break;
 		} else if( width <= current->width && height <= current->height ) {
 			tmbp_int score = guillotineScoreBestShortSideFit( width, height, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 0;
+				result.score         = score;
+				result.flipped       = 0;
 			}
 		} else if( height <= current->width && width <= current->height ) {
 			tmbp_int score = guillotineScoreBestShortSideFit( height, width, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 1;
+				result.score         = score;
+				result.flipped       = 1;
 			}
 		}
 	}
 	return result;
 }
-TMBP_DEF GuillotineHeuristicResult
-guillotineBestLongSideFit( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF GuillotineHeuristicResult guillotineBestLongSideFit( BinPack* pack, tmbp_int width,
+                                                              tmbp_int height )
 {
 	GuillotineHeuristicResult result = {0, TMBP_INVALID_SCORE, 0};
 
-	size_t count = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < count; ++i ) {
+	tmbp_size_t count = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < count; ++i ) {
 		tmbp_rect* current = &pack->freeRects.data[i];
 		if( width == current->width && height == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 0;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 0;
 			break;
 		} else if( height == current->width && width == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 1;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 1;
 			break;
 		} else if( width <= current->width && height <= current->height ) {
 			tmbp_int score = guillotineScoreBestLongSideFit( width, height, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 0;
+				result.score         = score;
+				result.flipped       = 0;
 			}
 		} else if( height <= current->width && width <= current->height ) {
 			tmbp_int score = guillotineScoreBestLongSideFit( height, width, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 1;
+				result.score         = score;
+				result.flipped       = 1;
 			}
 		}
 	}
 	return result;
 }
 TMBP_DEF GuillotineHeuristicResult guillotineChoice( BinPack* pack, tmbp_int width, tmbp_int height,
-													 GuillotineFreeRectChoiceHeuristic freeChoice )
+                                                     GuillotineFreeRectChoiceHeuristic freeChoice )
 {
 	GuillotineHeuristicResult result;
 	switch( freeChoice ) {
@@ -772,88 +767,87 @@ TMBP_DEF GuillotineHeuristicResult guillotineChoice( BinPack* pack, tmbp_int wid
 		default: {
 			TMBP_ASSERT( 0 );
 			result.freeRectIndex = 0;
-			result.score = TMBP_INVALID_SCORE;
+			result.score         = TMBP_INVALID_SCORE;
 			break;
 		}
 	}
 	return result;
 }
 
-TMBP_DEF GuillotineHeuristicResult
-guillotineBestAreaFitNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF GuillotineHeuristicResult guillotineBestAreaFitNoFlip( BinPack* pack, tmbp_int width,
+                                                                tmbp_int height )
 {
 	GuillotineHeuristicResult result = {0, TMBP_INVALID_SCORE, 0};
 
-	size_t count = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < count; ++i ) {
+	tmbp_size_t count = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < count; ++i ) {
 		tmbp_rect* current = &pack->freeRects.data[i];
 		if( width == current->width && height == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 0;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 0;
 			break;
 		} else if( width <= current->width && height <= current->height ) {
 			tmbp_int score = guillotineScoreBestAreaFit( width, height, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 0;
+				result.score         = score;
+				result.flipped       = 0;
 			}
 		}
 	}
 	return result;
 }
-TMBP_DEF GuillotineHeuristicResult
-guillotineBestShortSideFitNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF GuillotineHeuristicResult guillotineBestShortSideFitNoFlip( BinPack* pack, tmbp_int width,
+                                                                     tmbp_int height )
 {
 	GuillotineHeuristicResult result = {0, TMBP_INVALID_SCORE, 0};
 
-	size_t count = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < count; ++i ) {
+	tmbp_size_t count = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < count; ++i ) {
 		tmbp_rect* current = &pack->freeRects.data[i];
 		if( width == current->width && height == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 0;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 0;
 			break;
 		} else if( width <= current->width && height <= current->height ) {
 			tmbp_int score = guillotineScoreBestShortSideFit( width, height, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 0;
+				result.score         = score;
+				result.flipped       = 0;
 			}
 		}
 	}
 	return result;
 }
-TMBP_DEF GuillotineHeuristicResult
-guillotineBestLongSideFitNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF GuillotineHeuristicResult guillotineBestLongSideFitNoFlip( BinPack* pack, tmbp_int width,
+                                                                    tmbp_int height )
 {
 	GuillotineHeuristicResult result = {0, TMBP_INVALID_SCORE, 0};
 
-	size_t count = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < count; ++i ) {
+	tmbp_size_t count = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < count; ++i ) {
 		tmbp_rect* current = &pack->freeRects.data[i];
 		if( width == current->width && height == current->height ) {
 			result.freeRectIndex = i;
-			result.score = TMBP_INT_MIN;
-			result.flipped = 0;
+			result.score         = TMBP_INT_MIN;
+			result.flipped       = 0;
 			break;
 		} else if( width <= current->width && height <= current->height ) {
 			tmbp_int score = guillotineScoreBestLongSideFit( width, height, current );
 			if( score < result.score ) {
 				result.freeRectIndex = i;
-				result.score = score;
-				result.flipped = 0;
+				result.score         = score;
+				result.flipped       = 0;
 			}
 		}
 	}
 	return result;
 }
-TMBP_DEF GuillotineHeuristicResult
-guillotineChoiceNoFlip( BinPack* pack, tmbp_int width, tmbp_int height,
-						GuillotineFreeRectChoiceHeuristic freeChoice )
+TMBP_DEF GuillotineHeuristicResult guillotineChoiceNoFlip(
+    BinPack* pack, tmbp_int width, tmbp_int height, GuillotineFreeRectChoiceHeuristic freeChoice )
 {
 	GuillotineHeuristicResult result;
 	switch( freeChoice ) {
@@ -872,7 +866,7 @@ guillotineChoiceNoFlip( BinPack* pack, tmbp_int width, tmbp_int height,
 		default: {
 			TMBP_ASSERT( 0 );
 			result.freeRectIndex = 0;
-			result.score = TMBP_INVALID_SCORE;
+			result.score         = TMBP_INVALID_SCORE;
 			break;
 		}
 	}
@@ -880,27 +874,27 @@ guillotineChoiceNoFlip( BinPack* pack, tmbp_int width, tmbp_int height,
 }
 
 static tmbp_rect binPackRectFromPosition( BinPack* pack, tmbp_int width, tmbp_int height,
-										  size_t index, tmbp_bool flipped )
+                                          tmbp_size_t index, tmbp_bool flipped )
 {
-	tmbp_rect rect = {0};
+	tmbp_rect rect     = {0};
 	tmbp_rect* current = &pack->freeRects.data[index];
-	rect.left = current->left;
-	rect.top = current->top;
+	rect.left          = current->left;
+	rect.top           = current->top;
 	if( flipped ) {
-		rect.width = height;
+		rect.width  = height;
 		rect.height = width;
 	} else {
-		rect.width = width;
+		rect.width  = width;
 		rect.height = height;
 	}
 	return rect;
 }
 
 static void guillotineSplitFreeRectByHeuristic( tmbp_rect_array* freeRects,
-												BinPackReallocator* reallocator,
-												const tmbp_rect* freeRect,
-												const tmbp_rect* placedRect,
-												GuillotineSplitHeuristic heuristic )
+                                                BinPackReallocator* reallocator,
+                                                const tmbp_rect* freeRect,
+                                                const tmbp_rect* placedRect,
+                                                GuillotineSplitHeuristic heuristic )
 {
 	tmbp_int w = freeRect->width - placedRect->width;
 	tmbp_int h = freeRect->height - placedRect->height;
@@ -938,12 +932,12 @@ static void guillotineSplitFreeRectByHeuristic( tmbp_rect_array* freeRects,
 	}
 
 	tmbp_rect bottom;
-	bottom.left = freeRect->left;
-	bottom.top = freeRect->top + placedRect->height;
+	bottom.left   = freeRect->left;
+	bottom.top    = freeRect->top + placedRect->height;
 	bottom.height = h;
 	tmbp_rect right;
-	right.left = freeRect->left + placedRect->width;
-	right.top = freeRect->top;
+	right.left  = freeRect->left + placedRect->width;
+	right.top   = freeRect->top;
 	right.width = w;
 	if( splitHorizontal ) {
 		bottom.width = freeRect->width;
@@ -961,29 +955,29 @@ static void guillotineSplitFreeRectByHeuristic( tmbp_rect_array* freeRects,
 }
 
 TMBP_DEF BinPackResult guillotineInsert( BinPack* pack, tmbp_int width, tmbp_int height,
-										 const GuillotineHeuristicResult* choice,
-										 GuillotineSplitHeuristic splitChoice )
+                                         const GuillotineHeuristicResult* choice,
+                                         GuillotineSplitHeuristic splitChoice )
 {
 	TMBP_ASSERT( choice );
 	TMBP_ASSERT( choice->score != TMBP_INVALID_SCORE );
 
 	BinPackResult ret;
 	ret.rect =
-		binPackRectFromPosition( pack, width, height, choice->freeRectIndex, choice->flipped );
-	ret.flipped = choice->flipped;
-	ret.placed = 1;
+	    binPackRectFromPosition( pack, width, height, choice->freeRectIndex, choice->flipped );
+	ret.flipped        = choice->flipped;
+	ret.placed         = 1;
 	tmbp_rect freeRect = pack->freeRects.data[choice->freeRectIndex];
 	tmbp_erase( &pack->freeRects, choice->freeRectIndex );
 	guillotineSplitFreeRectByHeuristic( &pack->freeRects, &pack->reallocator, &freeRect, &ret.rect,
-										splitChoice );
+	                                    splitChoice );
 	*tmbp_push( &pack->usedRects, &pack->reallocator ) = ret.rect;
 	pack->usedArea += ret.rect.width * ret.rect.height;
 	return ret;
 }
-TMBP_DEF BinPackResult
-guillotineInsertChoice( BinPack* pack, tmbp_int width, tmbp_int height,
-						GuillotineFreeRectChoiceHeuristic freeChoice,
-						GuillotineSplitHeuristic splitChoice, tmbp_bool canFlip )
+TMBP_DEF BinPackResult guillotineInsertChoice( BinPack* pack, tmbp_int width, tmbp_int height,
+                                               GuillotineFreeRectChoiceHeuristic freeChoice,
+                                               GuillotineSplitHeuristic splitChoice,
+                                               tmbp_bool canFlip )
 {
 	BinPackResult ret = {{0}};
 	GuillotineHeuristicResult result;
@@ -997,16 +991,17 @@ guillotineInsertChoice( BinPack* pack, tmbp_int width, tmbp_int height,
 	}
 	return ret;
 }
-TMBP_DEF tmbp_size_t
-guillotineInsertBatch( BinPack* pack, BinPackBatchDim* dims, BinPackBatchResult* results,
-					   tmbp_size_t count, GuillotineFreeRectChoiceHeuristic freeChoice,
-					   GuillotineSplitHeuristic splitChoice, tmbp_bool canFlip )
+TMBP_DEF tmbp_size_t guillotineInsertBatch( BinPack* pack, BinPackBatchDim* dims,
+                                            BinPackBatchResult* results, tmbp_size_t count,
+                                            GuillotineFreeRectChoiceHeuristic freeChoice,
+                                            GuillotineSplitHeuristic splitChoice,
+                                            tmbp_bool canFlip )
 {
-	size_t dimsCount = (tmbp_usize_t)count;
+	tmbp_size_t dimsCount          = count;
 	GuillotineHeuristicResult best = {0};
 	while( dimsCount > 0 ) {
-		best.score = TMBP_INVALID_SCORE;
-		size_t i = 0;
+		best.score    = TMBP_INVALID_SCORE;
+		tmbp_size_t i = 0;
 		for( ; i < dimsCount; ++i ) {
 			tmbp_int w = dims[i].dim.width;
 			tmbp_int h = dims[i].dim.height;
@@ -1030,18 +1025,18 @@ guillotineInsertBatch( BinPack* pack, BinPackBatchDim* dims, BinPackBatchResult*
 
 		BinPackBatchResult* result = results++;
 		result->result =
-			guillotineInsert( pack, dims[i].dim.width, dims[i].dim.height, &best, splitChoice );
+		    guillotineInsert( pack, dims[i].dim.width, dims[i].dim.height, &best, splitChoice );
 		result->userData = dims[i].userData;
 
 		// we processed i already, move it to the back of the array and decrease dimsCount
 		--dimsCount;
 		if( i != dimsCount ) {
 			BinPackBatchDim tmp = dims[i];
-			dims[i] = dims[dimsCount];
-			dims[dimsCount] = tmp;
+			dims[i]             = dims[dimsCount];
+			dims[dimsCount]     = tmp;
 		}
 	}
-	return (tmbp_size_t)( (tmbp_usize_t)count - dimsCount );
+	return ( tmbp_size_t )( count - dimsCount );
 }
 TMBP_DEF float guillotineOccupancy( const BinPack* pack )
 {
@@ -1051,11 +1046,11 @@ TMBP_DEF void guillotineMergeFreeRects( BinPack* pack )
 {
 	// merge pairs of free rects into one if able
 	// since we are only looking at pairs, we will miss chances to merge three rectangles into one
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* a = &freeRects[i];
-		for( size_t j = i + 1; j < freeRectsCount; ) {
+		for( tmbp_size_t j = i + 1; j < freeRectsCount; ) {
 			tmbp_rect* b = &freeRects[j];
 			if( a->left == b->left && a->width == b->width ) {
 				if( a->top == b->top + b->height ) {
@@ -1091,7 +1086,7 @@ TMBP_DEF void guillotineMergeFreeRects( BinPack* pack )
 
 // MaxRects
 static tmbp_int maxRectsCommonIntervalLength( tmbp_int aStart, tmbp_int aEnd, tmbp_int bStart,
-											  tmbp_int bEnd )
+                                              tmbp_int bEnd )
 {
 	if( aEnd < bStart || bEnd < aStart ) {
 		return 0;
@@ -1099,7 +1094,7 @@ static tmbp_int maxRectsCommonIntervalLength( tmbp_int aStart, tmbp_int aEnd, tm
 	return tmbp_min( aEnd, bEnd ) - tmbp_max( aStart, bStart );
 }
 static tmbp_int maxRectsContactPointScore( BinPack* pack, tmbp_int left, tmbp_int top,
-										   tmbp_int right, tmbp_int bottom )
+                                           tmbp_int right, tmbp_int bottom )
 {
 	tmbp_int score = 0;
 	if( left == 0 || right == pack->width ) {
@@ -1109,60 +1104,58 @@ static tmbp_int maxRectsContactPointScore( BinPack* pack, tmbp_int left, tmbp_in
 		score += right - left;
 	}
 
-	tmbp_rect* usedRects = pack->usedRects.data;
-	size_t usedRectsCount = (tmbp_usize_t)pack->usedRects.size;
-	for( size_t i = 0; i < usedRectsCount; ++i ) {
+	tmbp_rect* usedRects       = pack->usedRects.data;
+	tmbp_size_t usedRectsCount = pack->usedRects.size;
+	for( tmbp_size_t i = 0; i < usedRectsCount; ++i ) {
 		tmbp_rect* current = &usedRects[i];
 		if( current->left == right || current->left + current->width == left ) {
 			score += maxRectsCommonIntervalLength( current->top, current->top + current->height,
-												   top, bottom );
+			                                       top, bottom );
 		}
 		if( current->top == bottom || current->top + current->height == top ) {
 			score += maxRectsCommonIntervalLength( current->left, current->left + current->width,
-												   left, right );
+			                                       left, right );
 		}
 	}
 	return score;
 }
 
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestShortSideFit( BinPack* pack, tmbp_int width,
-														  tmbp_int height )
+                                                           tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
 		if( width <= current->width && height <= current->height ) {
 			tmbp_int leftoverHoriz = current->width - width;
-			tmbp_int leftoverVert = current->height - height;
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
-			tmbp_int longSideFit = tmbp_max( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = current->height - height;
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int longSideFit   = tmbp_max( leftoverHoriz, leftoverVert );
 
 			if( shortSideFit < result.scores[0]
-				|| ( shortSideFit == result.scores[0] && longSideFit < result.scores[1] ) )
-			{
+			    || ( shortSideFit == result.scores[0] && longSideFit < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = shortSideFit;
-				result.scores[1] = longSideFit;
-				result.flipped = 0;
+				result.scores[0]     = shortSideFit;
+				result.scores[1]     = longSideFit;
+				result.flipped       = 0;
 			}
 		}
 
 		if( height <= current->width && width <= current->height ) {
 			tmbp_int leftoverHoriz = current->width - height;
-			tmbp_int leftoverVert = current->height - width;
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
-			tmbp_int longSideFit = tmbp_max( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = current->height - width;
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int longSideFit   = tmbp_max( leftoverHoriz, leftoverVert );
 
 			if( shortSideFit < result.scores[0]
-				|| ( shortSideFit == result.scores[0] && longSideFit < result.scores[1] ) )
-			{
+			    || ( shortSideFit == result.scores[0] && longSideFit < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = shortSideFit;
-				result.scores[1] = longSideFit;
-				result.flipped = 1;
+				result.scores[0]     = shortSideFit;
+				result.scores[1]     = longSideFit;
+				result.flipped       = 1;
 			}
 		}
 	}
@@ -1170,35 +1163,33 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestShortSideFit( BinPack* pack, tmbp_i
 	return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBottomLeftRule( BinPack* pack, tmbp_int width,
-														tmbp_int height )
+                                                         tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
 		if( width <= current->width && height <= current->height ) {
 			tmbp_int topSideY = current->top + height;
 			if( topSideY < result.scores[0]
-				|| ( topSideY == result.scores[0] && current->left < result.scores[1] ) )
-			{
+			    || ( topSideY == result.scores[0] && current->left < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = topSideY;
-				result.scores[1] = current->left;
-				result.flipped = 0;
+				result.scores[0]     = topSideY;
+				result.scores[1]     = current->left;
+				result.flipped       = 0;
 			}
 		}
 
 		if( height <= current->width && width <= current->height ) {
 			tmbp_int topSideY = current->top + width;
 			if( topSideY < result.scores[0]
-				|| ( topSideY == result.scores[0] && current->left < result.scores[1] ) )
-			{
+			    || ( topSideY == result.scores[0] && current->left < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = topSideY;
-				result.scores[1] = current->left;
-				result.flipped = 1;
+				result.scores[0]     = topSideY;
+				result.scores[1]     = current->left;
+				result.flipped       = 1;
 			}
 		}
 	}
@@ -1206,43 +1197,41 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBottomLeftRule( BinPack* pack, tmbp_int
 	return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestLongSideFit( BinPack* pack, tmbp_int width,
-														 tmbp_int height )
+                                                          tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
 		if( width <= current->width && height <= current->height ) {
 			tmbp_int leftoverHoriz = tmbp_abs( current->width - width );
-			tmbp_int leftoverVert = tmbp_abs( current->height - height );
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
-			tmbp_int longSideFit = tmbp_max( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = tmbp_abs( current->height - height );
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int longSideFit   = tmbp_max( leftoverHoriz, leftoverVert );
 
 			if( longSideFit < result.scores[1]
-				|| ( longSideFit == result.scores[1] && shortSideFit < result.scores[0] ) )
-			{
+			    || ( longSideFit == result.scores[1] && shortSideFit < result.scores[0] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = shortSideFit;
-				result.scores[1] = longSideFit;
-				result.flipped = 0;
+				result.scores[0]     = shortSideFit;
+				result.scores[1]     = longSideFit;
+				result.flipped       = 0;
 			}
 		}
 
 		if( height <= current->width && width <= current->height ) {
 			tmbp_int leftoverHoriz = tmbp_abs( current->width - height );
-			tmbp_int leftoverVert = tmbp_abs( current->height - width );
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
-			tmbp_int longSideFit = tmbp_max( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = tmbp_abs( current->height - width );
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int longSideFit   = tmbp_max( leftoverHoriz, leftoverVert );
 
 			if( longSideFit < result.scores[1]
-				|| ( longSideFit == result.scores[1] && shortSideFit < result.scores[0] ) )
-			{
+			    || ( longSideFit == result.scores[1] && shortSideFit < result.scores[0] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = shortSideFit;
-				result.scores[1] = longSideFit;
-				result.flipped = 1;
+				result.scores[0]     = shortSideFit;
+				result.scores[1]     = longSideFit;
+				result.flipped       = 1;
 			}
 		}
 	}
@@ -1250,43 +1239,41 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestLongSideFit( BinPack* pack, tmbp_in
 	return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestAreaFit( BinPack* pack, tmbp_int width,
-													 tmbp_int height )
+                                                      tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
-		tmbp_int areaFit = current->width * current->height - width * height;
+		tmbp_int areaFit   = current->width * current->height - width * height;
 
 		if( width <= current->width && height <= current->height ) {
 			tmbp_int leftoverHoriz = tmbp_abs( current->width - width );
-			tmbp_int leftoverVert = tmbp_abs( current->height - height );
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = tmbp_abs( current->height - height );
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
 
 			if( areaFit < result.scores[0]
-				|| ( areaFit == result.scores[0] && shortSideFit < result.scores[1] ) )
-			{
+			    || ( areaFit == result.scores[0] && shortSideFit < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = areaFit;
-				result.scores[1] = shortSideFit;
-				result.flipped = 0;
+				result.scores[0]     = areaFit;
+				result.scores[1]     = shortSideFit;
+				result.flipped       = 0;
 			}
 		}
 
 		if( height <= current->width && width <= current->height ) {
 			tmbp_int leftoverHoriz = tmbp_abs( current->width - height );
-			tmbp_int leftoverVert = tmbp_abs( current->height - width );
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = tmbp_abs( current->height - width );
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
 
 			if( areaFit < result.scores[0]
-				|| ( areaFit == result.scores[0] && shortSideFit < result.scores[1] ) )
-			{
+			    || ( areaFit == result.scores[0] && shortSideFit < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = areaFit;
-				result.scores[1] = shortSideFit;
-				result.flipped = 1;
+				result.scores[0]     = areaFit;
+				result.scores[1]     = shortSideFit;
+				result.flipped       = 1;
 			}
 		}
 	}
@@ -1294,33 +1281,31 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestAreaFit( BinPack* pack, tmbp_int wi
 	return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsContactPointRule( BinPack* pack, tmbp_int width,
-														  tmbp_int height )
+                                                           tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
 		if( width <= current->width && height <= current->height ) {
-			tmbp_int score =
-				-maxRectsContactPointScore( pack, current->left, current->top,
-											current->left + width, current->top + height );
+			tmbp_int score = -maxRectsContactPointScore(
+			    pack, current->left, current->top, current->left + width, current->top + height );
 			if( score < result.scores[0] ) {
 				result.freeRectIndex = i;
-				result.scores[0] = score;
-				result.flipped = 0;
+				result.scores[0]     = score;
+				result.flipped       = 0;
 			}
 		}
 
 		if( height <= current->width && width <= current->height ) {
-			tmbp_int score =
-				-maxRectsContactPointScore( pack, current->left, current->top,
-											current->left + height, current->top + width );
+			tmbp_int score = -maxRectsContactPointScore(
+			    pack, current->left, current->top, current->left + height, current->top + width );
 			if( score < result.scores[0] ) {
 				result.freeRectIndex = i;
-				result.scores[0] = score;
-				result.flipped = 1;
+				result.scores[0]     = score;
+				result.flipped       = 1;
 			}
 		}
 	}
@@ -1328,7 +1313,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsContactPointRule( BinPack* pack, tmbp_i
 	return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsChoice( BinPack* pack, tmbp_int width, tmbp_int height,
-												 MaxRectsFreeRectChoiceHeuristic freeChoice )
+                                                 MaxRectsFreeRectChoiceHeuristic freeChoice )
 {
 	MaxRectsHeuristicResult result;
 	switch( freeChoice ) {
@@ -1363,132 +1348,127 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsChoice( BinPack* pack, tmbp_int width, 
 }
 
 // no flip variants
-TMBP_DEF MaxRectsHeuristicResult
-maxRectsBestShortSideFitNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF MaxRectsHeuristicResult maxRectsBestShortSideFitNoFlip( BinPack* pack, tmbp_int width,
+                                                                 tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
 		if( width <= current->width && height <= current->height ) {
 			tmbp_int leftoverHoriz = tmbp_abs( current->width - width );
-			tmbp_int leftoverVert = tmbp_abs( current->height - height );
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
-			tmbp_int longSideFit = tmbp_max( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = tmbp_abs( current->height - height );
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int longSideFit   = tmbp_max( leftoverHoriz, leftoverVert );
 
 			if( shortSideFit < result.scores[0]
-				|| ( shortSideFit == result.scores[0] && longSideFit < result.scores[1] ) )
-			{
+			    || ( shortSideFit == result.scores[0] && longSideFit < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = shortSideFit;
-				result.scores[1] = longSideFit;
-				result.flipped = 0;
+				result.scores[0]     = shortSideFit;
+				result.scores[1]     = longSideFit;
+				result.flipped       = 0;
 			}
 		}
 	}
 
 	return result;
 }
-TMBP_DEF MaxRectsHeuristicResult
-maxRectsBottomLeftRuleNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF MaxRectsHeuristicResult maxRectsBottomLeftRuleNoFlip( BinPack* pack, tmbp_int width,
+                                                               tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
 		if( width <= current->width && height <= current->height ) {
 			tmbp_int topSideY = current->top + height;
 			if( topSideY < result.scores[0]
-				|| ( topSideY == result.scores[0] && current->left < result.scores[1] ) )
-			{
+			    || ( topSideY == result.scores[0] && current->left < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = topSideY;
-				result.scores[1] = current->left;
-				result.flipped = 0;
+				result.scores[0]     = topSideY;
+				result.scores[1]     = current->left;
+				result.flipped       = 0;
 			}
 		}
 	}
 
 	return result;
 }
-TMBP_DEF MaxRectsHeuristicResult
-maxRectsBestLongSideFitNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF MaxRectsHeuristicResult maxRectsBestLongSideFitNoFlip( BinPack* pack, tmbp_int width,
+                                                                tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
 		if( width <= current->width && height <= current->height ) {
 			tmbp_int leftoverHoriz = tmbp_abs( current->width - width );
-			tmbp_int leftoverVert = tmbp_abs( current->height - height );
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
-			tmbp_int longSideFit = tmbp_max( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = tmbp_abs( current->height - height );
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int longSideFit   = tmbp_max( leftoverHoriz, leftoverVert );
 
 			if( longSideFit < result.scores[1]
-				|| ( longSideFit == result.scores[1] && shortSideFit < result.scores[0] ) )
-			{
+			    || ( longSideFit == result.scores[1] && shortSideFit < result.scores[0] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = shortSideFit;
-				result.scores[1] = longSideFit;
-				result.flipped = 0;
+				result.scores[0]     = shortSideFit;
+				result.scores[1]     = longSideFit;
+				result.flipped       = 0;
 			}
 		}
 	}
 
 	return result;
 }
-TMBP_DEF MaxRectsHeuristicResult
-maxRectsBestAreaFitNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF MaxRectsHeuristicResult maxRectsBestAreaFitNoFlip( BinPack* pack, tmbp_int width,
+                                                            tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
-		tmbp_int areaFit = current->width * current->height - width * height;
+		tmbp_int areaFit   = current->width * current->height - width * height;
 
 		if( width <= current->width && height <= current->height ) {
 			tmbp_int leftoverHoriz = tmbp_abs( current->width - width );
-			tmbp_int leftoverVert = tmbp_abs( current->height - height );
-			tmbp_int shortSideFit = tmbp_min( leftoverHoriz, leftoverVert );
+			tmbp_int leftoverVert  = tmbp_abs( current->height - height );
+			tmbp_int shortSideFit  = tmbp_min( leftoverHoriz, leftoverVert );
 
 			if( areaFit < result.scores[0]
-				|| ( areaFit == result.scores[0] && shortSideFit < result.scores[1] ) )
-			{
+			    || ( areaFit == result.scores[0] && shortSideFit < result.scores[1] ) ) {
 				result.freeRectIndex = i;
-				result.scores[0] = areaFit;
-				result.scores[1] = shortSideFit;
-				result.flipped = 0;
+				result.scores[0]     = areaFit;
+				result.scores[1]     = shortSideFit;
+				result.flipped       = 0;
 			}
 		}
 	}
 
 	return result;
 }
-TMBP_DEF MaxRectsHeuristicResult
-maxRectsContactPointRuleNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
+TMBP_DEF MaxRectsHeuristicResult maxRectsContactPointRuleNoFlip( BinPack* pack, tmbp_int width,
+                                                                 tmbp_int height )
 {
 	MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* current = &freeRects[i];
 		if( width <= current->width && height <= current->height ) {
-			tmbp_int score =
-				-maxRectsContactPointScore( pack, current->left, current->top,
-											current->left + width, current->top + height );
+			tmbp_int score = -maxRectsContactPointScore(
+			    pack, current->left, current->top, current->left + width, current->top + height );
 			if( score < result.scores[0] ) {
 				result.freeRectIndex = i;
-				result.scores[0] = score;
-				result.flipped = 0;
+				result.scores[0]     = score;
+				result.flipped       = 0;
 			}
 		}
 	}
@@ -1496,8 +1476,8 @@ maxRectsContactPointRuleNoFlip( BinPack* pack, tmbp_int width, tmbp_int height )
 	return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsChoiceNoFlip( BinPack* pack, tmbp_int width,
-													   tmbp_int height,
-													   MaxRectsFreeRectChoiceHeuristic freeChoice )
+                                                       tmbp_int height,
+                                                       MaxRectsFreeRectChoiceHeuristic freeChoice )
 {
 	MaxRectsHeuristicResult result;
 	switch( freeChoice ) {
@@ -1532,44 +1512,44 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsChoiceNoFlip( BinPack* pack, tmbp_int w
 }
 
 static tmbp_bool maxRectsSplitFreeNode( BinPack* pack, tmbp_rect freeNode,
-										const tmbp_rect* usedNode )
+                                        const tmbp_rect* usedNode )
 {
-	tmbp_int freeNodeRight = freeNode.left + freeNode.width;
+	tmbp_int freeNodeRight  = freeNode.left + freeNode.width;
 	tmbp_int freeNodeBottom = freeNode.top + freeNode.height;
-	tmbp_int usedNodeRight = usedNode->left + usedNode->width;
+	tmbp_int usedNodeRight  = usedNode->left + usedNode->width;
 	tmbp_int usedNodeBottom = usedNode->top + usedNode->height;
 	if( usedNode->left >= freeNodeRight || usedNodeRight <= freeNode.left
-		|| usedNode->top >= freeNodeBottom || usedNodeBottom <= freeNode.top ) {
+	    || usedNode->top >= freeNodeBottom || usedNodeBottom <= freeNode.top ) {
 		return 0;
 	}
 
 	if( usedNode->left < freeNodeRight && usedNodeRight > freeNode.left ) {
 		if( usedNode->top > freeNode.top && usedNode->top < freeNodeBottom ) {
 			tmbp_rect* added = tmbp_push( &pack->freeRects, &pack->reallocator );
-			*added = freeNode;
-			added->height = usedNode->top - freeNode.top;
+			*added           = freeNode;
+			added->height    = usedNode->top - freeNode.top;
 		}
 
 		if( usedNodeBottom < freeNodeBottom ) {
 			tmbp_rect* added = tmbp_push( &pack->freeRects, &pack->reallocator );
-			*added = freeNode;
-			added->top = usedNodeBottom;
-			added->height = freeNodeBottom - usedNodeBottom;
+			*added           = freeNode;
+			added->top       = usedNodeBottom;
+			added->height    = freeNodeBottom - usedNodeBottom;
 		}
 	}
 
 	if( usedNode->top < freeNodeBottom && usedNodeBottom > freeNode.top ) {
 		if( usedNode->left > freeNode.left && usedNode->left < freeNodeRight ) {
 			tmbp_rect* added = tmbp_push( &pack->freeRects, &pack->reallocator );
-			*added = freeNode;
-			added->width = usedNode->left - freeNode.left;
+			*added           = freeNode;
+			added->width     = usedNode->left - freeNode.left;
 		}
 
 		if( usedNodeRight < freeNodeRight ) {
 			tmbp_rect* added = tmbp_push( &pack->freeRects, &pack->reallocator );
-			*added = freeNode;
-			added->left = usedNodeRight;
-			added->width = freeNodeRight - usedNodeRight;
+			*added           = freeNode;
+			added->left      = usedNodeRight;
+			added->width     = freeNodeRight - usedNodeRight;
 		}
 	}
 	return 1;
@@ -1578,17 +1558,17 @@ static tmbp_bool maxRectsSplitFreeNode( BinPack* pack, tmbp_rect freeNode,
 static tmbp_bool maxRectsIsContainedIn( const tmbp_rect* a, const tmbp_rect* b )
 {
 	return a->left >= b->left && a->top >= b->top && a->left + a->width <= b->left + b->width
-		   && a->top + a->height <= b->top + b->height;
+	       && a->top + a->height <= b->top + b->height;
 }
 static void maxRectsPruneFreeRects( BinPack* pack )
 {
 	TMBP_ASSERT( pack );
 
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	for( size_t i = 0; i < freeRectsCount; ++i ) {
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ++i ) {
 		tmbp_rect* a = &freeRects[i];
-		for( size_t j = i + 1; j < freeRectsCount; ) {
+		for( tmbp_size_t j = i + 1; j < freeRectsCount; ) {
 			tmbp_rect* b = &freeRects[j];
 			if( maxRectsIsContainedIn( a, b ) ) {
 				tmbp_erase( &pack->freeRects, i );
@@ -1607,25 +1587,25 @@ static void maxRectsPruneFreeRects( BinPack* pack )
 }
 
 TMBP_DEF BinPackResult maxRectsInsert( BinPack* pack, tmbp_int width, tmbp_int height,
-									   const MaxRectsHeuristicResult* choice )
+                                       const MaxRectsHeuristicResult* choice )
 {
 	TMBP_ASSERT( choice );
 	TMBP_ASSERT( maxRectsHeuristicIsValidResult( choice->scores ) );
 	BinPackResult ret;
 	ret.rect =
-		binPackRectFromPosition( pack, width, height, choice->freeRectIndex, choice->flipped );
-	ret.flipped = choice->flipped;
-	ret.placed = 1;
-	tmbp_rect* freeRects = pack->freeRects.data;
-	size_t freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
-	pack->maxFreeRectsSize = 0;
-	for( size_t i = 0; i < freeRectsCount; ) {
+	    binPackRectFromPosition( pack, width, height, choice->freeRectIndex, choice->flipped );
+	ret.flipped                = choice->flipped;
+	ret.placed                 = 1;
+	tmbp_rect* freeRects       = pack->freeRects.data;
+	tmbp_size_t freeRectsCount = pack->freeRects.size;
+	pack->maxFreeRectsSize     = 0;
+	for( tmbp_size_t i = 0; i < freeRectsCount; ) {
 		if( maxRectsSplitFreeNode( pack, freeRects[i], &ret.rect ) ) {
 			if( pack->freeRects.size > pack->maxFreeRectsSize ) {
 				pack->maxFreeRectsSize = pack->freeRects.size;
 			}
 			tmbp_erase( &pack->freeRects, i );
-			freeRectsCount = (tmbp_usize_t)pack->freeRects.size;
+			freeRectsCount = pack->freeRects.size;
 			continue;
 		}
 		++i;
@@ -1637,8 +1617,8 @@ TMBP_DEF BinPackResult maxRectsInsert( BinPack* pack, tmbp_int width, tmbp_int h
 }
 
 TMBP_DEF BinPackResult maxRectsInsertChoice( BinPack* pack, tmbp_int width, tmbp_int height,
-											 MaxRectsFreeRectChoiceHeuristic freeChoice,
-											 tmbp_bool canFlip )
+                                             MaxRectsFreeRectChoiceHeuristic freeChoice,
+                                             tmbp_bool canFlip )
 {
 	BinPackResult ret = {{0}};
 	MaxRectsHeuristicResult result;
@@ -1655,14 +1635,14 @@ TMBP_DEF BinPackResult maxRectsInsertChoice( BinPack* pack, tmbp_int width, tmbp
 	return ret;
 }
 TMBP_DEF tmbp_size_t maxRectsInsertBatch( BinPack* pack, BinPackBatchDim* dims,
-										  BinPackBatchResult* results, tmbp_size_t count,
-										  MaxRectsFreeRectChoiceHeuristic freeChoice,
-										  tmbp_bool canFlip )
+                                          BinPackBatchResult* results, tmbp_size_t count,
+                                          MaxRectsFreeRectChoiceHeuristic freeChoice,
+                                          tmbp_bool canFlip )
 {
-	size_t dimsCount = (tmbp_usize_t)count;
+	tmbp_size_t dimsCount = count;
 	while( dimsCount > 0 ) {
 		MaxRectsHeuristicResult best = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
-		size_t i = 0;
+		tmbp_size_t i                = 0;
 		for( ; i < dimsCount; ++i ) {
 			MaxRectsHeuristicResult result;
 			tmbp_int w = dims[i].dim.width;
@@ -1673,35 +1653,32 @@ TMBP_DEF tmbp_size_t maxRectsInsertBatch( BinPack* pack, BinPackBatchDim* dims,
 				result = maxRectsChoiceNoFlip( pack, w, h, freeChoice );
 			}
 			if( result.scores[0] < best.scores[0]
-				|| ( result.scores[0] == best.scores[0] && result.scores[1] < best.scores[1] ) ) {
+			    || ( result.scores[0] == best.scores[0] && result.scores[1] < best.scores[1] ) ) {
 				best = result;
 			}
 		}
 
-		if( maxRectsHeuristicIsValidResult( best.scores )) {
+		if( maxRectsHeuristicIsValidResult( best.scores ) ) {
 			break;
 		}
 		BinPackBatchResult* result = results++;
-		result->result = maxRectsInsert( pack, dims[i].dim.width, dims[i].dim.height, &best );
+		result->result   = maxRectsInsert( pack, dims[i].dim.width, dims[i].dim.height, &best );
 		result->userData = dims[i].userData;
 
 		// we processed i already, move it to the back of the array and decrease dimsCount
 		--dimsCount;
 		if( i != dimsCount ) {
 			BinPackBatchDim tmp = dims[i];
-			dims[i] = dims[dimsCount];
-			dims[dimsCount] = tmp;
+			dims[i]             = dims[dimsCount];
+			dims[dimsCount]     = tmp;
 		}
 	}
-	return (tmbp_size_t)( (tmbp_usize_t)count - dimsCount );
+	return ( tmbp_size_t )( count - dimsCount );
 }
-TMBP_DEF float maxRectsOccupancy( const BinPack* pack )
-{
-	return guillotineOccupancy( pack );
-}
+TMBP_DEF float maxRectsOccupancy( const BinPack* pack ) { return guillotineOccupancy( pack ); }
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // defined( TM_BIN_PACKING_IMPLEMENTATION )
+#endif  // defined( TM_BIN_PACKING_IMPLEMENTATION )

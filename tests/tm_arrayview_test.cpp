@@ -1,4 +1,12 @@
 // #define TM_NO_STD_ITERATOR
+#if 0
+#define TMA_USE_OWN_TYPES
+typedef int tma_size_t;
+typedef struct {
+	tma_size_t x;
+	tma_size_t y;
+} tma_point;
+#endif
 #include "../tm_arrayview.h"
 #include "../tm_utility.h"
 

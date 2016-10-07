@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.4a - public domain
+tm_print.h v0.0.4b - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -33,6 +33,7 @@ ISSUES
 	sized)
 
 HISTORY
+	v0.0.4b 07.10.16 fixed some casting issues when tmp_size_t is signed
 	v0.0.4a 29.09.16 fixed a bug where inputting an escaped {{ was resulting in an infinite loop
 	v0.0.4  29.09.16 added signed/unsigned char, short and long handling
 	                 fixed compiler errors when compiling with clang
@@ -829,7 +830,7 @@ static const char* tmp_find( const char* first, const char* last, char c )
 {
 	return (const char*)TMP_MEMCHR( first, c, last - first );
 }
-} // anonymous namespace
+}  // anonymous namespace
 
 template < class Output >
 static void print_impl( const char* format, size_t formatLen, const PrintFormat& initialFormatting,

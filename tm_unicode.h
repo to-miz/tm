@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v1.0b - public domain
+tm_unicode.h v1.0.1 - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -43,9 +43,10 @@ NOTES
 	caret to the next codepoint.
 
 HISTORY
-	v1.0b	02.07.16 changed #include <memory.h> into string.h
-	v1.0a	01.07.16 improved C99 conformity
-	v1.0	24.06.16 initial commit
+	v1.0.1  07.10.16 removed forcing to use unsigned arithmetic when tmu_size_t is signed
+	v1.0b   02.07.16 changed #include <memory.h> into string.h
+	v1.0a   01.07.16 improved C99 conformity
+	v1.0   24.06.16 initial commit
 
 LICENSE
 	This software is dual-licensed to the public domain and under the following
@@ -132,8 +133,10 @@ TMU_DEF Utf16Sequence toUtf16( tmu_char32 codepoint );
 TMU_DEF tmu_char16 toUcs2( tmu_char32 codepoint );
 TMU_DEF tmu_bool isUcs2( tmu_char32 codepoint );
 
-TMU_DEF tmu_size_t convertUtf8ToUtf16( const char* utf8Start, tmu_size_t utf8Length, tmu_char16* out, tmu_size_t size );
-TMU_DEF tmu_size_t convertUtf8ToUcs2( const char* utf8Start, tmu_size_t utf8Length, tmu_char16* out, tmu_size_t size );
+TMU_DEF tmu_size_t convertUtf8ToUtf16( const char* utf8Start, tmu_size_t utf8Length,
+                                       tmu_char16* out, tmu_size_t size );
+TMU_DEF tmu_size_t convertUtf8ToUcs2( const char* utf8Start, tmu_size_t utf8Length, tmu_char16* out,
+                                      tmu_size_t size );
 
 // utf8
 
@@ -168,8 +171,10 @@ typedef struct {
 } Utf8Sequence;
 
 TMU_DEF Utf8Sequence toUtf8( tmu_char32 codepoint );
-TMU_DEF tmu_size_t convertUtf16ToUtf8( const tmu_char16* utf16Start, tmu_size_t utf16Length, char* out, tmu_size_t size );
-TMU_DEF tmu_size_t convertUcs2ToUtf8( const tmu_char16* ucs2Start, tmu_size_t ucs2Length, char* out, tmu_size_t size );
+TMU_DEF tmu_size_t convertUtf16ToUtf8( const tmu_char16* utf16Start, tmu_size_t utf16Length,
+                                       char* out, tmu_size_t size );
+TMU_DEF tmu_size_t convertUcs2ToUtf8( const tmu_char16* ucs2Start, tmu_size_t ucs2Length, char* out,
+                                      tmu_size_t size );
 
 TMU_DEF tmu_size_t utf8CountCodepoints( const char* str, tmu_size_t size );
 
@@ -286,18 +291,18 @@ TMU_DEF tmu_char32 utf16NextCodepoint( const tmu_char16** it, tmu_size_t* remain
 }
 TMU_DEF void utf16SwapEndian16( tmu_char16* str, tmu_size_t length )
 {
-	for( size_t i = 0; i < (size_t)length; ++i ) {
+	for( tmu_size_t i = 0; i < length; ++i ) {
 		str[i] = ( tmu_char16 )( ( ( ( tmu_char16 )( str[i] ) & (tmu_char16)0x00ffU ) << 8 )
-								 | ( ( ( tmu_char16 )( str[i] ) & (tmu_char16)0xff00U ) >> 8 ) );
+		                         | ( ( ( tmu_char16 )( str[i] ) & (tmu_char16)0xff00U ) >> 8 ) );
 	}
 }
 TMU_DEF void utf16SwapEndian( char* str, tmu_size_t length )
 {
 	TMU_ASSERT( length % 2 == 0 );
 	// swap pairs of bytes around
-	for( size_t i = 1; i < (size_t)length; i += 2 ) {
-		char t = str[i];
-		str[i] = str[i - 1];
+	for( tmu_size_t i = 1; i < length; i += 2 ) {
+		char t     = str[i];
+		str[i]     = str[i - 1];
 		str[i - 1] = t;
 	}
 }
@@ -307,15 +312,15 @@ TMU_DEF Utf16Sequence toUtf16( tmu_char32 codepoint )
 	Utf16Sequence result = {{0, 0}, 0};
 	if( codepoint < 0xD7FF ) {
 		result.elements[0] = (tmu_char16)codepoint;
-		result.length = 1;
+		result.length      = 1;
 	} else if( codepoint >= 0xE000 && codepoint <= 0xFFFF ) {
 		result.elements[0] = (tmu_char16)codepoint;
-		result.length = 1;
+		result.length      = 1;
 	} else if( codepoint >= 0x10000 && codepoint <= 0x10FFFF ) {
 		codepoint -= 0x10000;
-		result.elements[0] = 0xD800 + (tmu_char16)( codepoint >> 10 );
-		result.elements[1] = 0xDC00 + (tmu_char16)( codepoint & 0x3FF );
-		result.length = 2;
+		result.elements[0] = 0xD800 + ( tmu_char16 )( codepoint >> 10 );
+		result.elements[1] = 0xDC00 + ( tmu_char16 )( codepoint & 0x3FF );
+		result.length      = 2;
 	}
 	return result;
 }
@@ -331,8 +336,8 @@ TMU_DEF tmu_bool isUcs2( tmu_char32 codepoint )
 	return ( codepoint < 0xD7FF ) || ( codepoint >= 0xE000 && codepoint <= 0xFFFF );
 }
 
-TMU_DEF tmu_size_t
-convertUtf8ToUtf16( const char* utf8Start, tmu_size_t utf8Length, tmu_char16* out, tmu_size_t size )
+TMU_DEF tmu_size_t convertUtf8ToUtf16( const char* utf8Start, tmu_size_t utf8Length,
+                                       tmu_char16* out, tmu_size_t size )
 {
 	tmu_size_t result = 0;
 	while( utf8Length ) {
@@ -349,8 +354,8 @@ convertUtf8ToUtf16( const char* utf8Start, tmu_size_t utf8Length, tmu_char16* ou
 	}
 	return result;
 }
-TMU_DEF tmu_size_t
-convertUtf8ToUcs2( const char* utf8Start, tmu_size_t utf8Length, tmu_char16* out, tmu_size_t size )
+TMU_DEF tmu_size_t convertUtf8ToUcs2( const char* utf8Start, tmu_size_t utf8Length, tmu_char16* out,
+                                      tmu_size_t size )
 {
 	tmu_size_t result = 0;
 	while( utf8Length ) {
@@ -368,15 +373,15 @@ convertUtf8ToUcs2( const char* utf8Start, tmu_size_t utf8Length, tmu_char16* out
 
 // utf8
 
-TMU_STORAGE const int utf8ByteOrderMarkSize = 3;
+TMU_STORAGE const int utf8ByteOrderMarkSize        = 3;
 TMU_STORAGE const int utf8ByteOrderMarkSizeInBytes = 3;
-TMU_STORAGE const tmu_char8 utf8ByteOrderMark[3] = {0xEF, 0xBB, 0xBF};
+TMU_STORAGE const tmu_char8 utf8ByteOrderMark[3]   = {0xEF, 0xBB, 0xBF};
 
 TMU_DEF tmu_bool utf8HasByteOrderMark( const char* str, tmu_size_t length )
 {
 	if( length >= utf8ByteOrderMarkSizeInBytes ) {
 		return str[0] == utf8ByteOrderMark[0] && str[1] == utf8ByteOrderMark[1]
-			   && str[2] == utf8ByteOrderMark[2];
+		       && str[2] == utf8ByteOrderMark[2];
 	}
 	return 0;
 }
@@ -391,45 +396,45 @@ TMU_DEF tmu_bool utf8HasByteOrderNullterminated( const char* str )
 }
 TMU_DEF tmu_char32 utf8NextCodepoint( const char** it, tmu_size_t* remaining )
 {
-	tmu_char32 codepoint = (tmu_char32)( (tmu_char8)**it );
+	tmu_char32 codepoint = ( tmu_char32 )( ( tmu_char8 ) * *it );
 
-	if( codepoint < 0x80 ) { // 0xxxxxxx
-		// 1 byte sequence
-	} else if( ( codepoint >> 5 ) == 0x6 ) { // 110xxxxx 10xxxxxx
+	if( codepoint < 0x80 ) {                  // 0xxxxxxx
+		                                      // 1 byte sequence
+	} else if( ( codepoint >> 5 ) == 0x6 ) {  // 110xxxxx 10xxxxxx
 		// 2 byte sequence
 		if( *remaining >= 2 ) {
-			tmu_char32 second = (tmu_char8)*( ++*it );
-			codepoint = ( ( codepoint & 0x1F ) << 6 ) | ( second & 0x3F );
+			tmu_char32 second = ( tmu_char8 ) * ( ++*it );
+			codepoint         = ( ( codepoint & 0x1F ) << 6 ) | ( second & 0x3F );
 			--*remaining;
 		} else {
-			codepoint = 0xFFFFFFFF;
+			codepoint  = 0xFFFFFFFF;
 			*remaining = 0;
 			return 0;
 		}
-	} else if( ( codepoint >> 4 ) == 0xE ) { // 1110xxxx 10xxxxxx 10xxxxxx
+	} else if( ( codepoint >> 4 ) == 0xE ) {  // 1110xxxx 10xxxxxx 10xxxxxx
 		// 3 byte sequence
 		if( *remaining >= 3 ) {
-			tmu_char32 second = (tmu_char8)*( ++*it );
-			tmu_char32 third = (tmu_char8)*( ++*it );
+			tmu_char32 second = ( tmu_char8 ) * ( ++*it );
+			tmu_char32 third  = ( tmu_char8 ) * ( ++*it );
 			codepoint =
-				( ( codepoint & 0xF ) << 12 ) | ( ( second & 0x3F ) << 6 ) | ( third & 0x3F );
+			    ( ( codepoint & 0xF ) << 12 ) | ( ( second & 0x3F ) << 6 ) | ( third & 0x3F );
 			*remaining -= 2;
 		} else {
-			codepoint = 0xFFFFFFFF;
+			codepoint  = 0xFFFFFFFF;
 			*remaining = 0;
 			return 0;
 		}
-	} else if( ( codepoint >> 3 ) == 0x1E ) { // 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+	} else if( ( codepoint >> 3 ) == 0x1E ) {  // 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
 		// 4 byte sequence
 		if( *remaining >= 4 ) {
-			tmu_char32 second = (tmu_char8)*( ++*it );
-			tmu_char32 third = (tmu_char8)*( ++*it );
-			tmu_char32 fourth = (tmu_char8)*( ++*it );
-			codepoint = ( ( codepoint & 0x7 ) << 18 ) | ( ( second & 0x3F ) << 12 )
-						| ( ( third & 0x3F ) << 6 ) | ( fourth & 0x3f );
+			tmu_char32 second = ( tmu_char8 ) * ( ++*it );
+			tmu_char32 third  = ( tmu_char8 ) * ( ++*it );
+			tmu_char32 fourth = ( tmu_char8 ) * ( ++*it );
+			codepoint         = ( ( codepoint & 0x7 ) << 18 ) | ( ( second & 0x3F ) << 12 )
+			            | ( ( third & 0x3F ) << 6 ) | ( fourth & 0x3f );
 			*remaining -= 3;
 		} else {
-			codepoint = 0xFFFFFFFF;
+			codepoint  = 0xFFFFFFFF;
 			*remaining = 0;
 			return 0;
 		}
@@ -457,10 +462,7 @@ TMU_DEF tmu_size_t utf8Advance( const char* str, tmu_size_t start, tmu_size_t si
 }
 TMU_DEF tmu_size_t utf8Retreat( const char* str, tmu_size_t start )
 {
-	// convert to size_t in case tmu_size_t is signed
-	// using size_t as index to arrays is more efficient
-	size_t first = (size_t)start;
-	size_t current = (size_t)start;
+	tmu_size_t current = start;
 	if( current <= 0 ) {
 		return 0;
 	}
@@ -468,7 +470,7 @@ TMU_DEF tmu_size_t utf8Retreat( const char* str, tmu_size_t start )
 	do {
 		--current;
 	} while( current > 0 && !utf8IsLead( str[current] ) );
-	return (tmu_size_t)( first - current );
+	return ( tmu_size_t )( start - current );
 }
 TMU_DEF Utf8Sequence toUtf8( tmu_char32 codepoint )
 {
@@ -521,7 +523,7 @@ TMU_DEF tmu_size_t
 convertUcs2ToUtf8( const tmu_char16* ucs2Start, tmu_size_t ucs2Length, char* out, tmu_size_t size )
 {
 	tmu_size_t result = 0;
-	for( size_t i = 0; i < (size_t)ucs2Length; ++i ) {
+	for( tmu_size_t i = 0; i < ucs2Length; ++i ) {
 		if( !isUcs2( ucs2Start[i] ) ) continue;
 		tmu_char32 codepoint = (tmu_char32)ucs2Start[i];
 
