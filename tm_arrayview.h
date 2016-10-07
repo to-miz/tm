@@ -563,7 +563,7 @@ inline reference emplace_back()
 		TMA_ASSERT( position >= begin() && position <= end() );
 
 		auto rem     = remaining();
-		size_t count = static_cast< size_t >( last - first );
+		tma_size_t count = static_cast< tma_size_t >( last - first );
 		TMA_ASSERT( rem >= count );
 		if( count > 0 && count <= rem ) {
 			// range fits move entries to make room and copy
