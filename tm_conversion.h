@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.4b - public domain
+tm_conversion.h v0.9.4c - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -86,6 +86,7 @@ ISSUES
 	is beyond the scope of this library. Do not use these functions for big numbers.
 
 HISTORY
+	v0.9.4c 08.10.16 fixed a buffer underflow bug in print_hex_u*_impl
 	v0.9.4b 07.10.16 typos
 	v0.9.4a 29.09.16 made PrintFormat forward declarable
 	v0.9.4  24.09.16 optimized base 10 and base 16 conversion paths based on the talk
@@ -2633,6 +2634,7 @@ static tmc_size_t print_hex_u32_impl( char* dest, tmc_size_t maxlen, int width, 
 	if( len > maxlen ) {
 		len = maxlen;
 	}
+	tmc_size_t result = len;
 	char* p = dest;
 	if( len < (tmc_size_t)width ) {
 		tmc_size_t count = maxlen - ( (tmc_size_t)width - len );
@@ -2643,18 +2645,18 @@ static tmc_size_t print_hex_u32_impl( char* dest, tmc_size_t maxlen, int width, 
 		len = (tmc_size_t)width;
 	}
 	p = dest + len - 1;
-	while( maxlen >= 2 && value ) {
+	while( len >= 2 && value ) {
 		*p         = table[value & 0x0F];
 		*( p - 1 ) = table[( value >> 4 ) & 0x0F];
 		value >>= 8;
 		p -= 2;
-		maxlen -= 2;
+		len -= 2;
 	}
-	// if the loop terminated because of maxlen >= 2, check whether we can output one more digit
-	if( maxlen && value ) {
+	// if the loop terminated because of len >= 2, check whether we can output one more digit
+	if( len && value ) {
 		*p = table[value & 0x0F];
 	}
-	return len;
+	return result;
 }
 static tmc_size_t print_hex_u64_impl( char* dest, tmc_size_t maxlen, int width, tmc_bool lower,
                                       tmc_uint64 value )
@@ -2665,6 +2667,7 @@ static tmc_size_t print_hex_u64_impl( char* dest, tmc_size_t maxlen, int width, 
 	if( len > maxlen ) {
 		len = maxlen;
 	}
+	tmc_size_t result = len;
 	char* p = dest;
 	if( len < (tmc_size_t)width ) {
 		tmc_size_t count = maxlen - ( (tmc_size_t)width - len );
@@ -2675,18 +2678,18 @@ static tmc_size_t print_hex_u64_impl( char* dest, tmc_size_t maxlen, int width, 
 		len = (tmc_size_t)width;
 	}
 	p = dest + len - 1;
-	while( maxlen >= 2 && value ) {
+	while( len >= 2 && value ) {
 		*p         = table[value & 0x0F];
 		*( p - 1 ) = table[( value >> 4 ) & 0x0F];
 		value >>= 8;
 		p -= 2;
-		maxlen -= 2;
+		len -= 2;
 	}
-	// if the loop terminated because of maxlen >= 2, check whether we can output one more digit
-	if( maxlen && value ) {
+	// if the loop terminated because of len >= 2, check whether we can output one more digit
+	if( len && value ) {
 		*p = table[value & 0x0F];
 	}
-	return len;
+	return result;
 }
 
 TMC_DEF tmc_size_t print_hex_i32( char* dest, tmc_size_t maxlen, tmc_bool lower, tmc_int32 value )
