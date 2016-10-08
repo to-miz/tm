@@ -1,5 +1,5 @@
 /*
-tm_utility v1.1.1 - public domain
+tm_utility v1.1.1a - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,7 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.1.1a 02.10.16 fixed a minor warning of unused variable when asserts are not used
 	v1.1.1  02.10.16 added TMUT_NO_CSTYLE_TAGGED_UNION_MACROS and c-style tagged union macros
 	v1.1.0a 15.09.16 added an alternate implementation of countof
 	v1.1.0  12.09.16 added isAligned
@@ -659,10 +660,9 @@ inline tmut_size_t indexof( const Container& container, const ValueType& value )
 	using std::end;
 #endif
 	auto first = begin( container );
-	auto last = end( container );
 	// TODO: to be perfectly correct, we'd have to use std::addressof here instead of &
 	// but then again, don't overload addressof & operator
-	TMUT_ASSERT( &value >= &*first && &value < &*last );
+	TMUT_ASSERT( &value >= &*first && &value < &*( end( container ) ) );
 	// we take the adress after dereferencing in case we are dealing with an iterator type instead
 	// of pointers
 	return static_cast< tmut_size_t >( &value - &*first );
