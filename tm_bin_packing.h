@@ -1,5 +1,5 @@
 /*
-tm_bin_packing.h v1.0a - public domain
+tm_bin_packing.h v1.0.1 - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -209,6 +209,8 @@ SAMPLES
 		}
 
 HISTORY
+	v1.0.1	11.10.16 fixed a bug in batch insertion functions using the wrong index
+	v1.0b   09.10.16 fixed a typo
 	v1.0a   07.10.16 removed using forced unsigned arithmetic when tmbp_size_t is signed
 	v1.0	20.07.16 initial commit
 
@@ -321,7 +323,7 @@ typedef struct {
 } BinPackResult;
 
 typedef struct {
-	size_t freeRectIndex;
+	tmbp_size_t freeRectIndex;
 	tmbp_int score;
 	tmbp_bool flipped;
 } GuillotineHeuristicResult;
@@ -415,7 +417,7 @@ typedef enum {
 } MaxRectsFreeRectChoiceHeuristic;
 
 typedef struct {
-	size_t freeRectIndex;
+	tmbp_size_t freeRectIndex;
 	tmbp_int scores[2];
 	tmbp_bool flipped;
 } MaxRectsHeuristicResult;
@@ -512,7 +514,7 @@ static tmbp_rect* tmbp_push( tmbp_rect_array* array, BinPackReallocator* realloc
     TMBP_ASSERT( array->size <= array->capacity );
     --array->size;
 }*/
-static void tmbp_erase( tmbp_rect_array* array, size_t index )
+static void tmbp_erase( tmbp_rect_array* array, tmbp_size_t index )
 {
 	TMBP_ASSERT( array );
 	TMBP_ASSERT( array->data );
@@ -1000,9 +1002,9 @@ TMBP_DEF tmbp_size_t guillotineInsertBatch( BinPack* pack, BinPackBatchDim* dims
 	tmbp_size_t dimsCount          = count;
 	GuillotineHeuristicResult best = {0};
 	while( dimsCount > 0 ) {
-		best.score    = TMBP_INVALID_SCORE;
-		tmbp_size_t i = 0;
-		for( ; i < dimsCount; ++i ) {
+		best.score         = TMBP_INVALID_SCORE;
+		tmbp_int bestIndex = -1;
+		for( tmbp_size_t i = 0; i < dimsCount; ++i ) {
 			tmbp_int w = dims[i].dim.width;
 			tmbp_int h = dims[i].dim.height;
 			GuillotineHeuristicResult result;
@@ -1012,7 +1014,8 @@ TMBP_DEF tmbp_size_t guillotineInsertBatch( BinPack* pack, BinPackBatchDim* dims
 				result = guillotineChoiceNoFlip( pack, w, h, freeChoice );
 			}
 			if( result.score < best.score ) {
-				best = result;
+				best      = result;
+				bestIndex = i;
 				if( result.score == TMBP_INT_MIN ) {
 					break;
 				}
@@ -1024,15 +1027,15 @@ TMBP_DEF tmbp_size_t guillotineInsertBatch( BinPack* pack, BinPackBatchDim* dims
 		}
 
 		BinPackBatchResult* result = results++;
-		result->result =
-		    guillotineInsert( pack, dims[i].dim.width, dims[i].dim.height, &best, splitChoice );
-		result->userData = dims[i].userData;
+		result->result             = guillotineInsert( pack, dims[bestIndex].dim.width,
+		                                   dims[bestIndex].dim.height, &best, splitChoice );
+		result->userData = dims[bestIndex].userData;
 
-		// we processed i already, move it to the back of the array and decrease dimsCount
+		// we processed bestIndex already, move it to the back of the array and decrease dimsCount
 		--dimsCount;
-		if( i != dimsCount ) {
-			BinPackBatchDim tmp = dims[i];
-			dims[i]             = dims[dimsCount];
+		if( bestIndex != dimsCount ) {
+			BinPackBatchDim tmp = dims[bestIndex];
+			dims[bestIndex]     = dims[dimsCount];
 			dims[dimsCount]     = tmp;
 		}
 	}
@@ -1642,8 +1645,8 @@ TMBP_DEF tmbp_size_t maxRectsInsertBatch( BinPack* pack, BinPackBatchDim* dims,
 	tmbp_size_t dimsCount = count;
 	while( dimsCount > 0 ) {
 		MaxRectsHeuristicResult best = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
-		tmbp_size_t i                = 0;
-		for( ; i < dimsCount; ++i ) {
+		tmbp_int bestIndex           = -1;
+		for( tmbp_size_t i = 0; i < dimsCount; ++i ) {
 			MaxRectsHeuristicResult result;
 			tmbp_int w = dims[i].dim.width;
 			tmbp_int h = dims[i].dim.height;
@@ -1654,22 +1657,24 @@ TMBP_DEF tmbp_size_t maxRectsInsertBatch( BinPack* pack, BinPackBatchDim* dims,
 			}
 			if( result.scores[0] < best.scores[0]
 			    || ( result.scores[0] == best.scores[0] && result.scores[1] < best.scores[1] ) ) {
-				best = result;
+				best      = result;
+				bestIndex = i;
 			}
 		}
 
-		if( maxRectsHeuristicIsValidResult( best.scores ) ) {
+		if( !maxRectsHeuristicIsValidResult( best.scores ) ) {
 			break;
 		}
 		BinPackBatchResult* result = results++;
-		result->result   = maxRectsInsert( pack, dims[i].dim.width, dims[i].dim.height, &best );
-		result->userData = dims[i].userData;
+		result->result =
+		    maxRectsInsert( pack, dims[bestIndex].dim.width, dims[bestIndex].dim.height, &best );
+		result->userData = dims[bestIndex].userData;
 
-		// we processed i already, move it to the back of the array and decrease dimsCount
+		// we processed bestIndex already, move it to the back of the array and decrease dimsCount
 		--dimsCount;
-		if( i != dimsCount ) {
-			BinPackBatchDim tmp = dims[i];
-			dims[i]             = dims[dimsCount];
+		if( bestIndex != dimsCount ) {
+			BinPackBatchDim tmp = dims[bestIndex];
+			dims[bestIndex]     = dims[dimsCount];
 			dims[dimsCount]     = tmp;
 		}
 	}
