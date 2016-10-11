@@ -1,5 +1,5 @@
 /*
-tm_json.h v.0.1.1a - public domain
+tm_json.h v.0.1.1b - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -105,6 +105,7 @@ ISSUES
 	- missing documentation and example usage code
 
 HISTORY
+	v0.1.1b 10.10.16 fixed some warnings when tmj_size_t is signed
 	v0.1.1a 07.10.16 removed usage of unsigned arithmetic when tmj_size_t is signed
 	v0.1.1  13.09.16 changed JsonValue interface to have operator[] overloads for convenience
 	                 added more string_view support through TMJ_STRING_VIEW
@@ -1226,7 +1227,7 @@ static tmj_bool readQuotedString( JsonReader* reader )
 					}
 					reader->column = 0;
 					++reader->line;
-					size -= p - last + 1;
+					size -= ( tmj_size_t )( p - last + 1 );
 					last = p + 1;
 				}
 				reader->column = size;
@@ -1566,7 +1567,7 @@ static void jsonCountNewlines( JsonReader* reader )
 	tmj_size_t size = reader->current.size;
 	while( ( p = (const char*)TMJ_MEMCHR( last, '\n', size ) ) != TMJ_NULL ) {
 		++newlines;
-		size -= p - last + 1;
+		size -= (tmj_size_t)( p - last + 1 );
 		last = p + 1;
 	}
 	if( newlines ) {
@@ -1626,7 +1627,7 @@ static JsonTokenType jsonParseBlockComment( JsonReader* reader )
 			const char* p;
 			while( ( p = (const char*)TMJ_MEMCHR( reader->data, '*', reader->size ) )
 			       != TMJ_NULL ) {
-				tmj_size_t diff = p - reader->data;
+				tmj_size_t diff = (tmj_size_t)( p - reader->data );
 				reader->current.size += diff;
 				reader->size -= diff + 1;
 				reader->data = p + 1;
@@ -2003,7 +2004,7 @@ static tmj_bool jsonParseCppRawString( JsonReader* reader, JsonContext currentCo
 					const char* p;
 					while( ( p = (const char*)TMJ_MEMCHR( reader->data, ')', reader->size ) )
 					       != TMJ_NULL ) {
-						reader->size -= p - reader->data + 1;
+						reader->size -= (tmj_size_t)( p - reader->data + 1 );
 						reader->data = p + 1;
 						if( reader->size < delimSize ) {
 							setError( reader, JERR_UNEXPECTED_EOF );
@@ -2470,7 +2471,7 @@ tmj_size_t jsonCopyConcatenatedString( JsonStringView str, char* buffer, tmj_siz
 	const char* start = buffer;
 	tmj_bool add      = TMJ_TRUE;
 	while( ( next = (const char*)TMJ_MEMCHR( p, quot, sz ) ) != TMJ_NULL ) {
-		sz -= next - p + 1;
+		sz -= (tmj_size_t)( next - p + 1 );
 		if( add ) {
 			tmj_bool skip = TMJ_FALSE;
 			if( next > p && *( next - 1 ) == '\\' ) {
