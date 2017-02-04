@@ -1,5 +1,5 @@
 /*
-tm_json.h v.0.1.1b - public domain
+tm_json.h v.0.1.2 - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -9,7 +9,7 @@ USAGE
 	To implement the interfaces in this header,
 	    #define TM_JSON_IMPLEMENTATION
 	in ONE C or C++ source file before #including this header.
-	
+
 	See SWITCHES for more options.
 
 PURPOSE
@@ -76,7 +76,8 @@ SWITCHES
 			    double to_double( const char* data, size_t size, double def )
 			    float to_float( const char* data, size_t size, float def )
 			    long long to_int64( const char* data, size_t size, int base, long long def )
-			    unsigned long long to_uint64( const char* data, size_t size, int base, unsigned long long def )
+			    unsigned long long to_uint64( const char* data, size_t size, int base,
+			                                  unsigned long long def )
 			Arguments:
 				str: a non nullterminated string
 				len: the length of str
@@ -105,6 +106,9 @@ ISSUES
 	- missing documentation and example usage code
 
 HISTORY
+	v0.1.2  28.01.17 added jsonObjectArray for usage with C++11 range based loops
+	v0.1.1d 10.01.17 minor change from static const char* to static const char* const in some places
+	v0.1.1c 07.11.16 minor edits, no runtime changes
 	v0.1.1b 10.10.16 fixed some warnings when tmj_size_t is signed
 	v0.1.1a 07.10.16 removed usage of unsigned arithmetic when tmj_size_t is signed
 	v0.1.1  13.09.16 changed JsonValue interface to have operator[] overloads for convenience
@@ -189,9 +193,12 @@ LICENSE
 	#ifndef TMJ_TO_INT
 		#define TMJ_DEFINE_OWN_STRING_CONVERSIONS
 		#define TMJ_TO_INT( str, len, base, def ) tmj_to_int( ( str ), ( len ), ( base ), ( def ) )
-		#define TMJ_TO_UINT( str, len, base, def ) tmj_to_uint( ( str ), ( len ), ( base ), ( def ) )
-		#define TMJ_TO_INT64( str, len, base, def ) tmj_to_int64( ( str ), ( len ), ( base ), ( def ) )
-		#define TMJ_TO_UINT64( str, len, base, def ) tmj_to_uint64( ( str ), ( len ), ( base ), ( def ) )
+		#define TMJ_TO_UINT( str, len, base, def ) \
+			tmj_to_uint( ( str ), ( len ), ( base ), ( def ) )
+		#define TMJ_TO_INT64( str, len, base, def ) \
+			tmj_to_int64( ( str ), ( len ), ( base ), ( def ) )
+		#define TMJ_TO_UINT64( str, len, base, def ) \
+			tmj_to_uint64( ( str ), ( len ), ( base ), ( def ) )
 		#define TMJ_TO_FLOAT( str, len, def ) tmj_to_float( ( str ), ( len ), ( def ) )
 		#define TMJ_TO_DOUBLE( str, len, def ) tmj_to_double( ( str ), ( len ), ( def ) )
 	#endif
@@ -388,7 +395,7 @@ typedef struct {
 
 	tmj_size_t line; // current line
 	tmj_size_t column; // current column
-	
+
 	// these next 3 fields are safe to access
 	JsonStringView current; // the contents of the current token
 	JsonTokenType lastToken; // last token that was parsed
@@ -456,7 +463,7 @@ TMJ_DEF tmj_bool jsonSkipCurrent( JsonReader* reader, JsonContext currentContext
 tmj_size_t jsonCopyUnescapedString( JsonStringView str, char* buffer, tmj_size_t size );
 
 // copy a concatenated string.
-// You only need to call this if you use JSON_READER_CONCATENATED_STRINGS or 
+// You only need to call this if you use JSON_READER_CONCATENATED_STRINGS or
 // JSON_READER_CONCATENATED_STRINGS_IN_ARRAYS and the valueType of the current token is
 // JVAL_CONCAT_STRING
 tmj_size_t jsonCopyConcatenatedString( JsonStringView str, char* buffer, tmj_size_t size );
@@ -531,6 +538,17 @@ typedef struct {
 #endif
 } JsonArray;
 
+typedef struct {
+	JsonValue* values;
+	tmj_size_t count;
+
+#ifdef __cplusplus
+	tmj_size_t size() const;
+	JsonObject operator[]( tmj_size_t index ) const;
+	inline explicit operator bool() const { return values != nullptr; }
+#endif
+} JsonObjectArray;
+
 struct JsonValueStruct {
 	JsonValueType type;
 	union {
@@ -564,6 +582,7 @@ struct JsonValueStruct {
 	// returns a JsonArray if value contains an array, returns a nil array otherwise
 	// see documentation at the top of the file for what nil arrays are
 	JsonArray getArray() const;
+	JsonObjectArray getObjectArray() const;
 
 	// returns whether value is null
 	bool isNull() const;
@@ -629,6 +648,20 @@ TMJ_DEF JsonDocument jsonMakeDocumentEx( JsonStackAllocator* allocator, const ch
 	JsonNode* end( const JsonObject& a );
 	JsonValue* begin( const JsonArray& a );
 	JsonValue* end( const JsonArray& a );
+
+	// iterator for range based loops that yield JsonObjects when dereferenced
+	struct JsonObjectArrayIterator {
+		JsonValue* ptr;
+
+		bool operator!=( JsonObjectArrayIterator other ) const;
+		bool operator==( JsonObjectArrayIterator other ) const;
+		JsonObjectArrayIterator& operator++();
+		JsonObjectArrayIterator operator++( int );
+		JsonObject operator*() const;
+	};
+
+	JsonObjectArrayIterator begin( const JsonObjectArray& a );
+	JsonObjectArrayIterator end( const JsonObjectArray& a );
 #endif
 
 #if !defined( TMJ_PASS_BY_POINTER ) && defined( __cplusplus )
@@ -654,6 +687,7 @@ TMJ_DEF JsonObject jsonGetObject( JsonValueArg value );
 // returns a JsonArray if value contains an array, returns a nil array otherwise
 // see documentation at the top of the file for what nil arrays are
 TMJ_DEF JsonArray jsonGetArray( JsonValueArg value );
+TMJ_DEF JsonObjectArray jsonGetObjectArray( JsonValueArg value );
 
 TMJ_DEF JsonValue jsonGetMember( JsonObjectArg object, const char* name );
 TMJ_DEF JsonValue* jsonQueryMember( JsonObjectArg object, const char* name );
@@ -694,9 +728,11 @@ TMJ_DEF tmj_bool jsonGetBool( JsonValueArg value, tmj_bool def );
     JsonValue jsonGetValue( JsonObjectArg object, const char* name );
     JsonObject jsonGetObject( JsonObjectArg object, const char* name );
     JsonArray jsonGetArray( JsonObjectArg object, const char* name );
+    JsonObjectArray jsonGetObjectArray( JsonObjectArg object, const char* name );
     JsonValue jsonGetValue( JsonArrayArg array, tmj_size_t index );
     JsonObject jsonGetObject( JsonArrayArg array, tmj_size_t index );
     JsonArray jsonGetArray( JsonArrayArg array, tmj_size_t index );
+    JsonObjectArray jsonGetObjectArray( JsonArrayArg array, tmj_size_t index );
 
     int jsonGetInt( JsonValueArg value );
     unsigned int jsonGetUInt( JsonValueArg value );
@@ -753,6 +789,10 @@ TMJ_DEF tmj_bool jsonGetBool( JsonValueArg value, tmj_bool def );
 	{
 		return jsonGetArray( jsonGetMember( object, name ) );
 	}
+	inline JsonObjectArray jsonGetObjectArray( JsonObjectArg object, const char* name )
+	{
+		return jsonGetObjectArray( jsonGetMember( object, name ) );
+	}
 	inline JsonValue jsonGetValue( JsonArrayArg array, tmj_size_t index )
 	{
 		return jsonGetEntry( array, index );
@@ -764,6 +804,10 @@ TMJ_DEF tmj_bool jsonGetBool( JsonValueArg value, tmj_bool def );
 	inline JsonArray jsonGetArray( JsonArrayArg array, tmj_size_t index )
 	{
 		return jsonGetArray( jsonGetEntry( array, index ) );
+	}
+	inline JsonObjectArray jsonGetObjectArray( JsonArrayArg array, tmj_size_t index )
+	{
+		return jsonGetObjectArray( jsonGetEntry( array, index ) );
 	}
 
 	inline int jsonGetInt( JsonValueArg value )
@@ -835,6 +879,30 @@ TMJ_DEF tmj_bool jsonGetBool( JsonValueArg value, tmj_bool def );
     inline JsonValue* begin( const JsonArray& a ) { return a.values; }
     inline JsonValue* end( const JsonArray& a ) { return a.values + a.count; }
 
+    inline bool JsonObjectArrayIterator::operator!=( JsonObjectArrayIterator other ) const
+    {
+    	return ptr != other.ptr;
+    }
+    inline bool JsonObjectArrayIterator::operator==( JsonObjectArrayIterator other ) const
+    {
+	    return ptr != other.ptr;
+    }
+    inline JsonObjectArrayIterator& JsonObjectArrayIterator::operator++()
+    {
+    	++ptr;
+    	return *this;
+    }
+    inline JsonObjectArrayIterator JsonObjectArrayIterator::operator++( int )
+    {
+    	JsonObjectArrayIterator result = *this;
+    	++ptr;
+    	return result;
+    }
+    inline JsonObject JsonObjectArrayIterator::operator*() const { return ptr->getObject(); }
+
+    inline JsonObjectArrayIterator begin( const JsonObjectArray& a ) { return {a.values}; }
+    inline JsonObjectArrayIterator end( const JsonObjectArray& a ) { return {a.values + a.count}; }
+
     #ifdef TMJ_STRING_VIEW
     	inline TMJ_STRING_VIEW JsonValueStruct::getString( TMJ_STRING_VIEW def ) const
     	{
@@ -860,15 +928,26 @@ TMJ_DEF tmj_bool jsonGetBool( JsonValueArg value, tmj_bool def );
 	    return jsonGetObject( TMJ_ARG( *this ) );
     }
     inline JsonArray JsonValueStruct::getArray() const { return jsonGetArray( TMJ_ARG( *this ) ); }
+    inline JsonObjectArray JsonValueStruct::getObjectArray() const
+    {
+	    return jsonGetObjectArray( TMJ_ARG( *this ) );
+    }
     inline bool JsonValueStruct::isNull() const { return jsonIsNull( TMJ_ARG( *this ) ); }
     inline bool JsonValueStruct::isIntegral() const { return jsonIsIntegral( TMJ_ARG( *this ) ); }
     inline bool JsonValueStruct::isString() const { return jsonIsString( TMJ_ARG( *this ) ); }
 
     inline tmj_size_t JsonArray::size() const { return count; }
-    JsonValue JsonArray::operator[]( tmj_size_t index ) const
+    inline JsonValue JsonArray::operator[]( tmj_size_t index ) const
     {
 	    return jsonGetEntry( TMJ_ARG( *this ), index );
     }
+
+    inline tmj_size_t JsonObjectArray::size() const { return count; }
+	inline JsonObject JsonObjectArray::operator[]( tmj_size_t index ) const
+	{
+		TMJ_ASSERT( index >= 0 && index < count );
+	    return jsonGetObject( values[index] );
+	}
 
     inline tmj_size_t JsonObject::size() const { return count; }
     inline bool JsonObject::exists( const char* name ) const
@@ -1066,7 +1145,7 @@ TMJ_DEF double jsonToDouble( JsonStringView str, double def )
 			if( compareStringIgnoreCase( str_.data, str_.size, "INFINITY", 8 ) ) {
 				return ( neg ) ? ( -TMJ_INFINITY ) : ( TMJ_INFINITY );
 			}
-	#endif 
+	#endif
 	#if defined( TMJ_NAN )
 			if( compareStringIgnoreCase( str_.data, str_.size, "NAN", 3 ) ) {
 				return ( neg ) ? ( -TMJ_NAN ) : ( TMJ_NAN );
@@ -1155,7 +1234,7 @@ TMJ_DEF tmj_bool jsonToBool( JsonStringView str, tmj_bool def )
 TMJ_DEF const char* jsonGetErrorString( JsonErrorType error )
 {
 	TMJ_ASSERT( error >= 0 && error <= JERR_INTERNAL_ERROR );
-	static const char* ErrorStrings[] = {
+	static const char* const ErrorStrings[] = {
 		"Ok",
 		"Unexpected Token",
 		"Unexpected EOF",
@@ -1179,7 +1258,7 @@ static void jsonAdvance( JsonReader* reader )
 }
 static tmj_size_t skipWhitespace( JsonReader* reader )
 {
-	static const char* whitespace = " \t\r\f\n\v";
+	static const char* const whitespace = " \t\r\f\n\v";
 	const char* p;
 	while( ( p = (const char*)TMJ_MEMCHR( whitespace, reader->data[0], 6 ) ) != TMJ_NULL ) {
 		if( reader->data[0] == '\n' ) {
@@ -1924,10 +2003,7 @@ static tmj_bool jsonParseUnquotedPropertyName( JsonReader* reader, JsonContext c
 		}
 		reader->current.size = (tmj_size_t)( reader->data - reader->current.data );
 		reader->lastToken = JTOK_PROPERTYNAME;
-		if( !jsonParseColon( reader ) ) {
-			return TMJ_FALSE;
-		}
-		return TMJ_TRUE;
+		return jsonParseColon( reader );
 	}
 	return TMJ_FALSE;
 }
@@ -2506,7 +2582,7 @@ tmj_size_t jsonCopyConcatenatedString( JsonStringView str, char* buffer, tmj_siz
 
 JsonStringView jsonAllocateUnescapedString( JsonStackAllocator* allocator, JsonStringView str )
 {
-	JsonStringView result = {0};
+	JsonStringView result = {TMJ_NULL};
 	char* buffer = (char*)jsonAllocate( allocator, str.size, sizeof( char ) );
 	if( buffer ) {
 		result.size = jsonCopyUnescapedString( str, buffer, str.size );
@@ -2522,7 +2598,7 @@ JsonStringView jsonAllocateUnescapedString( JsonStackAllocator* allocator, JsonS
 }
 JsonStringView jsonAllocateConcatenatedString( JsonStackAllocator* allocator, JsonStringView str )
 {
-	JsonStringView result = {0};
+	JsonStringView result = {TMJ_NULL};
 	char* buffer = (char*)jsonAllocate( allocator, str.size, sizeof( char ) );
 	if( buffer ) {
 		result.size = jsonCopyConcatenatedString( str, buffer, str.size );
@@ -2846,7 +2922,7 @@ static JsonValue jsonAllocateValueEx( JsonStackAllocator* allocator, JsonReader*
 		case JVAL_CONCAT_STRING: {
 			result.type = JVAL_STRING;
 			result.data.content = jsonAllocateConcatenatedString( allocator, reader->current );
-			break;	
+			break;
 		}
 		case JVAL_RAW_STRING: {
 			result.type = JVAL_STRING;
@@ -3137,7 +3213,7 @@ TMJ_DEF tmj_bool jsonIsString( JsonValueArg value )
 }
 TMJ_DEF JsonObject jsonGetObject( JsonValueArg value )
 {
-	JsonObject result = {0};
+	JsonObject result = {TMJ_NULL};
 	if( TMJ_DEREF( value ).type == JVAL_OBJECT ) {
 		result = TMJ_DEREF( value ).data.object;
 	}
@@ -3146,9 +3222,18 @@ TMJ_DEF JsonObject jsonGetObject( JsonValueArg value )
 TMJ_DEF JsonArray jsonGetArray( JsonValueArg value )
 
 {
-	JsonArray result = {0};
+	JsonArray result = {TMJ_NULL};
 	if( TMJ_DEREF( value ).type == JVAL_ARRAY ) {
 		result = TMJ_DEREF( value ).data.array;
+	}
+	return result;
+}
+TMJ_DEF JsonObjectArray jsonGetObjectArray( JsonValueArg value )
+{
+	JsonObjectArray result = {TMJ_NULL};
+	if( TMJ_DEREF( value ).type == JVAL_ARRAY ) {
+		result.values = TMJ_DEREF( value ).data.array.values;
+		result.count = TMJ_DEREF( value ).data.array.count;
 	}
 	return result;
 }
