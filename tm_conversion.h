@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.4c - public domain
+tm_conversion.h v0.9.7 - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -9,7 +9,7 @@ USAGE
 	To implement the interfaces in this header,
 	    #define TM_CONVERSION_IMPLEMENTATION
 	in ONE C or C++ source file before #including this header.
-	
+
 	See SWITCHES for more options.
 
 PURPOSE
@@ -84,8 +84,15 @@ ISSUES
 	This is because we use floating arithmetic and we lose too much precision when dealing with
 	very big numbers. This could be fixed by using arbitrary precision math, but that pretty much
 	is beyond the scope of this library. Do not use these functions for big numbers.
+	For precision > 9, decimal digits after the 9nth are not correctly rounded, but floating point
+	values survive the roundtrip of print_double -> scan_double exactly at precision 14. This means
+	print_double is safe to use for serializing with precision set to 14.
 
 HISTORY
+	v0.9.7  18.01.17 added some more utility overloads
+	v0.9.6a 10.01.17 minor change from static const char* to static const char* const in print_bool
+	v0.9.6  07.11.16 increased print_double max precision from 9 to 14
+	v0.9.5  23.10.16 fixed a buffer underflow bug in print_hex_* and prind_decimal_*
 	v0.9.4c 08.10.16 fixed a buffer underflow bug in print_hex_u*_impl
 	v0.9.4b 07.10.16 typos
 	v0.9.4a 29.09.16 made PrintFormat forward declarable
@@ -307,7 +314,7 @@ int main()
 	string_view sub0 = str.substr( 2, 4 ); // sub0 is "3456"
 	int value = convert_to< int >( sub0 );
 
-	printf( "%d\n", value ); 
+	printf( "%d\n", value );
 }
 /*
 OUTPUT:
@@ -559,6 +566,10 @@ TMC_DEF tmc_size_t print_hex_u64( char* dest, tmc_size_t maxlen, tmc_bool lower,
 	tmc_size_t scan( const char* nullterminated, int base, tmc_uint32* out );
 	tmc_size_t scan( const char* nullterminated, int base, tmc_int64* out );
 	tmc_size_t scan( const char* nullterminated, int base, tmc_uint64* out );
+	tmc_size_t scan( const char* nullterminated, tmc_int32* out );
+	tmc_size_t scan( const char* nullterminated, tmc_uint32* out );
+	tmc_size_t scan( const char* nullterminated, tmc_int64* out );
+	tmc_size_t scan( const char* nullterminated, tmc_uint64* out );
 	tmc_size_t scan( const char* nullterminated, float* out );
 	tmc_size_t scan( const char* nullterminated, double* out );
 	tmc_size_t scan( const char* nullterminated, bool* out );
@@ -570,6 +581,12 @@ TMC_DEF tmc_size_t print_hex_u64( char* dest, tmc_size_t maxlen, tmc_bool lower,
 	tmc_size_t scan( const char* str, tmc_size_t len, float* out );
 	tmc_size_t scan( const char* str, tmc_size_t len, double* out );
 	tmc_size_t scan( const char* str, tmc_size_t len, bool* out );
+
+	// these need _n suffix, otherwise they have the same signature as the nullterminated version
+	tmc_size_t scan_n( const char* str, tmc_size_t len, tmc_int32* out );
+	tmc_size_t scan_n( const char* str, tmc_size_t len, tmc_uint32* out );
+	tmc_size_t scan_n( const char* str, tmc_size_t len, tmc_int64* out );
+	tmc_size_t scan_n( const char* str, tmc_size_t len, tmc_uint64* out );
 
 	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_int32 value );
 	tmc_size_t print( char* dest, tmc_size_t maxlen, PrintFormat* format, tmc_uint32 value );
@@ -588,6 +605,18 @@ TMC_DEF tmc_size_t print_hex_u64( char* dest, tmc_size_t maxlen, tmc_bool lower,
 	tmc_size_t scan_bool( const char* str, tmc_size_t len, bool* out );
 	// overloads for some sort of string_view class
 	#ifdef TMC_STRING_VIEW
+		tmc_size_t scan( TMC_STRING_VIEW str, int base, tmc_int32* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, int base, tmc_uint32* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, int base, tmc_int64* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, int base, tmc_uint64* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, tmc_int32* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, tmc_uint32* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, tmc_int64* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, tmc_uint64* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, float* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, double* out );
+		tmc_size_t scan( TMC_STRING_VIEW str, bool* out );
+
 		tmc_size_t scan_i32( TMC_STRING_VIEW str, int base, tmc_int32* out );
 		tmc_size_t scan_u32( TMC_STRING_VIEW str, int base, tmc_uint32* out );
 		tmc_size_t scan_i64( TMC_STRING_VIEW str, int base, tmc_int64* out );
@@ -631,7 +660,7 @@ TMC_DEF tmc_size_t print_hex_u64( char* dest, tmc_size_t maxlen, tmc_bool lower,
 		double to_double( TMC_STRING_VIEW str, double def = {} );
 		tmc_bool to_bool( TMC_STRING_VIEW str, tmc_bool def = {} );
 	#endif // TMC_STRING_VIEW
-	
+
 	/*
 	to_string functions
 	Turn value into string and store into dest.
@@ -665,7 +694,7 @@ TMC_DEF tmc_size_t print_hex_u64( char* dest, tmc_size_t maxlen, tmc_bool lower,
 	auto value = convert_to< int >( str );
 	*/
 	template< class T > T convert_to( const char* str, T def = {} );
-	
+
 	#ifdef TMC_STRING_VIEW
 		template< class T > T convert_to( TMC_STRING_VIEW str, T def = {} );
 	#endif // TMC_STRING_VIEW
@@ -695,6 +724,22 @@ inline PrintFormat defaultPrintFormat()
 	{
 		return scan_u64( nullterminated, base, out );
 	}
+	inline tmc_size_t scan( const char* nullterminated, tmc_int32* out )
+	{
+		return scan_i32( nullterminated, 10, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, tmc_uint32* out )
+	{
+		return scan_u32( nullterminated, 10, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, tmc_int64* out )
+	{
+		return scan_i64( nullterminated, 10, out );
+	}
+	inline tmc_size_t scan( const char* nullterminated, tmc_uint64* out )
+	{
+		return scan_u64( nullterminated, 10, out );
+	}
 	inline tmc_size_t scan( const char* nullterminated, float* out )
 	{
 		return scan_float( nullterminated, out );
@@ -723,6 +768,22 @@ inline PrintFormat defaultPrintFormat()
 	inline tmc_size_t scan( const char* str, tmc_size_t len, int base, tmc_uint64* out )
 	{
 		return scan_u64_n( str, len, base, out );
+	}
+	inline tmc_size_t scan_n( const char* str, tmc_size_t len, tmc_int32* out )
+	{
+		return scan_i32_n( str, len, 10, out );
+	}
+	inline tmc_size_t scan_n( const char* str, tmc_size_t len, tmc_uint32* out )
+	{
+		return scan_u32_n( str, len, 10, out );
+	}
+	inline tmc_size_t scan_n( const char* str, tmc_size_t len, tmc_int64* out )
+	{
+		return scan_i64_n( str, len, 10, out );
+	}
+	inline tmc_size_t scan_n( const char* str, tmc_size_t len, tmc_uint64* out )
+	{
+		return scan_u64_n( str, len, 10, out );
 	}
 	inline tmc_size_t scan( const char* str, tmc_size_t len, float* out )
 	{
@@ -795,6 +856,51 @@ inline PrintFormat defaultPrintFormat()
 		return scan_bool_n( str, len, out );
 	}
 #ifdef TMC_STRING_VIEW
+	inline tmc_size_t scan( TMC_STRING_VIEW str, int base, tmc_int32* out )
+    {
+	    return scan_i32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, int base, tmc_uint32* out )
+    {
+	    return scan_u32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, int base, tmc_int64* out )
+    {
+	    return scan_i64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, int base, tmc_uint64* out )
+    {
+	    return scan_u64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, tmc_int32* out )
+    {
+	    return scan_i32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, tmc_uint32* out )
+    {
+	    return scan_u32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, tmc_int64* out )
+    {
+	    return scan_i64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, tmc_uint64* out )
+    {
+	    return scan_u64_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), 10, out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, float* out )
+    {
+	    return scan_float_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, double* out )
+    {
+	    return scan_double_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), out );
+    }
+    inline tmc_size_t scan( TMC_STRING_VIEW str, bool* out )
+    {
+	    return scan_bool_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), out );
+    }
+
     inline tmc_size_t scan_i32( TMC_STRING_VIEW str, int base, tmc_int32* out )
     {
 	    return scan_i32_n( TMC_STRING_VIEW_DATA( str ), TMC_STRING_VIEW_SIZE( str ), base, out );
@@ -1075,7 +1181,7 @@ extern "C" {
 			return result;
 		}
 	#endif // TMC_STRING_VIEW
-	
+
 	// to_string functions
 	inline tmc_size_t to_string( tmc_int32 value, char* dest, tmc_size_t maxlen, Radix base )
 	{
@@ -1239,6 +1345,7 @@ extern "C" {
 #endif
 
 #define tmc_char_to_i32( x ) ( (tmc_int32)( (tmc_uint8)x ) )
+#define TMC_MAX_PRECISION 14
 
 TMC_DEF tmc_size_t scan_i32( const char* nullterminated, int base, tmc_int32* out )
 {
@@ -2310,8 +2417,8 @@ TMC_DEF tmc_size_t print_bool( char* dest, tmc_size_t maxlen, PrintFormat* forma
 	if( format && ( format->flags & PF_BOOL_AS_NUMBER ) ) {
 		return print_string( dest, maxlen, ( value ) ? ( "1" ) : ( "0" ), 1 );
 	} else {
-		static const char* strings[] = {"false", "true"};
-		static tmc_size_t lengths[] = {sizeof( "false" ) - 1, sizeof( "true" ) - 1};
+		static const char* const strings[] = {"false", "true"};
+		static const tmc_size_t lengths[] = {sizeof( "false" ) - 1, sizeof( "true" ) - 1};
 		int index = value != 0;
 		return print_string( dest, maxlen, strings[index], lengths[index] );
 	}
@@ -2339,11 +2446,11 @@ static const char print_DoubleDigitsToCharTable[200] = {
     '6', '6', '7', '6', '8', '6', '9', '7', '0', '7', '1', '7', '2', '7', '3', '7', '4', '7', '5',
     '7', '6', '7', '7', '7', '8', '7', '9', '8', '0', '8', '1', '8', '2', '8', '3', '8', '4', '8',
     '5', '8', '6', '8', '7', '8', '8', '8', '9', '9', '0', '9', '1', '9', '2', '9', '3', '9', '4',
-    '9', '5', '9', '6', '9', '7', '9', '8', '9', '9'
-};
+    '9', '5', '9', '6', '9', '7', '9', '8', '9', '9'};
 
-static const double print_PowersOfTen[] = {1,	 10,	100,   1.0e3, 1.0e4,
-										   1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9};
+static const double print_PowersOfTen[] = {1,      10,     100,    1.0e3,  1.0e4,
+                                           1.0e5,  1.0e6,  1.0e7,  1.0e8,  1.0e9,
+                                           1.0e10, 1.0e11, 1.0e12, 1.0e13, 1.0e14};
 // magnitude is the number of digits before decimal point
 static tmc_int32 print_magnitude( double value )
 {
@@ -2475,6 +2582,9 @@ static tmc_size_t print_decimal_u32_impl( char* dest, tmc_size_t maxlen, int wid
 	if( len > maxlen ) {
 		len = maxlen;
 	}
+	if( width > maxlen ) {
+		width = (int)maxlen;
+	}
 	char* p = dest;
 	if( len < (tmc_size_t)width ) {
 		tmc_size_t count = maxlen - ( (tmc_size_t)width - len );
@@ -2534,6 +2644,9 @@ static tmc_size_t print_decimal_u64_impl( char* dest, tmc_size_t maxlen, int wid
 	tmc_size_t len = numberOfDigits64( value );
 	if( len > maxlen ) {
 		len = maxlen;
+	}
+	if( width > maxlen ) {
+		width = (int)maxlen;
 	}
 	char* p = dest;
 	if( len < (tmc_size_t)width ) {
@@ -2634,6 +2747,9 @@ static tmc_size_t print_hex_u32_impl( char* dest, tmc_size_t maxlen, int width, 
 	if( len > maxlen ) {
 		len = maxlen;
 	}
+	if( width > maxlen ) {
+		width = (int)maxlen;
+	}
 	tmc_size_t result = len;
 	char* p = dest;
 	if( len < (tmc_size_t)width ) {
@@ -2666,6 +2782,9 @@ static tmc_size_t print_hex_u64_impl( char* dest, tmc_size_t maxlen, int width, 
 	tmc_size_t len = numberOfHexDigits64( value );
 	if( len > maxlen ) {
 		len = maxlen;
+	}
+	if( width > maxlen ) {
+		width = (int)maxlen;
 	}
 	tmc_size_t result = len;
 	char* p = dest;
@@ -2989,8 +3108,8 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 		precision = format->precision;
 		if( precision < 0 ) {
 			precision = 0;
-		} else if( precision > 9 ) {
-			precision = 9;
+		} else if( precision > TMC_MAX_PRECISION ) {
+			precision = TMC_MAX_PRECISION;
 		}
 	}
 
@@ -3030,8 +3149,9 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 	if( precision ) {
 		printWidth = precision;
 		// fractionalPart is positive, so we can round by adding 0.5 before truncating
-		tmc_uint32 fractionalDigits =
-			( tmc_uint32 )( ( fractionalPart * print_PowersOfTen[precision] ) + 0.5 );
+		// this might produce wrong rounding, but matches MSVC's printf rounding
+		tmc_uint64 fractionalDigits =
+			( tmc_uint64 )( ( fractionalPart * print_PowersOfTen[precision] ) + 0.5 );
 		if( fractionalDigits ) {
 			if( maxlen ) {
 				*dest++ = '.';
@@ -3039,7 +3159,7 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 				if( format && !( format->flags & PF_TRAILING_ZEROES ) ) {
 					// get rid of trailing zeroes
 					for( ;; ) {
-						tmc_uint32 digit = fractionalDigits % 10;
+						tmc_uint64 digit = fractionalDigits % 10;
 						if( !digit ) {
 							fractionalDigits /= 10;
 							--printWidth;
@@ -3051,7 +3171,7 @@ TMC_DEF tmc_size_t print_double( char* dest, tmc_size_t maxlen, PrintFormat* for
 				// check whether we got rid of all digits when trimming trailing zeroes
 				if( printWidth > 0 ) {
 					tmc_size_t fractionalLen =
-					    print_decimal_u32_impl( dest, maxlen, printWidth, fractionalDigits );
+					    print_decimal_u64_impl( dest, maxlen, printWidth, fractionalDigits );
 					maxlen -= fractionalLen;
 					dest += fractionalLen;
 				} else {
