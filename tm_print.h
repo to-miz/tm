@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.4b - public domain
+tm_print.h v0.0.4d - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -33,13 +33,15 @@ ISSUES
 	sized)
 
 HISTORY
+	v0.0.4d 10.01.17 minor change from static const char* to static const char* const in print_bool
+	v0.0.4c 23.10.16 added some assertions for bounds checking
 	v0.0.4b 07.10.16 fixed some casting issues when tmp_size_t is signed
 	v0.0.4a 29.09.16 fixed a bug where inputting an escaped {{ was resulting in an infinite loop
 	v0.0.4  29.09.16 added signed/unsigned char, short and long handling
 	                 fixed compiler errors when compiling with clang
 	v0.0.3  27.09.16 added printing custom types by overloading snprint
 	                 added initialFormatting parameter to snprint so that custom printing can
-	                 inherit formatting options 
+	                 inherit formatting options
 	v0.0.2  26.09.16 changed makeFlags to tmp_type_flags so that it is guaranteed to be a
 	                 compile time constant
 	                 added string view overloads so that print can accept a string view as the
@@ -86,7 +88,7 @@ LICENSE
 		#include <cstdlib>
 		#define TMP_STRTOUL strtoul
 	#endif
-	
+
 	#if defined( TMP_NO_TM_CONVERSION ) && defined( TMP_NO_STDIO ) && !defined( TMP_SNPRINTF )
 		#error "TMP_SNPRINTF has to be defined if TMP_NO_STDIO and TMP_NO_TM_CONVERSION are defined"
 	#endif
@@ -691,7 +693,7 @@ enum Values : unsigned int {
 	WidthSpecified     = TMP_BITFIELD( 6 ),
 	PrecisionSpecified = TMP_BITFIELD( 7 ),
 };
-}	
+}
 
 #ifdef TMP_NO_TM_CONVERSION
 static tmp_size_t scan_u32_n( const char* str, tmp_size_t len, int base, unsigned int* out )
@@ -1006,30 +1008,35 @@ struct memoryprinter {
 			}
 			case PrintType::Bool: {
 				auto len = print_bool( data, remaining, &format, value.b );
+				TMP_ASSERT( len <= remaining );
 				data += len;
 				remaining -= len;
 				break;
 			}
 			case PrintType::Int: {
 				auto len = print_i32( data, remaining, &format, value.i );
+				TMP_ASSERT( len <= remaining );
 				data += len;
 				remaining -= len;
 				break;
 			}
 			case PrintType::UInt: {
 				auto len = print_u32( data, remaining, &format, value.u );
+				TMP_ASSERT( len <= remaining );
 				data += len;
 				remaining -= len;
 				break;
 			}
 			case PrintType::Int64: {
 				auto len = print_i64( data, remaining, &format, value.ll );
+				TMP_ASSERT( len <= remaining );
 				data += len;
 				remaining -= len;
 				break;
 			}
 			case PrintType::UInt64: {
 				auto len = print_u64( data, remaining, &format, value.ull );
+				TMP_ASSERT( len <= remaining );
 				data += len;
 				remaining -= len;
 				break;
@@ -1040,6 +1047,7 @@ struct memoryprinter {
 					format.flags |= PF_TRAILING_ZEROES;
 				#endif
 				auto len = print_float( data, remaining, &format, value.f );
+				TMP_ASSERT( len <= remaining );
 				data += len;
 				remaining -= len;
 				#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
@@ -1053,6 +1061,7 @@ struct memoryprinter {
 					format.flags |= PF_TRAILING_ZEROES;
 				#endif
 				auto len = print_double( data, remaining, &format, value.d );
+				TMP_ASSERT( len <= remaining );
 				data += len;
 				remaining -= len;
 				#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
@@ -1071,6 +1080,7 @@ struct memoryprinter {
 #ifdef TMP_CUSTOM_PRINTING
 			case PrintType::Custom: {
 				auto len =  value.custom.customPrint( data, remaining, format, value.custom.data );
+				TMP_ASSERT( len <= remaining );
 				remaining -= len;
 				data += len;
 				break;
@@ -1086,6 +1096,7 @@ struct memoryprinter {
 	void operator()( const char* str, tmp_size_t len )
 	{
 		auto size = TMP_MIN( len, remaining );
+		assert( size >= 0 );
 		TMP_MEMCPY( data, str, size );
 		remaining -= size;
 		data += size;
@@ -1222,8 +1233,8 @@ static tmp_size_t print_bool( char* dest, tmp_size_t maxlen, PrintFormat* format
 		}
 		return 1;
 	} else {
-		static const char* strings[] = {"false", "true"};
-		static tmp_size_t lengths[] = {sizeof( "false" ) - 1, sizeof( "true" ) - 1};
+		static const char* const strings[] = {"false", "true"};
+		static const tmp_size_t lengths[] = {sizeof( "false" ) - 1, sizeof( "true" ) - 1};
 		size_t index = value != 0;
 
 		auto size = TMP_MIN( lengths[index], maxlen );
