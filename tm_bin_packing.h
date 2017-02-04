@@ -1,5 +1,5 @@
 /*
-tm_bin_packing.h v1.0.1 - public domain
+tm_bin_packing.h v1.0.1a - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -209,6 +209,7 @@ SAMPLES
 		}
 
 HISTORY
+	v1.0.1a	07.11.16 added TMBP_NULL
 	v1.0.1	11.10.16 fixed a bug in batch insertion functions using the wrong index
 	v1.0b   09.10.16 fixed a typo
 	v1.0a   07.10.16 removed using forced unsigned arithmetic when tmbp_size_t is signed
@@ -254,8 +255,10 @@ LICENSE
 
 #ifdef __cplusplus
 	typedef bool tmbp_bool;
+	#define TMBP_NULL nullptr;
 #else
 	typedef int tmbp_bool;
+	#define TMBP_NULL NULL;
 #endif
 
 #ifndef TMBP_STATIC
@@ -556,11 +559,11 @@ TMBP_DEF BinPack binPackCreate( tmbp_int width, tmbp_int height, void* allocator
 TMBP_DEF void binPackDestroy( BinPack* pack, void* allocatorState, BinPackFree* freeFunc )
 {
 	freeFunc( allocatorState, pack->freeRects.data, pack->freeRects.size );
-	pack->freeRects.data     = NULL;
+	pack->freeRects.data     = TMBP_NULL;
 	pack->freeRects.size     = 0;
 	pack->freeRects.capacity = 0;
 	freeFunc( allocatorState, pack->usedRects.data, pack->usedRects.size );
-	pack->usedRects.data     = NULL;
+	pack->usedRects.data     = TMBP_NULL;
 	pack->usedRects.size     = 0;
 	pack->usedRects.capacity = 0;
 }
@@ -592,8 +595,8 @@ TMBP_DEF BinPack binPackCreateStatic( tmbp_int width, tmbp_int height, tmbp_rect
 	result.usedRects.size     = 0;
 	result.usedRects.capacity = usedRectsCount;
 
-	result.reallocator.state      = NULL;
-	result.reallocator.reallocate = NULL;
+	result.reallocator.state      = TMBP_NULL;
+	result.reallocator.reallocate = TMBP_NULL;
 	binPackInit( &result, width, height );
 	return result;
 }
