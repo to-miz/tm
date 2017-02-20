@@ -1,5 +1,5 @@
 /*
-tm_utility v1.1.2 - public domain
+tm_utility v1.1.2a - public domain
 written by Tolga Mizrak 2016
 
 USAGE
@@ -14,6 +14,7 @@ NOTES
 	See comments at declarations for more info.
 
 HISTORY
+	v1.1.2a 24.01.17 setFlagCond is wrapped in do {} while( false ) now
 	v1.1.2  24.01.17 changed clamp to take two different types as min and max
 	v1.1.1a 02.10.16 fixed a minor warning of unused variable when asserts are not used
 	v1.1.1  02.10.16 added TMUT_NO_CSTYLE_TAGGED_UNION_MACROS and c-style tagged union macros
@@ -460,12 +461,14 @@ inline int mapToRange( int value, int min, int max )
 // flags
 #define setFlag( flags, flag_to_set ) ( flags ) |= ( flag_to_set )
 #define clearFlag( flags, flag_to_clear ) ( flags ) &= ~( flag_to_clear )
-#define setFlagCond( flags, flag_to_set, cond )  \
-	if( cond ) {                                 \
-		setFlag( ( flags ), ( flag_to_set ) );   \
-	} else {                                     \
-		clearFlag( ( flags ), ( flag_to_set ) ); \
-	}
+#define setFlagCond( flags, flag_to_set, cond )      \
+	do {                                             \
+		if( cond ) {                                 \
+			setFlag( ( flags ), ( flag_to_set ) );   \
+		} else {                                     \
+			clearFlag( ( flags ), ( flag_to_set ) ); \
+		}                                            \
+	} while( false )
 #define toggleFlag( flags, flag_to_toggle ) ( flags ) ^= ( flag_to_toggle )
 #define isFlagSet( flags, flag_to_check ) ( ( ( flags ) & ( flag_to_check ) ) != 0 )
 
