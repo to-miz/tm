@@ -1,5 +1,5 @@
 /*
-tm_json.h v.0.1.2 - public domain
+tm_json.h v.0.1.3 - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -106,6 +106,7 @@ ISSUES
 	- missing documentation and example usage code
 
 HISTORY
+	v0.1.3  10.02.17 string view operators are now preferred to const char* operators in JsonObject
 	v0.1.2  28.01.17 added jsonObjectArray for usage with C++11 range based loops
 	v0.1.1d 10.01.17 minor change from static const char* to static const char* const in some places
 	v0.1.1c 07.11.16 minor edits, no runtime changes
@@ -514,15 +515,17 @@ typedef struct {
 	mutable tmj_size_t lastAccess;
 
 	tmj_size_t size() const;
-	bool exists( const char* name ) const;
-	JsonValue* find( const char* name ) const;
-	JsonValue operator[]( const char* name ) const;
 	inline explicit operator bool() const { return nodes != nullptr; }
 
+	// prefer string view versions over const char*
 	#ifdef TMJ_STRING_VIEW
 		bool exists( TMJ_STRING_VIEW name ) const;
 		JsonValue* find( TMJ_STRING_VIEW name ) const;
 		JsonValue operator[]( TMJ_STRING_VIEW name ) const;
+	#else
+		bool exists( const char* name ) const;
+		JsonValue* find( const char* name ) const;
+		JsonValue operator[]( const char* name ) const;
 	#endif
 #endif
 } JsonObject;
@@ -591,9 +594,10 @@ struct JsonValueStruct {
 
 	// convenience overload to treat a value as an object directly
 	// use getObject directly, if you need to invoke operator[] or jsonGetMember repeatedly
-	inline JsonValue operator[]( const char* name ) { return getObject()[name]; }
 	#ifdef TMJ_STRING_VIEW
 		inline JsonValue operator[]( TMJ_STRING_VIEW name ) const { return getObject()[name]; }
+	#else
+		inline JsonValue operator[]( const char* name ) { return getObject()[name]; }
 	#endif // TMJ_STRING_VIEW
 
 	// convenience overload to treat a value as an array directly
@@ -950,18 +954,33 @@ TMJ_DEF tmj_bool jsonGetBool( JsonValueArg value, tmj_bool def );
 	}
 
     inline tmj_size_t JsonObject::size() const { return count; }
-    inline bool JsonObject::exists( const char* name ) const
-    {
-	    return jsonQueryMember( TMJ_ARG( *this ), name ) != TMJ_NULL;
-    }
-    inline JsonValue* JsonObject::find( const char* name ) const
-    {
-	    return jsonQueryMember( TMJ_ARG( *this ), name );
-    }
-    inline JsonValue JsonObject::operator[]( const char* name ) const
-    {
-        return jsonGetMember( *this, name );
-    }
+    #ifndef TMJ_STRING_VIEW
+	    inline JsonValue JsonObject::operator[]( const char* name ) const
+	    {
+	        return jsonGetMember( *this, name );
+	    }
+	    inline bool JsonObject::exists( const char* name ) const
+	    {
+		    return jsonQueryMember( TMJ_ARG( *this ), name ) != TMJ_NULL;
+	    }
+	    inline JsonValue* JsonObject::find( const char* name ) const
+	    {
+		    return jsonQueryMember( TMJ_ARG( *this ), name );
+	    }
+	#else
+	    inline JsonValue JsonObject::operator[]( TMJ_STRING_VIEW name ) const
+	    {
+	        return jsonGetMember( *this, name );
+	    }
+	    inline bool JsonObject::exists( TMJ_STRING_VIEW name ) const
+	    {
+		    return jsonQueryMember( TMJ_ARG( *this ), name ) != TMJ_NULL;
+	    }
+	    inline JsonValue* JsonObject::find( TMJ_STRING_VIEW name ) const
+	    {
+		    return jsonQueryMember( TMJ_ARG( *this ), name );
+	    }
+	#endif
 
     inline int JsonValueStruct::getInt( int def ) const
     {
