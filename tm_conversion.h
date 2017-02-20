@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.7 - public domain
+tm_conversion.h v0.9.8 - public domain
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -89,6 +89,7 @@ ISSUES
 	print_double is safe to use for serializing with precision set to 14.
 
 HISTORY
+	v0.9.8  18.02.17 fixed a bug in print_hex_u32 and print_hex_u64 not being able to print 0
 	v0.9.7  18.01.17 added some more utility overloads
 	v0.9.6a 10.01.17 minor change from static const char* to static const char* const in print_bool
 	v0.9.6  07.11.16 increased print_double max precision from 9 to 14
@@ -2741,6 +2742,13 @@ static tmc_size_t numberOfHexDigits64( tmc_uint64 value )
 static tmc_size_t print_hex_u32_impl( char* dest, tmc_size_t maxlen, int width, tmc_bool lower,
                                       tmc_uint32 value )
 {
+	if( !value ) {
+		if( maxlen ) {
+			*dest = '0';
+			return 1;
+		}
+		return 0;
+	}
 	const char* table =
 	    ( lower ) ? ( print_NumberToCharTableLower ) : ( print_NumberToCharTableUpper );
 	tmc_size_t len = numberOfHexDigits32( value );
@@ -2777,6 +2785,13 @@ static tmc_size_t print_hex_u32_impl( char* dest, tmc_size_t maxlen, int width, 
 static tmc_size_t print_hex_u64_impl( char* dest, tmc_size_t maxlen, int width, tmc_bool lower,
                                       tmc_uint64 value )
 {
+	if( !value ) {
+		if( maxlen ) {
+			*dest = '0';
+			return 1;
+		}
+		return 0;
+	}
 	const char* table =
 	    ( lower ) ? ( print_NumberToCharTableLower ) : ( print_NumberToCharTableUpper );
 	tmc_size_t len = numberOfHexDigits64( value );
