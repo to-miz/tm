@@ -1,5 +1,5 @@
 /*
-tm_bin_packing.h v1.0.1a - public domain
+tm_bin_packing.h v1.0.2 - public domain
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -59,7 +59,7 @@ NOTES
 		This depends on what your goal is.
 		If you need fast runtime bin packing where not all bins are inserted at the same time or not
 		known beforehand (like loading textures in a game and placing them on a texture atlas on
-		runtime) you should use guillotineRectBestShortSideFit and GuillotineSplitMinimizeArea
+		runtime) you should use guillotineBestShortSideFit and GuillotineSplitMinimizeArea
 		(BSSF-MINAS). The guillotine algorithm has low complexity for inserting bins, but also
 		doesn't result in the best quality of packing.
 
@@ -95,10 +95,6 @@ NOTES
 	TMBP_OWN_TYPES and supplying your own types by typedefing the same names.
 	If you are using a different integer type for tmbp_int, make sure to define TMBP_INT_MAX
 	and TMBP_INT_MIN with the right min/max values for that type.
-	If you are using signed integers when typedefing tmbp_size_t, note that you need to typedef
-	tmbp_usize_t with an unsigned version of the same size. This is because the algorithms cast
-	sizes to size_t internally by first casting to tmbp_usize_t, so that sizes are promoted to
-	register size integers without sign extension.
 
 SAMPLES
 	Writing your own insertion function for specific heuristics depending on your use case:
@@ -209,6 +205,8 @@ SAMPLES
 		}
 
 HISTORY
+	v1.0.2  31.03.17 fixed a bug in maxRectsInsert resulting in too many splits
+	v1.0.1b 29.03.17 changed documentation, fixed a typo, changed allocator functions signature
 	v1.0.1a	07.11.16 added TMBP_NULL
 	v1.0.1	11.10.16 fixed a bug in batch insertion functions using the wrong index
 	v1.0b   09.10.16 fixed a typo
@@ -276,9 +274,9 @@ extern "C" {
 // function types for taking function pointers to these signatures
 // params
 //	state: same as what was passed into binPackCreate, useful if you are using a stateful allocator
-typedef tmbp_rect* BinPackReallocate( void* state, tmbp_rect* ptr, size_t oldSize, size_t newSize );
-typedef tmbp_rect* BinPackAllocate( void* state, size_t size );
-typedef void BinPackFree( void* state, tmbp_rect* ptr, size_t size );
+typedef tmbp_rect* BinPackReallocate( void* state, tmbp_rect* ptr, tmbp_size_t oldSize, tmbp_size_t newSize );
+typedef tmbp_rect* BinPackAllocate( void* state, tmbp_size_t size );
+typedef void BinPackFree( void* state, tmbp_rect* ptr, tmbp_size_t size );
 
 typedef struct {
 	void* state;
@@ -300,8 +298,6 @@ typedef struct {
 	tmbp_rect_array usedRects;
 
 	BinPackReallocator reallocator;
-
-	tmbp_size_t maxFreeRectsSize;
 } BinPack;
 
 // Guillotine bin packing algorithms
@@ -1604,17 +1600,10 @@ TMBP_DEF BinPackResult maxRectsInsert( BinPack* pack, tmbp_int width, tmbp_int h
 	ret.placed                 = 1;
 	tmbp_rect* freeRects       = pack->freeRects.data;
 	tmbp_size_t freeRectsCount = pack->freeRects.size;
-	pack->maxFreeRectsSize     = 0;
-	for( tmbp_size_t i = 0; i < freeRectsCount; ) {
+	for( tmbp_size_t i = 0; i < freeRectsCount; i++) {
 		if( maxRectsSplitFreeNode( pack, freeRects[i], &ret.rect ) ) {
-			if( pack->freeRects.size > pack->maxFreeRectsSize ) {
-				pack->maxFreeRectsSize = pack->freeRects.size;
-			}
 			tmbp_erase( &pack->freeRects, i );
-			freeRectsCount = pack->freeRects.size;
-			continue;
 		}
-		++i;
 	}
 	maxRectsPruneFreeRects( pack );
 	*tmbp_push( &pack->usedRects, &pack->reallocator ) = ret.rect;
