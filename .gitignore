@@ -1,3 +1,5 @@
 builds/
 projects/
 *.suo
+
+*.sublime-workplace
