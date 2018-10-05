@@ -1,5 +1,5 @@
 /*
-tm_bezier.h v1.0a - public domain
+tm_bezier.h v1.0b - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -22,8 +22,8 @@ NOTES
 	value. This only works for special bezier curves, where no loops are present. Use this function
 	if you want to use bezier curves for easing. Your bezier curve points should be like this:
 		x0 = 0, y0 = 0
-		x1 = [0, 1], y1 = (-inf, inf)
-		x2 = [0, 1], y2 = (-inf, inf)
+		x1 in interval [0, 1], y1 in interval (-inf, inf)
+		x2 in interval [0, 1], y2 in interval (-inf, inf)
 		x3 = 1, y3 = 1
 	For most easing curves a steps count of 10 should be totally fine.
 
@@ -32,6 +32,7 @@ NOTES
 	natively.
 
 HISTORY
+	v1.0b	25.08.18 added repository link, changed some wording in the description
 	v1.0a	01.07.16 improved C99 conformity
 	v1.0	24.06.16 initial commit
 
