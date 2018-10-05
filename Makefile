@@ -25,13 +25,13 @@ arch := 64
 # autoconfig
 ifeq (${OS}, Windows_NT)
 	ext := .exe
-	MKDIR_CMD := cmd /c setlocal enableextensions && mkdir
+	MKDIR_CMD = mkdir $(subst /,\,${1})
 else
 	ifeq (${COMPILER}, cl)
 		COMPILER := ${FALLBACK_COMPILER}
 	endif
 	ext := .out
-	MKDIR_CMD := @mkdir -p
+	MKDIR_CMD = mkdir -p ${1}
 endif
 
 # files
@@ -43,21 +43,15 @@ TESTS_INCLUDE_DIRS  := tests/external ./ tests/src/
 
 # tm_conversion
 TM_CONVERSION_SRC  := tests/src/tm_conversion/main.cpp
-TM_CONVERSION_DEPS := ${TM_CONVERSION_SRC} tm_conversion.h tests/external/doctest/doctest.h
+TM_CONVERSION_DEPS := ${build_dir} ${TM_CONVERSION_SRC} tm_conversion.h tests/external/doctest/doctest.h
 TM_CONVERSION_DEPS += tests/src/assert_throws.h tests/src/assert_throws.cpp
 TM_CONVERSION_OUT  := ${build_dir}/tm_conversion_tests${ext}
 
 TM_CONVERSION_SRC_C  := tests/src/tm_conversion/main.c
-TM_CONVERSION_DEPS_C := ${TM_CONVERSION_SRC_C}
+TM_CONVERSION_DEPS_C := ${build_dir} ${TM_CONVERSION_SRC_C}
 TM_CONVERSION_OUT_C  := ${build_dir}/tm_conversion_tests_c${ext}
 
 # tools
-
-# merge
-MERGE_INCLUDE_DIRS := tools/merge/src
-MERGE_SRC          := tools/merge/src/main.cpp
-MERGE_DEPS         := tools/merge/src/main.cpp
-MERGE_OUT          := ${build_dir}/merge${ext}
 
 gcc_version_suffix := -8
 CXX.gcc := g++${gcc_version_suffix}
@@ -214,6 +208,11 @@ all: directories
 
 # merge
 
+MERGE_INCLUDE_DIRS := tools/merge/src
+MERGE_SRC          := tools/merge/src/main.cpp
+MERGE_DEPS         := ${build_dir} tools/merge/src/main.cpp
+MERGE_OUT          := ${build_dir}/merge${ext}
+
 ${MERGE_OUT}: ${MERGE_DEPS}
 	@echo building merge
 	@${CXX} ${CXXFLAGS} \
@@ -265,7 +264,7 @@ tm_conversion-check: tm_conversion
 TM_PRINT_UNMERGED := ${build_dir}/tm_print-unmerged${ext}
 
 TM_PRINT_SRC  := tests/src/tm_print/main.cpp
-TM_PRINT_DEPS := ${TM_PRINT_SRC} ./tm_print.h tm_conversion.h tests/external/doctest/doctest.h
+TM_PRINT_DEPS := ${build_dir} ${TM_PRINT_SRC} ./tm_print.h tm_conversion.h tests/external/doctest/doctest.h
 TM_PRINT_DEPS += tests/src/assert_throws.h tests/src/assert_throws.cpp
 TM_PRINT_OUT  := ${build_dir}/tm_print_tests${ext}
 
@@ -388,7 +387,7 @@ tm_print-run-tests: tm_print-tests
 directories: ${build_dir}
 
 ${build_dir}:
-	${MKDIR_CMD} $@
+	@$(call MKDIR_CMD,$@)
 
 clean:
 	rm -rf ${build_dir}
