@@ -1,0 +1,46 @@
+{
+	"folders": [
+		{
+			"path": "../../../",
+			"folder_exclude_patterns": ["builds", "build", "data", "src", "tests"]
+		},
+		{
+			"path": "../../",
+			"folder_exclude_patterns": ["builds", "build", "data", "src", "tests"]
+		},
+		{
+			"path": "./"
+		}
+	],
+	"build_systems": [
+		{
+			"name": "make",
+			"cmd": "make tm_print-tests",
+
+			"windows": {
+				"shell": false,
+				"file_regex": "(.*)\\(([0-9]+)\\): (error|note|warning)",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../../",
+			},
+
+			"linux": {
+				"shell": true,
+				"file_regex": "^(..[^:\n]*):([0-9]+):?([0-9]+)?:? (.*)$",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../../",
+			},
+
+			"variants": [
+				{
+					"name": "run tests",
+					"cmd": "make tm_print-run-tests"
+				},
+				{
+					"name": "run tests (default config only)",
+					"cmd": "make tm_print-run-tests-default"
+				}
+			]
+		}
+	]
+}

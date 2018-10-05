@@ -1,8 +1,11 @@
 /*
-tm_print.h v0.0.4d - public domain
+tm_print.h v0.0.7 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
+
+LICENSE
+    see license notes at end of file
 
 USAGE
     This file works as both the header and implementation.
@@ -11,1289 +14,1847 @@ USAGE
     in ONE C or C++ source file before #including this header.
 
 ISSUES
-	- The output between tm_conversion.h and snprintf based output isn't the same for floating
-	points.
-	The tm_conversion.h library doesn't output trailing zeroes by default, while printf will output
-	trailing zeroes when using %f. To make the tm_conversion based implementation always output
-	trailing zeroes, define:
-		#define TMP_FLOAT_ALWAYS_TRAILING_ZEROES
-	See Switches for more info.
-	Otherwise outputting floats with {:f} will always produce trailing zeroes for both
-	implementations.
+    - The output between tm_conversion.h and snprintf based output isn't the same for floating
+    points.
+    The tm_conversion.h library doesn't output trailing zeroes by default, while printf will output
+    trailing zeroes when using %f. To make the tm_conversion based implementation always output
+    trailing zeroes, define:
+        #define TMP_FLOAT_ALWAYS_TRAILING_ZEROES
+    See Switches for more info.
+    Otherwise outputting floats with {:f} will always produce trailing zeroes for both
+    implementations.
 
-	- The tm_conversion based implementation always outputs '.' as the decimal point character
-	regardless of the locale, while the snprintf based output outputs the decimal point based on the
-	current locale.
-
-	- The print function (not snprint) will always use a buffer to print into that has the size
-	TMP_PRINTF_BUFFER_SIZE. It then passes that buffer to printf to output. When using cusom
-	printers and exceeding TMP_PRINTF_BUFFER_SIZE, your output will be truncated.
-	Either increase TMP_PRINTF_BUFFER_SIZE (will increase stack memory usage) or use snprintf (which
-	will use the buffer you supply, so no truncation will occur unless the buffer is insufficiently
-	sized)
+    - The tm_conversion based implementation always outputs '.' as the decimal point character
+    regardless of the locale, while the snprintf based output outputs the decimal point based on the
+    current locale.
 
 HISTORY
-	v0.0.4d 10.01.17 minor change from static const char* to static const char* const in print_bool
-	v0.0.4c 23.10.16 added some assertions for bounds checking
-	v0.0.4b 07.10.16 fixed some casting issues when tmp_size_t is signed
-	v0.0.4a 29.09.16 fixed a bug where inputting an escaped {{ was resulting in an infinite loop
-	v0.0.4  29.09.16 added signed/unsigned char, short and long handling
-	                 fixed compiler errors when compiling with clang
-	v0.0.3  27.09.16 added printing custom types by overloading snprint
-	                 added initialFormatting parameter to snprint so that custom printing can
-	                 inherit formatting options
-	v0.0.2  26.09.16 changed makeFlags to tmp_type_flags so that it is guaranteed to be a
-	                 compile time constant
-	                 added string view overloads so that print can accept a string view as the
-	                 format parameter
-	                 fixed some compiler warnings when tmp_size_t is defined as int
+    v0.0.7  02.10.18 refactored into multiple files that get merged
+    v0.0.6  25.09.18 reworked many printing functions because of breaking changes to tm_conversion
+    v0.0.5  01.09.18 added MIT license option
+                     refactored fillPrintArgList to not be dependend on preprocessor switches
+                     removed fprinter
+                     tmp_memory_printer can now grow and can use small buffer optimization
+                     removed dependency on fprintf
+    v0.0.4e 25.08.18 added repository link
+    v0.0.4d 10.01.17 minor change from static const char* to static const char* const in print_bool
+    v0.0.4c 23.10.16 added some assertions for bounds checking
+    v0.0.4b 07.10.16 fixed some casting issues when tm_size_t is signed
+    v0.0.4a 29.09.16 fixed a bug where inputting an escaped {{ was resulting in an infinite loop
+    v0.0.4  29.09.16 added signed/unsigned char, short and long handling
+                     fixed compiler errors when compiling with clang
+    v0.0.3  27.09.16 added printing custom types by overloading snprint
+                     added initialFormatting parameter to snprint so that custom printing can
+                     inherit formatting options
+    v0.0.2  26.09.16 changed makeFlags to tmp_type_flags so that it is guaranteed to be a
+                     compile time constant
+                     added string view overloads so that print can accept a string view as the
+                     format parameter
+                     fixed some compiler warnings when tm_size_t is defined as int
     v0.0.1  24.09.16 initial commit
-
-LICENSE
-    This software is dual-licensed to the public domain and under the following
-    license: you are granted a perpetual, irrevocable license to copy, modify,
-    publish, and distribute this file as you see fit.
 */
 
+/* This is a generated file, do not modify directly. You can find the generator files in the src directory. */
+
+// clang-format off
 #ifdef TM_PRINT_IMPLEMENTATION
-	#ifndef TMP_ASSERT
-		#include <cassert>
-		#define TMP_ASSERT assert
-	#endif
-	#ifndef TMP_MEMCPY
-		#include <cstring>
-		#define TMP_MEMCPY memcpy
-	#endif
-	#ifndef TMP_MEMCHR
-		#include <cstring>
-		#define TMP_MEMCHR memchr
-	#endif
-	#ifndef TMP_STRLEN
-		#include <cstring>
-		#define TMP_STRLEN strlen
-	#endif
+    /* string.h dependency */
+    #if !defined(TM_MEMCPY) || !defined(TM_MEMSET) || !defined(TM_MEMCHR) || !defined(TM_STRLEN)
+        #include <cstring>
+    #endif
+    #ifndef TM_MEMCPY
+        #define TM_MEMCPY std::memcpy
+    #endif
+    #ifndef TM_MEMMOVE
+        #define TM_MEMMOVE std::memmove
+    #endif
+    #ifndef TM_MEMSET
+        #define TM_MEMSET std::memset
+    #endif
+    #ifndef TM_MEMCHR
+        #define TM_MEMCHR std::memchr
+    #endif
+    #ifndef TM_STRLEN
+        #define TM_STRLEN std::strlen
+    #endif
 
-	#if defined( TMP_NO_TM_CONVERSION ) && !defined( TMP_NO_STDIO )
-		#include <cstdio>
-		#if defined( _MSC_VER ) && _MSC_VER <= 1800
-			// in case we are not using tm_conversion.h and _MSC_VER is <= Visual Studio 2013
-			// snprintf wasn't supported until after Visual Studio 2013
-			#define TMP_SNPRINTF _snprintf
-		#else
-			#define TMP_SNPRINTF snprintf
-		#endif
-	#endif
+    /* cstdlib dependency */
+    #if !defined(TMP_MALLOC) || !defined(TMP_REALLOC) || !defined(TMP_FREE)
+        // either all or none have to be defined
+        #include <cstdlib>
+        #define TMP_MALLOC(type, size) (type*)malloc(size)
+        #define TMP_FREE(ptr) free(ptr)
+        #define TMP_REALLOC(type, ptr, size) (type*)realloc(ptr, size)
+    #endif
 
-	#if defined( TMP_NO_TM_CONVERSION ) && !defined( TMP_STRTOUL )
-		#include <cstdlib>
-		#define TMP_STRTOUL strtoul
-	#endif
+    /*
+    What dependency/backend to use to convert values.
+    Available backends are:
+        Integer values (int32_t, int64_t, uint32_t, uint64_t):
+            TMP_INT_BACKEND_CRT                inefficient, only base 10, 16 and 8 are possible, locale dependent
+            TMP_INT_BACKEND_TM_CONVERSION      efficient, because size calculations are possible without printing
+            TMP_INT_BACKEND_CHARCONV           needs C++17/20 standard library, but postprocessing needed after printing
+        Floating point values (float, double):
+            TMP_FLOAT_BACKEND_CRT              might not do correct rounding, locale dependent
+            TMP_FLOAT_BACKEND_TM_CONVERSION    very inaccurate, hex and scientific printing not implemented yet
+            TMP_FLOAT_BACKEND_CHARCONV         needs C++17/20 standard library, probably fast and accurate
+    */
+    #if !defined(TMP_INT_BACKEND_CRT) && !defined(TMP_INT_BACKEND_TM_CONVERSION) && !defined(TMP_INT_BACKEND_CHARCONV)
+        #define TMP_INT_BACKEND_CRT
+    #endif
+    #if !defined(TMP_FLOAT_BACKEND_CRT) && !defined(TMP_FLOAT_BACKEND_TM_CONVERSION) && !defined(TMP_FLOAT_BACKEND_CHARCONV)
+        #define TMP_FLOAT_BACKEND_CRT
+    #endif
 
-	#if defined( TMP_NO_TM_CONVERSION ) && defined( TMP_NO_STDIO ) && !defined( TMP_SNPRINTF )
-		#error "TMP_SNPRINTF has to be defined if TMP_NO_STDIO and TMP_NO_TM_CONVERSION are defined"
-	#endif
+    #if defined(TMP_INT_BACKEND_CRT) + defined(TMP_INT_BACKEND_TM_CONVERSION) + defined(TMP_INT_BACKEND_CHARCONV) != 1
+        #error "Only one backend for int is allowed."
+    #endif
 
-	// the buffer size of the buffer that printf will use when formatting
-	// if the buffer size isn't big enough, using custom printing and exceeding this buffer size
-	// will result in truncated output (see ISSUES)
-	#ifndef TMP_PRINTF_BUFFER_SIZE
-		#define TMP_PRINTF_BUFFER_SIZE 200
-	#endif // !defined( TMP_PRINTF_BUFFER_SIZE )
+    #if defined(TMP_FLOAT_BACKEND_CRT) + defined(TMP_FLOAT_BACKEND_TM_CONVERSION) + defined(TMP_FLOAT_BACKEND_CHARCONV) != 1
+        #error "Only one backend for float is allowed."
+    #endif
+
+    #if defined(TMP_INT_BACKEND_TM_CONVERSION) || defined(TMP_FLOAT_BACKEND_TM_CONVERSION)
+        #define TMP_TM_CONVERSION_INCLUDED
+        // in case you want to use tm_conversion but just don't want this header to include it
+        #ifndef TMP_NO_INCLUDE_TM_CONVERSION
+            #include <tm_conversion.h>
+        #endif
+    #endif
+
+    #if defined(TMP_INT_BACKEND_CRT) || defined(TMP_FLOAT_BACKEND_CRT) || !defined(TMP_NO_CRT_FILE_PRINTING)
+        #define TMP_CRT_INCLUDED
+        #include <cstdio>
+        #include <cinttypes>
+    #endif
+
+    #if defined(TMP_INT_BACKEND_CHARCONV) || defined(TMP_FLOAT_BACKEND_CHARCONV)
+        #define TMP_CHARCONV_INCLUDED
+        #include <charconv>
+    #endif
+
+    #if !defined(TMP_STRTOUL) && (!defined(TMP_TM_CONVERSION_INCLUDED) && !defined(TMP_CHARCONV_INCLUDED))
+        #include <cstdlib>
+        #define TMP_STRTOUL strtoul
+    #endif
+
+    #if !defined(TMP_SNPRINTF) && (defined(TMP_INT_BACKEND_CRT) || defined(TMP_FLOAT_BACKEND_CRT))
+        #include <cstdio>
+        #if defined(_MSC_VER) && _MSC_VER <= 1800
+            // in case _MSC_VER is <= Visual Studio 2013
+            // snprintf wasn't supported until after Visual Studio 2013
+            #define TMP_SNPRINTF _snprintf
+        #else
+            #define TMP_SNPRINTF snprintf
+        #endif
+    #endif
+
+    #if !defined(TMP_TOUPPER) && defined(TMP_INT_BACKEND_CHARCONV)
+        #include <cctype>
+        #define TMP_TOUPPER toupper
+    #endif
+
+    // the buffer size used for small buffer optimization, change this by profiling if malloc is a bottleneck
+    #ifndef TMP_SBO_SIZE
+        #define TMP_SBO_SIZE 200
+    #endif  // !defined( TMP_SBO_SIZE )
 #endif
+
 
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#ifndef TMP_NO_STDIO
-	#include <cstdio>
+#define TMP_VERSION 0x00000007u
+
+/* assert */
+#ifndef TM_ASSERT
+    #include <assert.h>
+    #define TM_ASSERT assert
+#endif /* !defined(TM_ASSERT) */
+
+/* Fixed width ints. Include C version so identifiers are in global namespace. */
+#include <stdint.h>
+
+#include <type_traits>
+
+/* Linkage defaults to extern, to override define TMC_DEF before including this file.
+   Examples of possible override values are static or __declspec(dllexport). */
+#ifndef TMC_DEF
+    #define TMC_DEF extern
 #endif
 
-#ifndef TMP_OWN_TYPES
-	#include <cstdint>
-	typedef int32_t tmp_int32;
-	typedef uint32_t tmp_uint32;
-	typedef int64_t tmp_int64;
-	typedef uint64_t tmp_uint64;
-	typedef size_t tmp_size_t;
+/* size_t is unsigned by default, but we also allow for signed and/or 32bit size_t.
+   You can override this block by defining TM_SIZE_T_DEFINED and the typedefs before including this file. */
+#ifndef TM_SIZE_T_DEFINED
+    #define TM_SIZE_T_DEFINED
+    #define TM_SIZE_T_IS_SIGNED 0 /* define to 1 if tm_size_t is signed */
+    #include <stddef.h> /* include C version so identifiers are in global namespace */
+    typedef size_t tm_size_t;
+#endif /* !defined(TM_SIZE_T_DEFINED) */
+
+/* Common POSIX compatible error codes. You can override the definitions by defining TM_ERRC_DEFINED
+   before including this file. */
+#ifndef TM_ERRC_DEFINED
+    #define TM_ERRC_DEFINED
+    enum TM_ERRC_CODES {
+        TM_OK        = 0,   /* same as std::errc() */
+        TM_EOVERFLOW = 75,  /* same as std::errc::value_too_large */
+        TM_ERANGE    = 34,  /* same as std::errc::result_out_of_range */
+        TM_EINVAL    = 22,  /* same as std::errc::invalid_argument */
+        TM_ENOMEM    = 12,  /* same as std::errc::not_enough_memory */
+    };
+    typedef int tm_errc;
 #endif
 
-#define TMP_BITFIELD( x ) ( 1 << ( x ) )
-#define TMP_BITCOUNT( x ) ( sizeof( x ) * 8 )
-#define TMP_MIN( a, b ) ( ( a ) < ( b ) ? ( a ) : ( b ) )
+// clang-format on
 
-// define this if you do not want to use tm_conversion at all
-// the library will then use snprintf and cstdlib or a snprintf variant you supply instead
-#ifndef TMP_NO_TM_CONVERSION
-	// in case you want to use tm_conversion but just don't want this header to include it
-	#ifndef TMP_NO_INCLUDE_TM_CONVERSION
-		#include "tm_conversion.h"
-	#endif
-#else
-	// these are yanked from tm_conversion, we need these to do formatting our selves
-	enum PrintFormatFlags : unsigned int {
-		PF_SIGN            = TMP_BITFIELD( 0 ),
-		PF_LOWERCASE       = TMP_BITFIELD( 1 ),
-		PF_TRAILING_ZEROES = TMP_BITFIELD( 2 ),
-		PF_BOOL_AS_NUMBER  = TMP_BITFIELD( 3 ),
-		PF_SCIENTIFIC      = TMP_BITFIELD( 4 ),  // not implemented yet
+namespace PrintFlags {
+enum Values : unsigned int {
+    Fixed = (1u << 0u),
+    Scientific = (1u << 1u),
+    Hex = (1u << 2u),
+    Shortest = (1u << 3u),
+    TrailingZeroes = (1u << 4u),
+    BoolAsNumber = (1u << 5u),
+    Lowercase = (1u << 6u),
+    Sign = (1u << 7u),
+    Char = (1u << 8u),
 
-		PF_DEFAULT = 0,
+    Default = 0,
 
-		PF_COUNT = 5,  // 5 flags in total
-	};
+    Count = 9,
+    General = Fixed | Scientific
+};
+}
 
-	typedef struct PrintFormatStruct {
-		int base;
-		int precision;
-		int width;
-		unsigned int flags;
-	} PrintFormat;
+struct PrintFormat {
+    int base;
+    int precision;
+    int width;
+    unsigned int flags;
+};
 
-	inline PrintFormat defaultPrintFormat()
-	{
-		return PrintFormat{10, 6, 0, PF_DEFAULT};
-	}
-#endif
+inline PrintFormat defaultPrintFormat() { return PrintFormat{10, 6, 0, PrintFlags::Default}; }
 
-namespace PrintType
-{
-enum Values : tmp_uint64 {
-	Char = 1,
-	Bool,
-	Int,
-	UInt,
-	Int64,
-	UInt64,
-	Float,
-	Double,
-	String,
-	StringView,
-	Custom,
+namespace PrintType {
+enum Values : uint64_t {
+    Char = 1,
+    Bool,
+    Int32,
+    UInt32,
+    Int64,
+    UInt64,
+    Float,
+    Double,
+    String,
+    StringView,
+    Custom,
 
-	Last,  // only here to check against Count to see if they are the same (see static_asserts
-	       // below)
+    Last,  // only here to check against Count to see if they are the same (see static_asserts
+           // below)
 
-	// count needs to be power of two so that Mask and Bits is valid
-	Count = 16,
-	Mask  = Count - 1,
-	Bits  = 4
+    // count needs to be power of two so that Mask and Bits is valid
+    Count = 16,
+    Mask = Count - 1,
+    Bits = 4
 };
 }
 
 #ifndef TMP_STATIC
-	#define TMP_DEF extern
+#define TMP_DEF extern
 #else
-	#define TMP_DEF static
+#define TMP_DEF static
 #endif
 
 // sanity checks
-static_assert( PrintType::Last <= PrintType::Count,
-               "Values added to PrintType without adjusting Count and Bits" );
-static_assert( ( PrintType::Count & ( PrintType::Count - 1 ) ) == 0, "Count must be power of two" );
-static_assert( TMP_BITCOUNT( tmp_uint64 ) / PrintType::Bits >= PrintType::Count,
-               "Can't store PrintType::Count in a tmp_uint64" );
+static_assert(PrintType::Last <= PrintType::Count, "Values added to PrintType without adjusting Count and Bits");
+static_assert((PrintType::Count & (PrintType::Count - 1)) == 0, "Count must be power of two");
+static_assert((sizeof(uint64_t) * 8) / PrintType::Bits >= PrintType::Count,
+              "Can't store PrintType::Count in a uint64_t");
 
 #ifdef TMP_CUSTOM_PRINTING
-	typedef tmp_size_t tmp_custom_printer_type( char* buffer, tmp_size_t len,
-	                                            const PrintFormat& initialFormatting,
-	                                            const void* data );
+typedef tm_size_t tmp_custom_printer_type(char* buffer, tm_size_t len, const PrintFormat& initialFormatting,
+                                          const void* data);
 #endif
 
-// these are needed to do a preprocessor branch on the size of long
-// you can define TMP_SIZEOF_LONG yourself if you do not want to include climits and cstdint
-// if your compiler has constexpr if (C++1z feature), you can define TMP_HAS_CONSTEXPR_IF and the
-// preprocessor branching on the size of long won't be needed
-#if !defined( TMP_SIZEOF_LONG ) && !defined( TMP_HAS_CONSTEXPR_IF )
-	#include <climits>
-	#include <cstdint>
-	#if LONG_MAX == INT32_MAX
-		#define TMP_SIZEOF_LONG 4
-	#elif LONG_MAX == INT64_MAX
-		#define TMP_SIZEOF_LONG 8
-	#else
-		#error unhandled size of long
-	#endif
-#endif // !defined( TMP_SIZEOF_LONG )
-
 union PrintValue {
-	char c;
-	bool b;
-	int i;
-	unsigned int u;
-	long long ll;
-	unsigned long long ull;
-	float f;
-	double d;
-	const char* s;
-	struct {
-		const char* data;
-		tmp_size_t size;
-	} v;
-	#ifdef TMP_CUSTOM_PRINTING
-		struct {
-			const void* data;
-			tmp_custom_printer_type* customPrint;
-		} custom;
-	#endif
+    char c;
+    bool b;
+    int32_t i32;
+    uint32_t u32;
+    int64_t i64;
+    uint64_t u64;
+    float f;
+    double d;
+    const char* s;
+    struct {
+        const char* data;
+        tm_size_t size;
+    } v;
+#ifdef TMP_CUSTOM_PRINTING
+    struct {
+        const void* data;
+        tmp_custom_printer_type* customPrint;
+    } custom;
+#endif
 };
 
 struct PrintArgList {
-	PrintValue args[PrintType::Count];
-	tmp_uint64 flags;
-	unsigned int size;
+    PrintValue args[PrintType::Count];
+    uint64_t flags;
+    unsigned int size;
 };
 
-#ifndef TMP_NO_STDIO
-	TMP_DEF void print( FILE* out, const char* format, const PrintArgList& args );
-	void print( const char* format, const PrintArgList& args );
-	#ifdef TMP_STRING_VIEW
-		TMP_DEF void print( FILE* out, TMP_STRING_VIEW format, const PrintArgList& args );
-		void print( TMP_STRING_VIEW format, const PrintArgList& args );
-	#endif // TMP_STRING_VIEW
+// define TMP_NO_CRT_FILE_PRINTING if you don't need printing to stdout or to FILE* handles
+// clang-format off
+#ifndef TMP_NO_CRT_FILE_PRINTING
+    TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintArgList& args);
+    #ifdef TMP_STRING_VIEW
+        TMP_DEF tm_errc tmp_print(FILE* out, TMP_STRING_VIEW format, const PrintArgList& args);
+    #endif  // TMP_STRING_VIEW
 #endif  // TMP_NO_STDIO
-TMP_DEF tmp_size_t snprint( char* dest, tmp_size_t len, const char* format,
-                            const PrintArgList& args );
-TMP_DEF tmp_size_t snprint( char* dest, tmp_size_t len, const char* format,
-                            const PrintFormat& initialFormatting, const PrintArgList& args );
+// clang-format on
+
+TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
+                              const PrintArgList& args);
 #ifdef TMP_STRING_VIEW
-	TMP_DEF tmp_size_t snprint( char* dest, tmp_size_t len, TMP_STRING_VIEW format,
-	                            const PrintArgList& args );
-	TMP_DEF tmp_size_t snprint( char* dest, tmp_size_t len, TMP_STRING_VIEW format,
-	                            const PrintFormat& initialFormatting, const PrintArgList& args );
+TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const PrintFormat& initialFormatting,
+                              const PrintArgList& args);
 #endif
 
-template < class... Types > struct tmp_type_flags;
-template <> struct tmp_type_flags<> {
-	enum : tmp_uint64 { Value = 0 };
-};
-template < class... Types > struct tmp_type_flags< char, Types... > {
-	enum : tmp_uint64 {
-		Value = PrintType::Char | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
+template <class... Types>
+struct tmp_type_flags;
+
+template <>
+struct tmp_type_flags<> {
+    enum : uint64_t { Value = 0 };
 };
 
-// for some types, we don't know what their sizes are
-template <size_t N> struct tmp_int_size;
-template <> struct tmp_int_size<1> { enum : tmp_uint64 { Value = PrintType::Int }; };
-template <> struct tmp_int_size<2> { enum : tmp_uint64 { Value = PrintType::Int }; };
-template <> struct tmp_int_size<4> { enum : tmp_uint64 { Value = PrintType::Int }; };
-template <> struct tmp_int_size<8> { enum : tmp_uint64 { Value = PrintType::Int64 }; };
-template <size_t N> struct tmp_uint_size;
-template <> struct tmp_uint_size<1> { enum : tmp_uint64 { Value = PrintType::UInt }; };
-template <> struct tmp_uint_size<2> { enum : tmp_uint64 { Value = PrintType::UInt }; };
-template <> struct tmp_uint_size<4> { enum : tmp_uint64 { Value = PrintType::UInt }; };
-template <> struct tmp_uint_size<8> { enum : tmp_uint64 { Value = PrintType::UInt64 }; };
-
-template < class... Types > struct tmp_type_flags< signed char, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_int_size< sizeof( signed char ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< unsigned char, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_uint_size< sizeof( unsigned char ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< short, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_int_size< sizeof( short ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< unsigned short, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_uint_size< sizeof( unsigned short ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types >
-struct tmp_type_flags< long, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_int_size< sizeof( long ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< unsigned long, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_uint_size< sizeof( unsigned long ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< int, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_int_size< sizeof( int ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< unsigned int, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_uint_size< sizeof( unsigned int ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< long long, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_int_size< sizeof( long long ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< unsigned long long, Types... > {
-	enum : tmp_uint64 {
-		Value = tmp_uint_size< sizeof( unsigned long long ) >::Value
-		        | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
+template <class... Types>
+struct tmp_type_flags<char, Types...> {
+    enum : uint64_t { Value = PrintType::Char | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
 };
 
-template < class... Types > struct tmp_type_flags< bool, Types... > {
-	enum : tmp_uint64 {
-		Value = PrintType::Bool | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< float, Types... > {
-	enum : tmp_uint64 {
-		Value = PrintType::Float | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< double, Types... > {
-	enum : tmp_uint64 {
-		Value = PrintType::Double | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-template < class... Types > struct tmp_type_flags< const char*, Types... > {
-	enum : tmp_uint64 {
-		Value = PrintType::String | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-#ifdef TMP_STRING_VIEW
-template < class... Types > struct tmp_type_flags< TMP_STRING_VIEW, Types... > {
-	enum : tmp_uint64 {
-		Value = PrintType::StringView | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-	};
-};
-#endif
-#ifdef TMP_CUSTOM_PRINTING
-	template < class T, class... Types > struct tmp_type_flags< T, Types... > {
-		enum : tmp_uint64 {
-			Value = PrintType::Custom | ( tmp_type_flags< Types... >::Value << PrintType::Bits )
-		};
-	};
-#else
-	template < class T, class... Types > struct tmp_type_flags< T, Types... > {
-		enum : tmp_uint64 { Value = 0 };
-	};
-#endif
+// integer types to enum mapping based on their size
+template <size_t N>
+struct tmp_int_size;
 
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, char value, const Types&... args )
-{
-	list->args[list->size++].c = value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, signed char value, const Types&... args )
-{
-	list->args[list->size++].i = (int)value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, unsigned char value, const Types&... args )
-{
-	list->args[list->size++].u = (unsigned int)value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, short value, const Types&... args )
-{
-	list->args[list->size++].i = (int)value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, unsigned short value, const Types&... args )
-{
-	list->args[list->size++].u = (unsigned int)value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, long value, const Types&... args )
-{
-#ifdef TMP_HAS_CONSTEXPR_IF
-	if constexpr( sizeof( long ) == sizeof( int ) ) {
-		list->args[list->size++].i = (int)value;
-		fillPrintArgList( list, args... );
-	} else if constexpr ( sizeof( long ) == sizeof( long long ) ) {
-		list->args[list->size++].ll = (long long)value;
-		fillPrintArgList( list, args... );
-	} else {
-		static_assert( false, "unhandled size of long" );
-	}
-#elif TMP_SIZEOF_LONG == 4
-	list->args[list->size++].i = (int)value;
-	fillPrintArgList( list, args... );
-#elif TMP_SIZEOF_LONG == 8
-	list->args[list->size++].ll = (long long)value;
-	fillPrintArgList( list, args... );
-#else
-	#error unhandled size of long
-#endif
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, unsigned long value, const Types&... args )
-{
-#ifdef TMP_HAS_CONSTEXPR_IF
-	if constexpr( sizeof( unsigned long ) == sizeof( unsigned int ) ) {
-		list->args[list->size++].u = (unsigned int)value;
-		fillPrintArgList( list, args... );
-	} else if constexpr ( sizeof( unsigned long ) == sizeof( unsigned long long ) ) {
-		list->args[list->size++].ull = (unsigned long long)value;
-		fillPrintArgList( list, args... );
-	} else {
-		static_assert( false, "unhandled size of long" );
-	}
-#elif TMP_SIZEOF_LONG == 4
-	list->args[list->size++].u = (unsigned int)value;
-	fillPrintArgList( list, args... );
-#elif TMP_SIZEOF_LONG == 8
-	list->args[list->size++].ull = (unsigned long long)value;
-	fillPrintArgList( list, args... );
-#else
-	#error unhandled size of long
-#endif
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, bool value, const Types&... args )
-{
-	list->args[list->size++].b = value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, int value, const Types&... args )
-{
-	list->args[list->size++].i = value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, unsigned int value, const Types&... args )
-{
-	list->args[list->size++].u = value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, long long value, const Types&... args )
-{
-	list->args[list->size++].ll = value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, unsigned long long value, const Types&... args )
-{
-	list->args[list->size++].ull = value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, float value, const Types&... args )
-{
-	list->args[list->size++].f = value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, double value, const Types&... args )
-{
-	list->args[list->size++].d = value;
-	fillPrintArgList( list, args... );
-}
-template < class... Types >
-void fillPrintArgList( PrintArgList* list, const char* value, const Types&... args )
-{
-	list->args[list->size++].s = value;
-	fillPrintArgList( list, args... );
-}
-#ifdef TMP_STRING_VIEW
-	template < class... Types >
-	void fillPrintArgList( PrintArgList* list, TMP_STRING_VIEW value, const Types&... args )
-	{
-		list->args[list->size].v.data = TMP_STRING_VIEW_DATA( value );
-		list->args[list->size].v.size = TMP_STRING_VIEW_SIZE( value );
-		++list->size;
-		fillPrintArgList( list, args... );
-	}
-#endif
-#ifdef TMP_CUSTOM_PRINTING
-	// this looks very confusing, but it checks for the existence of a specific overload of snprint
-	// this way we can do a static_assert on whether the overload exists and report an error
-	// otherwise
-    template < class T >
-    class tmp_has_custom_printer
-    {
-    	typedef tmp_size_t printer_t( char*, tmp_size_t, const PrintFormat&, const T& );
-	    typedef char no;
+template <>
+struct tmp_int_size<1> {
+    enum : uint64_t { Value = PrintType::Int32 };
+    typedef int32_t Type;
+    static PrintValue makeValue(Type v) {
+        PrintValue result;
+        result.i32 = v;
+        return result;
+    }
+};
+template <>
+struct tmp_int_size<2> {
+    enum : uint64_t { Value = PrintType::Int32 };
+    typedef int32_t Type;
+    static PrintValue makeValue(Type v) {
+        PrintValue result;
+        result.i32 = v;
+        return result;
+    }
+};
+template <>
+struct tmp_int_size<4> {
+    enum : uint64_t { Value = PrintType::Int32 };
+    typedef int32_t Type;
+    static PrintValue makeValue(Type v) {
+        PrintValue result;
+        result.i32 = v;
+        return result;
+    }
+};
+template <>
+struct tmp_int_size<8> {
+    enum : uint64_t { Value = PrintType::Int64 };
+    typedef int64_t Type;
+    static PrintValue makeValue(Type v) {
+        PrintValue result;
+        result.i64 = v;
+        return result;
+    }
+};
+template <size_t N>
+struct tmp_uint_size;
+template <>
+struct tmp_uint_size<1> {
+    enum : uint64_t { Value = PrintType::UInt32 };
+    typedef uint32_t Type;
+    static PrintValue makeValue(Type v) {
+        PrintValue result;
+        result.u32 = v;
+        return result;
+    }
+};
+template <>
+struct tmp_uint_size<2> {
+    enum : uint64_t { Value = PrintType::UInt32 };
+    typedef uint32_t Type;
+    static PrintValue makeValue(Type v) {
+        PrintValue result;
+        result.u32 = v;
+        return result;
+    }
+};
+template <>
+struct tmp_uint_size<4> {
+    enum : uint64_t { Value = PrintType::UInt32 };
+    typedef uint32_t Type;
+    static PrintValue makeValue(Type v) {
+        PrintValue result;
+        result.u32 = v;
+        return result;
+    }
+};
+template <>
+struct tmp_uint_size<8> {
+    enum : uint64_t { Value = PrintType::UInt64 };
+    typedef uint64_t Type;
+    static PrintValue makeValue(Type v) {
+        PrintValue result;
+        result.u64 = v;
+        return result;
+    }
+};
 
-	    template < class C >
-	    static auto test( C c ) -> decltype(
-	        static_cast< tmp_size_t ( * )( char*, tmp_size_t, const PrintFormat&, const C& ) >(
-	            &snprint ) );
-	    template < class C >
-	    static no test( ... );
-
-	public:
-	    enum { Value = ( sizeof( test< T >( T{} ) ) == sizeof( void* ) ) };
+template <class... Types>
+struct tmp_type_flags<signed char, Types...> {
+    enum : uint64_t {
+        Value = tmp_int_size<sizeof(signed char)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
     };
+};
+template <class... Types>
+struct tmp_type_flags<unsigned char, Types...> {
+    enum : uint64_t {
+        Value = tmp_uint_size<sizeof(unsigned char)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
+    };
+};
+template <class... Types>
+struct tmp_type_flags<short, Types...> {
+    enum : uint64_t {
+        Value = tmp_int_size<sizeof(short)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
+    };
+};
+template <class... Types>
+struct tmp_type_flags<unsigned short, Types...> {
+    enum : uint64_t {
+        Value = tmp_uint_size<sizeof(unsigned short)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
+    };
+};
+template <class... Types>
+struct tmp_type_flags<long, Types...> {
+    enum : uint64_t {
+        Value = tmp_int_size<sizeof(long)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
+    };
+};
+template <class... Types>
+struct tmp_type_flags<unsigned long, Types...> {
+    enum : uint64_t {
+        Value = tmp_uint_size<sizeof(unsigned long)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
+    };
+};
+template <class... Types>
+struct tmp_type_flags<int, Types...> {
+    enum : uint64_t { Value = tmp_int_size<sizeof(int)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
+};
+template <class... Types>
+struct tmp_type_flags<unsigned int, Types...> {
+    enum : uint64_t {
+        Value = tmp_uint_size<sizeof(unsigned int)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
+    };
+};
+template <class... Types>
+struct tmp_type_flags<long long, Types...> {
+    enum : uint64_t {
+        Value = tmp_int_size<sizeof(long long)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
+    };
+};
+template <class... Types>
+struct tmp_type_flags<unsigned long long, Types...> {
+    enum : uint64_t {
+        Value = tmp_uint_size<sizeof(unsigned long long)>::Value | (tmp_type_flags<Types...>::Value << PrintType::Bits)
+    };
+};
 
-    template < class T, class... Types >
-	void fillPrintArgList( PrintArgList* list, const T& value, const Types&... args )
-	{
-	    static_assert( tmp_has_custom_printer< T >::Value,
-	                   "T is not printable, there is no snprint that takes value of type T" );
-	    // if the static assert fails, the compiler will also report that there are no overloads of
-	    // snprint that accept the argument types. We could get rid of that error by using SFINAE
-	    // but that introduces more boilerplate
-
-	    // having constexpr if simplifies the error message
-#ifdef TMP_HAS_CONSTEXPR_IF
-	    if constexpr( tmp_has_custom_printer< T >::Value )
+template <class... Types>
+struct tmp_type_flags<bool, Types...> {
+    enum : uint64_t { Value = PrintType::Bool | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
+};
+template <class... Types>
+struct tmp_type_flags<float, Types...> {
+    enum : uint64_t { Value = PrintType::Float | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
+};
+template <class... Types>
+struct tmp_type_flags<double, Types...> {
+    enum : uint64_t { Value = PrintType::Double | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
+};
+template <class... Types>
+struct tmp_type_flags<const char*, Types...> {
+    enum : uint64_t { Value = PrintType::String | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
+};
+#ifdef TMP_STRING_VIEW
+template <class... Types>
+struct tmp_type_flags<TMP_STRING_VIEW, Types...> {
+    enum : uint64_t { Value = PrintType::StringView | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
+};
 #endif
-	    {
-			auto custom         = &list->args[list->size++].custom;
-			custom->data        = &value;
-			custom->customPrint = []( char* buffer, tmp_size_t len,
-			                          const PrintFormat& initialFormatting, const void* data ) {
-			    return snprint( buffer, len, initialFormatting, *(const T*)data );
-			};
-		}
-	    fillPrintArgList( list, args... );
-    }
+#ifdef TMP_CUSTOM_PRINTING
+template <class T, class... Types>
+struct tmp_type_flags<T, Types...> {
+    enum : uint64_t { Value = PrintType::Custom | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
+};
 #else
-	template < class T, class... Types >
-	void fillPrintArgList( PrintArgList* list, const T& value, const Types&... args )
-	{
-		static_assert(
-		    false,
-		    "T is not printable, custom printing is disabled (TMP_CUSTOM_PRINTING not defined)" );
-    }
+template <class T, class... Types>
+struct tmp_type_flags<T, Types...> {
+    enum : uint64_t { Value = 0 };
+};
 #endif
-void fillPrintArgList( PrintArgList* ) {}
 
-template < class... Types >
-void makePrintArgList( PrintArgList* list, const Types&... args )
-{
-	list->flags = tmp_type_flags< Types... >::Value;
-	list->size  = 0;
-	fillPrintArgList( list, args... );
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, char value, const Types&... args) {
+    list->args[list->size++].c = value;
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, signed char value, const Types&... args) {
+    typedef tmp_int_size<sizeof(signed char)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, unsigned char value, const Types&... args) {
+    typedef tmp_uint_size<sizeof(unsigned char)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, short value, const Types&... args) {
+    typedef tmp_int_size<sizeof(short)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, unsigned short value, const Types&... args) {
+    typedef tmp_uint_size<sizeof(unsigned short)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, long value, const Types&... args) {
+    typedef tmp_int_size<sizeof(long)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, unsigned long value, const Types&... args) {
+    typedef tmp_uint_size<sizeof(unsigned long)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, bool value, const Types&... args) {
+    list->args[list->size++].b = value;
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, int value, const Types&... args) {
+    typedef tmp_int_size<sizeof(int)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, unsigned int value, const Types&... args) {
+    typedef tmp_uint_size<sizeof(unsigned int)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, long long value, const Types&... args) {
+    typedef tmp_int_size<sizeof(long long)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, unsigned long long value, const Types&... args) {
+    typedef tmp_uint_size<sizeof(unsigned long long)> Print;
+    list->args[list->size++] = Print::makeValue((Print::Type)value);
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, float value, const Types&... args) {
+    list->args[list->size++].f = value;
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, double value, const Types&... args) {
+    list->args[list->size++].d = value;
+    fillPrintArgList(list, args...);
+}
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, const char* value, const Types&... args) {
+    list->args[list->size++].s = value;
+    fillPrintArgList(list, args...);
+}
+#ifdef TMP_STRING_VIEW
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, TMP_STRING_VIEW value, const Types&... args) {
+    list->args[list->size].v.data = TMP_STRING_VIEW_DATA(value);
+    list->args[list->size].v.size = TMP_STRING_VIEW_SIZE(value);
+    ++list->size;
+    fillPrintArgList(list, args...);
+}
+#endif
+#ifdef TMP_CUSTOM_PRINTING
+// this looks very confusing, but it checks for the existence of a specific overload of snprint
+// this way we can do a static_assert on whether the overload exists and report an error
+// otherwise
+template <class T>
+class tmp_has_custom_printer {
+    typedef tm_size_t printer_t(char*, tm_size_t, const PrintFormat&, const T&);
+    typedef char no;
+
+    template <class C>
+    static auto test(C c)
+        -> decltype(static_cast<tm_size_t (*)(char*, tm_size_t, const PrintFormat&, const C&)>(&snprint));
+    template <class C>
+    static no test(...);
+
+   public:
+    enum { Value = (sizeof(test<T>(T{})) == sizeof(void*)) };
+};
+
+template <class T, class... Types>
+void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args) {
+    static_assert(tmp_has_custom_printer<T>::Value,
+                  "T is not printable, there is no snprint that takes value of type T");
+    // if the static assert fails, the compiler will also report that there are no overloads of
+    // snprint that accept the argument types. We could get rid of that error by using SFINAE
+    // but that introduces more boilerplate
+
+    // having constexpr if simplifies the error message
+#ifdef TMP_HAS_CONSTEXPR_IF
+    if constexpr (tmp_has_custom_printer<T>::Value)
+#endif
+    {
+        auto custom = &list->args[list->size++].custom;
+        custom->data = &value;
+        custom->customPrint = [](char* buffer, tm_size_t len, const PrintFormat& initialFormatting, const void* data) {
+            return snprint(buffer, len, initialFormatting, *(const T*)data);
+        };
+    }
+    fillPrintArgList(list, args...);
+}
+#else
+template <class T, class... Types>
+void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args) {
+    static_assert(tmp_type_flags<T>::Value != 0,
+                  "T is not printable, custom printing is disabled (TMP_CUSTOM_PRINTING not defined)");
+    static_assert(tmp_type_flags<T>::Value == 0, "");  // this function is not allowed to be instantiated
+}
+#endif
+void fillPrintArgList(PrintArgList*) {}
+
+template <class... Types>
+void makePrintArgList(PrintArgList* list, const Types&... args) {
+    list->flags = tmp_type_flags<Types...>::Value;
+    list->size = 0;
+    fillPrintArgList(list, args...);
 }
 
 #ifndef TMP_NO_STDIO
-	template < class... Types >
-	inline void print( const char* format, const Types&... args )
-	{
-		static_assert( sizeof...( args ) <= PrintType::Count,
-		               "Invalid number of arguments to print" );
-		PrintArgList argList;
-		makePrintArgList( &argList, args... );
-		print( format, argList );
-	}
-	template < class... Types >
-	inline void print( FILE* out, const char* format, const Types&... args )
-	{
-		static_assert( sizeof...( args ) <= PrintType::Count,
-		               "Invalid number of arguments to print" );
-		PrintArgList argList;
-		makePrintArgList( &argList, args... );
-		print( out, format, argList );
-	}
-	// inline impl
-	inline void print( const char* format, const PrintArgList& args )
-	{
-		print( stdout, format, args );
-	}
-	inline void print( TMP_STRING_VIEW format, const PrintArgList& args )
-	{
-		print( stdout, format, args );
-	}
+template <class... Types>
+tm_errc print(const char* format, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
+    PrintArgList argList;
+    makePrintArgList(&argList, args...);
+    return tmp_print(stdout, format, argList);
+}
+template <class... Types>
+tm_errc print(FILE* out, const char* format, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
+    PrintArgList argList;
+    makePrintArgList(&argList, args...);
+    return tmp_print(out, format, argList);
+}
+// impl
 
-	#ifdef TMP_STRING_VIEW
-		template < class... Types >
-		inline void print( TMP_STRING_VIEW format, const Types&... args )
-		{
-			static_assert( sizeof...( args ) <= PrintType::Count,
-			               "Invalid number of arguments to print" );
-			PrintArgList argList;
-			makePrintArgList( &argList, args... );
-			print( format, argList );
-		}
-		template < class... Types >
-		inline void print( FILE* out, TMP_STRING_VIEW format, const Types&... args )
-		{
-			static_assert( sizeof...( args ) <= PrintType::Count,
-			               "Invalid number of arguments to print" );
-			PrintArgList argList;
-			makePrintArgList( &argList, args... );
-			print( out, format, argList );
-		}
-	#endif // defined( TMP_STRING_VIEW )
+#ifdef TMP_STRING_VIEW
+template <class... Types>
+tm_errc print(TMP_STRING_VIEW format, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
+    PrintArgList argList;
+    makePrintArgList(&argList, args...);
+    return tmp_print(stdout, format, argList);
+}
+template <class... Types>
+tm_errc print(FILE* out, TMP_STRING_VIEW format, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
+    PrintArgList argList;
+    makePrintArgList(&argList, args...);
+    return tmp_print(out, format, argList);
+}
+#endif  // defined( TMP_STRING_VIEW )
 #endif  // TMP_NO_STDIO
 
-template < class... Types >
-inline tmp_size_t snprint( char* dest, tmp_size_t len, const char* format, const Types&... args )
-{
-	static_assert( sizeof...( args ) <= PrintType::Count,
-	               "Invalid number of arguments to snprint" );
-	PrintArgList argList;
-	makePrintArgList( &argList, args... );
-	return snprint( dest, len, format, argList );
+template <class... Types>
+tm_size_t snprint(char* dest, tm_size_t len, const char* format, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
+    PrintArgList argList;
+    makePrintArgList(&argList, args...);
+    return tmp_snprint(dest, len, format, defaultPrintFormat(), argList);
 }
-template < class... Types >
-inline tmp_size_t snprint( char* dest, tmp_size_t len, const char* format,
-                           const PrintFormat& initialFormatting, const Types&... args )
-{
-	static_assert( sizeof...( args ) <= PrintType::Count,
-	               "Invalid number of arguments to snprint" );
-	PrintArgList argList;
-	makePrintArgList( &argList, args... );
-	return snprint( dest, len, format, initialFormatting, argList );
+template <class... Types>
+tm_size_t snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
+                  const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
+    PrintArgList argList;
+    makePrintArgList(&argList, args...);
+    return tmp_snprint(dest, len, format, initialFormatting, argList);
 }
 #ifdef TMP_STRING_VIEW
-	template < class... Types >
-	inline tmp_size_t snprint( char* dest, tmp_size_t len, TMP_STRING_VIEW format,
-	                           const Types&... args )
-	{
-		static_assert( sizeof...( args ) <= PrintType::Count,
-		               "Invalid number of arguments to snprint" );
-		PrintArgList argList;
-		makePrintArgList( &argList, args... );
-		return snprint( dest, len, format, argList );
-	}
-	template < class... Types >
-	inline tmp_size_t snprint( char* dest, tmp_size_t len, TMP_STRING_VIEW format,
-	                           const PrintFormat& initialFormatting, const Types&... args )
-	{
-		static_assert( sizeof...( args ) <= PrintType::Count,
-		               "Invalid number of arguments to snprint" );
-		PrintArgList argList;
-		makePrintArgList( &argList, args... );
-		return snprint( dest, len, format, initialFormatting, argList );
-	}
-#endif // defined( TMP_STRING_VIEW )
+template <class... Types>
+tm_size_t snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
+    PrintArgList argList;
+    makePrintArgList(&argList, args...);
+    return tmp_snprint(dest, len, format, defaultPrintFormat(), argList);
+}
+template <class... Types>
+tm_size_t snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const PrintFormat& initialFormatting,
+                  const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
+    PrintArgList argList;
+    makePrintArgList(&argList, args...);
+    return tmp_snprint(dest, len, format, initialFormatting, argList);
+}
+#endif  // defined( TMP_STRING_VIEW )
 
 #endif  // _TM_PRINT_H_INCLUDED_
 
 #ifdef TM_PRINT_IMPLEMENTATION
+#define TMP_MIN(a, b) ((a) < (b) ? (a) : (b))
 
-namespace
-{
-namespace FormatSpecifierFlags
-{
+// clang-format off
+#ifndef TM_ASSERT_VALID_SIZE
+    #if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
+        #define TM_ASSERT_VALID_SIZE(x) TM_ASSERT((x) >= 0)
+    #else
+        /* always true if size_t is unsigned */
+        #define TM_ASSERT_VALID_SIZE(x) ((void)0)
+    #endif
+#endif /* !defined(TM_ASSERT_VALID_SIZE) */
+
+namespace {
+
+struct PrintSizes {
+    tm_size_t digits;
+    tm_size_t decorated;
+    tm_size_t size;
+};
+
+#if !defined(TMP_TM_CONVERSION_INCLUDED)
+    struct PrintFormattedResult {
+        tm_size_t size;
+        tm_errc ec;
+    };
+
+    static PrintFormattedResult scan_u32_n(const char* str, tm_size_t maxlen, uint32_t* out, int32_t base) {
+        TM_ASSERT(out);
+        TM_ASSERT(base >= 2 && base <= 36);
+        TM_ASSERT_VALID_SIZE(maxlen);
+
+        PrintFormattedResult result = {maxlen, TM_EOVERFLOW};
+        if (maxlen <= 0) {
+            return result;
+        }
+        #if defined(TMP_CHARCONV_INCLUDED)
+            auto std_result = std::from_chars(str, str + maxlen, *out, base);
+            if(std_result.ec == std::errc{}) {
+                result.size = (tm_size_t)(std_result.ptr - str);
+                result.ec = TM_OK;
+            }
+        #elif defined(TMP_STRTOUL)
+            char* endptr = nullptr;
+            auto value = TMP_STRTOUL(str, &endptr, base);
+            auto size = (tm_size_t)(endptr - str);
+            if (endptr && size > 0 && size <= maxlen) {
+                *out = value;
+                result.size = size;
+                result.ec = TM_OK;
+            }
+        #else
+            #error "TMP_STRTOUL not defined"
+        #endif
+        return result;
+    }
+#else
+    typedef tmc_conv_result PrintFormattedResult;
+
+    template <class T>
+    PrintSizes tmp_get_print_sizes(T value, const PrintFormat& format, bool negative);
+#endif
+// clang-format on
+
+namespace FormatSpecifierFlags {
 enum Values : unsigned int {
-	LeftJustify        = TMP_BITFIELD( 0 ),
-	PoundSpecified     = TMP_BITFIELD( 1 ),
-	PrependHex         = TMP_BITFIELD( 2 ),
-	PrependBinary      = TMP_BITFIELD( 3 ),
-	EmitDecimalPoint   = TMP_BITFIELD( 4 ),
-	IndexSpecified     = TMP_BITFIELD( 5 ),
-	WidthSpecified     = TMP_BITFIELD( 6 ),
-	PrecisionSpecified = TMP_BITFIELD( 7 ),
+    LeftJustify = (1u << 8u),
+    PoundSpecified = (1u << 9u),
+    PrependHex = (1u << 10u),
+    PrependBinary = (1u << 11u),
+    PrependOctal = (1u << 12u),
+    EmitDecimalPoint = (1u << 13u),
+    IndexSpecified = (1u << 14u),
+    WidthSpecified = (1u << 15u),
+    PrecisionSpecified = (1u << 16u),
+    PadWithSpaces = (1u << 17u),
 };
 }
 
-#ifdef TMP_NO_TM_CONVERSION
-static tmp_size_t scan_u32_n( const char* str, tmp_size_t len, int base, unsigned int* out )
-{
-	if( !len ) {
-		return 0;
-	}
-	char* endptr = nullptr;
-	auto value = TMP_STRTOUL( str, &endptr, base );
-	tmp_size_t result = endptr - str;
-	if( endptr && result > 0 && result <= len ) {
-		*out = value;
-		return (tmp_size_t)( endptr - str );
-	}
-	return 0;
+static unsigned int tmp_parse_format_specifiers(const char* p, tm_size_t len, PrintFormat* format,
+                                                uint32_t* currentIndex) {
+    unsigned int result = 0;
+    if (len != 0) {
+        auto end = p + len;
+        // parse what is inside {}
+
+        auto scan_index_result = scan_u32_n(p, (tm_size_t)(end - p), currentIndex, 10);
+        if (scan_index_result.ec == TM_OK) {
+            p += scan_index_result.size;
+            result |= FormatSpecifierFlags::IndexSpecified;
+        }
+        if (*p == ':') {
+            ++p;
+            // custom formatting was defined, so we reject the initial formatting
+            *format = defaultPrintFormat();
+        }
+        // parse flags
+        {
+            // pad with spaces by default
+            format->flags |= FormatSpecifierFlags::PadWithSpaces;
+
+            bool parseFlags = true;
+            do {
+                switch (*p) {
+                    case '-': {
+                        result |= FormatSpecifierFlags::LeftJustify;
+                        ++p;
+                        break;
+                    }
+                    case '+': {
+                        format->flags |= PrintFlags::Sign;
+                        ++p;
+                        break;
+                    }
+                    case ' ': {
+                        format->flags |= FormatSpecifierFlags::PadWithSpaces;
+                        ++p;
+                        break;
+                    }
+                    case '#': {
+                        result |= FormatSpecifierFlags::PoundSpecified;
+                        ++p;
+                        break;
+                    }
+                    case '0': {
+                        format->flags &= ~FormatSpecifierFlags::PadWithSpaces;
+                        ++p;
+                        break;
+                    }
+                    default: {
+                        parseFlags = false;
+                        break;
+                    }
+                }
+            } while (parseFlags);
+        }
+
+        // parse width
+        unsigned width = 0;
+        auto scan_width_result = scan_u32_n(p, (tm_size_t)(end - p), &width, 10);
+        if (scan_width_result.ec == TM_OK) {
+            p += scan_width_result.size;
+            result |= FormatSpecifierFlags::WidthSpecified;
+        }
+        format->width = (int)width;
+
+        // parse precision
+        if (*p == '.') {
+            ++p;
+            unsigned precision = 0;
+            auto scan_precision_result = scan_u32_n(p, (tm_size_t)(end - p), &precision, 10);
+            if (scan_precision_result.ec == TM_OK) {
+                p += scan_precision_result.size;
+                result |= FormatSpecifierFlags::PrecisionSpecified;
+            }
+            format->precision = (int)precision;
+        }
+
+        switch (*p) {
+            case 'x': {
+                format->flags |= PrintFlags::Lowercase;
+                format->base = 16;
+                if (result & FormatSpecifierFlags::PoundSpecified) {
+                    result |= FormatSpecifierFlags::PrependHex;
+                }
+                break;
+            }
+            case 'X': {
+                format->base = 16;
+                if (result & FormatSpecifierFlags::PoundSpecified) {
+                    result |= FormatSpecifierFlags::PrependHex;
+                }
+                break;
+            }
+            case 'o': {
+                format->base = 8;
+                if (result & FormatSpecifierFlags::PoundSpecified) {
+                    result |= FormatSpecifierFlags::PrependOctal;
+                }
+                break;
+            }
+            case 'b': {
+                format->flags |= PrintFlags::Lowercase;
+                format->base = 2;
+                if (result & FormatSpecifierFlags::PoundSpecified) {
+                    result |= FormatSpecifierFlags::PrependBinary;
+                }
+                break;
+            }
+            case 'B': {
+                format->base = 2;
+                if (result & FormatSpecifierFlags::PoundSpecified) {
+                    result |= FormatSpecifierFlags::PrependBinary;
+                }
+                break;
+            }
+            case 'c': {
+                format->flags |= PrintFlags::Char;
+                break;
+            }
+
+            // floating point
+            case 'e': {
+                format->flags |= PrintFlags::Lowercase;
+                format->flags |= PrintFlags::Scientific;
+                break;
+            }
+            case 'E': {
+                format->flags |= PrintFlags::Scientific;
+                break;
+            }
+            case 'f': {
+                format->flags |= PrintFlags::TrailingZeroes | PrintFlags::Fixed;
+                break;
+            }
+            case 'g': {
+                format->flags |= PrintFlags::Lowercase;
+                format->flags |= PrintFlags::General;
+                format->flags |= PrintFlags::Shortest;
+                break;
+            }
+            case 'G': {
+                format->flags |= PrintFlags::General;
+                format->flags |= PrintFlags::Shortest;
+                break;
+            }
+            case 'a': {
+                format->flags |= PrintFlags::Lowercase;
+                format->flags |= PrintFlags::Hex;
+                if (result & FormatSpecifierFlags::PoundSpecified) {
+                    result |= FormatSpecifierFlags::PrependHex;
+                }
+                break;
+            }
+            case 'A': {
+                format->flags |= PrintFlags::Hex;
+                if (result & FormatSpecifierFlags::PoundSpecified) {
+                    result |= FormatSpecifierFlags::PrependHex;
+                }
+                break;
+            }
+
+            // non printf
+            case 'n': {
+                result |= PrintFlags::BoolAsNumber;
+                break;
+            }
+        }
+    }
+    return result;
 }
+
+// TODO: this could be done better with dependency to type_traits
+template <class T>
+struct UnsignedPair {
+    T value;
+    bool negative;
+};
+
+static UnsignedPair<double> tmp_make_unsigned(double v) {
+    bool negative = v < 0;
+    if (negative) v = -v;
+    return {v, negative};
+}
+static UnsignedPair<float> tmp_make_unsigned(float v) {
+    bool negative = v < 0;
+    if (negative) v = -v;
+    return {v, negative};
+}
+
+#if !defined(TMP_INT_BACKEND_TM_CONVERSION)
+static UnsignedPair<uint32_t> tmp_make_unsigned(int32_t v) {
+    bool negative = v < 0;
+    if (negative) v = -v;
+    return {(uint32_t)v, negative};
+}
+static UnsignedPair<uint64_t> tmp_make_unsigned(int64_t v) {
+    bool negative = v < 0;
+    if (negative) v = -v;
+    return {(uint64_t)v, negative};
+}
+
+static UnsignedPair<uint32_t> tmp_make_unsigned(uint32_t v) { return {v, false}; }
+static UnsignedPair<uint64_t> tmp_make_unsigned(uint64_t v) { return {v, false}; }
+#endif  // !defined(TMP_INT_BACKEND_TM_CONVERSION)
+
+static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, const char* str,
+                                            tm_size_t str_len) {
+    TM_ASSERT_VALID_SIZE(maxlen);
+    TM_ASSERT_VALID_SIZE(str_len);
+
+    const auto width = format.width;
+    tm_size_t size = (width > 0 && (tm_size_t)width > str_len) ? width : str_len;
+    if (size > maxlen) {
+        return {maxlen, TM_EOVERFLOW};
+    }
+
+    auto remaining = maxlen;
+
+    if (width > 0 && (tm_size_t)width > str_len) {
+        tm_size_t padding = (tm_size_t)width - str_len;
+        if (!(format.flags & FormatSpecifierFlags::LeftJustify)) {
+            TM_ASSERT(padding <= remaining);
+            TM_MEMSET(dest, ' ', (size_t)padding);
+            dest += padding;
+            remaining -= padding;
+        } else {
+            TM_ASSERT(padding + str_len <= maxlen);
+            TM_MEMSET(dest + str_len, ' ', (size_t)padding);
+        }
+    }
+
+    TM_ASSERT(str_len <= remaining);
+    TM_MEMCPY(dest, str, (size_t)str_len);
+    return {size, TM_OK};
+}
+
+static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, bool value) {
+    TM_ASSERT(dest || maxlen == 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+
+    auto flags = format.flags;
+    if (flags & PrintFlags::BoolAsNumber) {
+        return print_formatted(dest, maxlen, format, (value) ? "1" : "0", 1);
+    }
+    const bool lowercase = ((flags & PrintFlags::Lowercase) != 0);
+    const char* str = nullptr;
+    tm_size_t str_len = 0;
+    if (value) {
+        str = (lowercase) ? "true" : "TRUE";
+        str_len = 4;
+    } else {
+        str = (lowercase) ? "false" : "FALSE";
+        str_len = 5;
+    }
+    return print_formatted(dest, maxlen, format, str, str_len);
+}
+
+static tm_size_t tmp_get_decorated_size(tm_size_t digits, const PrintFormat& format, bool negative) {
+    tm_size_t result = digits;
+    if (negative || (format.flags & PrintFlags::Sign)) {
+        ++result;
+    }
+    if ((format.flags & FormatSpecifierFlags::PrependHex) || (format.flags & FormatSpecifierFlags::PrependBinary)) {
+        result += 2;
+    }
+    if (format.flags & FormatSpecifierFlags::PrependOctal) {
+        result += 1;
+    }
+    return result;
+}
+
+static void tmp_print_decoration(char* dest, tm_size_t maxlen, const PrintSizes& sizes, const PrintFormat& format,
+                                 bool negative) {
+    TM_ASSERT(dest || maxlen == 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+    TM_ASSERT(sizes.size <= maxlen);
+    auto remaining = maxlen;
+
+    char* decorate_pos = dest;
+    const auto flags = format.flags;
+
+    // padding
+    if (format.width > 0 && sizes.size <= (tm_size_t)format.width) {
+        if (!(flags & FormatSpecifierFlags::LeftJustify)) {
+            auto padding = (tm_size_t)format.width - sizes.decorated;
+            TM_ASSERT(padding <= maxlen);
+            if (flags & FormatSpecifierFlags::PadWithSpaces) {
+                decorate_pos = dest + padding;
+            } else {
+                TM_ASSERT(sizes.decorated >= sizes.digits);
+                dest += sizes.decorated - sizes.digits;
+            }
+            TM_MEMSET(dest, (flags & FormatSpecifierFlags::PadWithSpaces) ? ' ' : '0', padding);
+            dest += padding;
+            remaining -= padding;
+        } else {
+            dest += sizes.decorated;
+            TM_ASSERT((tm_size_t)format.width >= sizes.decorated);
+            TM_MEMSET(dest, ' ', (tm_size_t)format.width - sizes.decorated);
+        }
+    } else {
+        TM_ASSERT(sizes.decorated >= sizes.digits);
+        dest += sizes.decorated - sizes.digits;
+    }
+
+    if (negative) {
+        TM_ASSERT(remaining > 0);
+        *decorate_pos++ = '-';
+        --remaining;
+    } else if (flags & PrintFlags::Sign) {
+        TM_ASSERT(remaining > 0);
+        *decorate_pos++ = '+';
+        --remaining;
+    }
+
+    if (flags & FormatSpecifierFlags::PrependHex) {
+        *decorate_pos++ = '0';
+        *decorate_pos++ = (flags & PrintFlags::Lowercase) ? 'x' : 'X';
+        remaining -= 2;
+    } else if (flags & FormatSpecifierFlags::PrependBinary) {
+        *decorate_pos++ = '0';
+        *decorate_pos++ = (flags & PrintFlags::Lowercase) ? 'b' : 'B';
+        remaining -= 2;
+    } else if (flags & FormatSpecifierFlags::PrependOctal) {
+        *decorate_pos++ = '0';
+        --remaining;
+    }
+}
+
+static PrintFormattedResult tmp_move_printed_value_and_decorate(char* dest, tm_size_t maxlen, const PrintFormat& format,
+                                                                PrintFormattedResult printResult, bool negative) {
+    TM_ASSERT(dest || maxlen == 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+
+    if (printResult.ec != TM_OK) return printResult;
+
+    PrintSizes sizes = {};
+    sizes.digits = printResult.size;
+    sizes.decorated = tmp_get_decorated_size(sizes.digits, format, negative);
+    sizes.size = sizes.decorated;
+
+    auto width = format.width;
+    if (width > 0 && sizes.size < (tm_size_t)width) {
+        sizes.size = (tm_size_t)width;
+    }
+    TM_ASSERT(sizes.size >= sizes.decorated);
+    TM_ASSERT(sizes.size >= sizes.digits);
+    TM_ASSERT(sizes.decorated >= sizes.digits);
+
+    tm_size_t digits_pos = 0;
+    if (width <= 0 || (format.flags & FormatSpecifierFlags::LeftJustify)) {
+        digits_pos = sizes.decorated - sizes.digits;
+    } else {
+        digits_pos = sizes.size - sizes.digits;
+    }
+    if (digits_pos > 0) {
+        tm_size_t sign = negative || ((format.flags & PrintFlags::Sign) != 0);
+        if (digits_pos != sign) {
+            TM_MEMMOVE(dest + digits_pos, dest + sign, sizes.digits);
+        }
+    }
+
+    tmp_print_decoration(dest, maxlen, sizes, format, negative);
+    printResult.size = sizes.size;
+    return printResult;
+}
+
+template <class T>
+static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, T value) {
+    TM_ASSERT(dest || maxlen == 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+
+    if (maxlen <= 0 || (format.width > 0 && (tm_size_t)format.width > maxlen)) {
+        return {maxlen, TM_EOVERFLOW};
+    }
+
+    auto pair = tmp_make_unsigned(value);
+    bool sign = pair.negative || ((format.flags & PrintFlags::Sign) != 0);
+    auto result = tmp_print(dest + sign, maxlen - sign, pair.value, format);
+    return tmp_move_printed_value_and_decorate(dest, maxlen, format, result, pair.negative);
+}
+
+#ifdef TMP_INT_BACKEND_CRT
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint32_t value, const PrintFormat& format) {
+    TM_ASSERT(!dest || maxlen > 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+
+    PrintFormattedResult result = {maxlen, TM_EOVERFLOW};
+    const char* format_string = "%" PRIu32;
+    if (format.base == 16) {
+        format_string = (format.flags & PrintFlags::Lowercase) ? "%" PRIx32 : "%" PRIX32;
+    } else if (format.base == 8) {
+        format_string = "%" PRIo32;
+    }
+    auto size = TMP_SNPRINTF(dest, (size_t)maxlen, format_string, value);
+    if (size > 0 && (tm_size_t)size <= maxlen) {
+        result.size = (tm_size_t)size;
+        result.ec = TM_OK;
+    }
+    return result;
+}
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint64_t value, const PrintFormat& format) {
+    TM_ASSERT(!dest || maxlen > 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+
+    PrintFormattedResult result = {};
+    const char* format_string = "%" PRIu64;
+    if (format.base == 16) {
+        format_string = (format.flags & PrintFlags::Lowercase) ? "%" PRIx64 : "%" PRIX64;
+    } else if (format.base == 8) {
+        format_string = "%" PRIo64;
+    }
+    auto size = TMP_SNPRINTF(dest, (size_t)maxlen, format_string, value);
+    if (size > 0 && (tm_size_t)size <= maxlen) {
+        result.size = (tm_size_t)size;
+        result.ec = TM_OK;
+    }
+    return result;
+}
+#endif  // defined(TMP_INT_BACKEND_CRT)
+
+#ifdef TMP_INT_BACKEND_TM_CONVERSION
+static tm_size_t tmp_get_digits_count_decimal(uint64_t value) { return get_digits_count_decimal_u64(value); }
+static tm_size_t tmp_get_digits_count_decimal(uint32_t value) { return get_digits_count_decimal_u32(value); }
+static tm_size_t tmp_get_digits_count_hex(uint32_t value) { return get_digits_count_hex_u32(value); }
+static tm_size_t tmp_get_digits_count_hex(uint64_t value) { return get_digits_count_hex_u64(value); }
+static tm_size_t tmp_get_digits_count(uint32_t value, int32_t base) { return get_digits_count_u32(value, base); }
+static tm_size_t tmp_get_digits_count(uint64_t value, int32_t base) { return get_digits_count_u64(value, base); }
+
+template <class T>
+PrintSizes tmp_get_print_sizes(T value, const PrintFormat& format, bool negative) {
+    static_assert(std::is_unsigned<T>::value, "T has to be unsigned");
+
+    PrintSizes result = {};
+
+    switch (format.base) {
+        case 10: {
+            result.digits = tmp_get_digits_count_decimal(value);
+            break;
+        }
+        case 16: {
+            result.digits = tmp_get_digits_count_hex(value);
+            break;
+        }
+        default: {
+            result.digits = tmp_get_digits_count(value, format.base);
+            break;
+        }
+    }
+
+    result.decorated = tmp_get_decorated_size(result.digits, format, negative);
+    result.size = result.decorated;
+    if (format.width > 0 && result.size < (tm_size_t)format.width) {
+        result.size = (tm_size_t)format.width;
+    }
+
+    TM_ASSERT(result.size >= result.decorated);
+    TM_ASSERT(result.size >= result.digits);
+    TM_ASSERT(result.decorated >= result.digits);
+    return result;
+}
+
+static PrintFormattedResult tmp_print_decimal_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value) {
+    return print_decimal_u32_w(dest, maxlen, width, value);
+}
+static PrintFormattedResult tmp_print_decimal_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value) {
+    return print_decimal_u64_w(dest, maxlen, width, value);
+}
+static PrintFormattedResult tmp_print_hex_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value,
+                                            bool lowercase) {
+    return print_hex_u32_w(dest, maxlen, width, value, lowercase);
+}
+static PrintFormattedResult tmp_print_hex_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value,
+                                            bool lowercase) {
+    return print_hex_u64_w(dest, maxlen, width, value, lowercase);
+}
+static PrintFormattedResult tmp_print_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value, int32_t base,
+                                        bool lowercase) {
+    return print_u32_w(dest, maxlen, width, value, base, lowercase);
+}
+static PrintFormattedResult tmp_print_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value, int32_t base,
+                                        bool lowercase) {
+    return print_u64_w(dest, maxlen, width, value, base, lowercase);
+}
+
+template <class T>
+static PrintFormattedResult print_formatted_unsigned(char* dest, tm_size_t maxlen, const PrintSizes& sizes,
+                                                     const PrintFormat& format, T value, bool negative) {
+    PrintFormattedResult result = {0, TM_OK};
+    if (sizes.size > maxlen) {
+        result.size = maxlen;
+        result.ec = TM_EOVERFLOW;
+        return result;
+    }
+    result.size = sizes.size;
+
+    tmp_print_decoration(dest, maxlen, sizes, format, negative);
+
+    tm_size_t padding = 0;
+    auto flags = format.flags;
+    if (flags & FormatSpecifierFlags::LeftJustify) {
+        padding = sizes.decorated - sizes.digits;
+    } else {
+        padding = sizes.size - sizes.digits;
+    }
+    dest += padding;
+    auto remaining = maxlen - padding;
+    PrintFormattedResult print_result = {};
+    switch (format.base) {
+        case 10: {
+            print_result = tmp_print_decimal_w(dest, remaining, sizes.digits, value);
+            break;
+        }
+        case 16: {
+            bool lowercase = (flags & PrintFlags::Lowercase) != 0;
+            print_result = tmp_print_hex_w(dest, remaining, sizes.digits, value, lowercase);
+            break;
+        }
+        default: {
+            bool lowercase = (flags & PrintFlags::Lowercase) != 0;
+            print_result = tmp_print_w(dest, remaining, sizes.digits, value, format.base, lowercase);
+            break;
+        }
+    }
+    if (print_result.ec != TM_OK) {
+        result.size = maxlen;
+        result.ec = print_result.ec;
+        return result;
+    }
+
+    return result;
+}
+#endif  // defined(TMP_INT_BACKEND_TM_CONVERSION)
+
+#ifdef TMP_INT_BACKEND_CHARCONV
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint32_t value, const PrintFormat& format) {
+    TM_ASSERT(!dest || maxlen > 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+    TM_ASSERT(format.base >= 2 && format.base <= 36);
+
+    auto std_result = std::to_chars(dest, dest + maxlen, value, format.base);
+    if(std_result.ec == std::errc{}) {
+        if(!(format.flags & PrintFlags::Lowercase)) {
+            for(char* p = dest, *end = dest + maxlen; p < end; ++p) {
+                *p = (char)TMP_TOUPPER((unsigned char)*p);
+            }
+        }
+        return {(tm_size_t)(std_result.ptr - dest), TM_OK};
+    }
+    return {maxlen, TM_EOVERFLOW};
+}
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint64_t value, const PrintFormat& format) {
+    TM_ASSERT(!dest || maxlen > 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+    TM_ASSERT(format.base >= 2 && format.base <= 36);
+
+    auto std_result = std::to_chars(dest, dest + maxlen, value, format.base);
+    if(std_result.ec == std::errc{}) {
+        if(!(format.flags & PrintFlags::Lowercase)) {
+            for(char* p = dest, *end = dest + maxlen; p < end; ++p) {
+                *p = (char)TMP_TOUPPER((unsigned char)*p);
+            }
+        }
+        return {(tm_size_t)(std_result.ptr - dest), TM_OK};
+    }
+    return {maxlen, TM_EOVERFLOW};
+}
+#endif  // defined(TMP_INT_BACKEND_CHARCONV)
+
+#ifdef TMP_FLOAT_BACKEND_CRT
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, double value, const PrintFormat& format) {
+    TM_ASSERT(!dest || maxlen > 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+    TM_ASSERT(format.base >= 2 && format.base <= 36);
+
+    PrintFormattedResult result = {maxlen, TM_EOVERFLOW};
+    auto precision = format.precision;
+    char fmt_buffer[5];
+    char* p = fmt_buffer;
+    *p++ = '%';
+    if (precision >= 0) {
+        *p++ = '.';
+        *p++ = '*';
+    }
+    *p = 'f';
+    if ((format.flags & PrintFlags::General) == PrintFlags::General) {
+        *p = (format.flags & PrintFlags::Lowercase) ? 'g' : 'G';
+    } else if (format.flags & PrintFlags::Scientific) {
+        *p = (format.flags & PrintFlags::Lowercase) ? 'e' : 'E';
+    } else if (format.flags & PrintFlags::Hex) {
+        *p = (format.flags & PrintFlags::Lowercase) ? 'a' : 'A';
+    }
+    ++p;
+    *p = 0;
+    TM_ASSERT(p < fmt_buffer + 5);
+
+    int size = -1;
+    if (precision < 0) {
+        size = TMP_SNPRINTF(dest, maxlen, fmt_buffer, value);
+    } else {
+        size = TMP_SNPRINTF(dest, maxlen, fmt_buffer, precision, value);
+    }
+    if (size > 0 && (tm_size_t)size <= maxlen) {
+        if (format.flags & PrintFlags::Hex) {
+            // remove 0x prefix to make output same as other backends
+            if (size > 2) {
+                TM_ASSERT(dest[0] == '0');
+                TM_ASSERT(dest[1] == 'x' || dest[1] == 'X');
+                TM_MEMMOVE(dest, dest + 2, size - 2);
+                size -= 2;
+            }
+        }
+        result.size = (tm_size_t)size;
+        result.ec = TM_OK;
+    }
+    return result;
+}
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, float value, const PrintFormat& format) {
+    return tmp_print(dest, maxlen, (double)value, format);
+}
+#endif  // defined(TMP_FLOAT_BACKEND_CRT)
+
+#ifdef TMP_FLOAT_BACKEND_TM_CONVERSION
+static uint32_t tmp_convert_flags(uint32_t flags) {
+    // assuming that flags are 1 to 1 compatible with the ones in tm_conversion.h
+    return flags & ((1u << PF_COUNT) - 1);  // mask out flags not defined in tm_conversion
+}
+
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, double value, const PrintFormat& format) {
+    return print_double(dest, maxlen, value, tmp_convert_flags(format.flags), format.precision);
+}
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, float value, const PrintFormat& format) {
+    return print_double(dest, maxlen, (double)value, tmp_convert_flags(format.flags), format.precision);
+}
+#endif  // defined(TMP_FLOAT_BACKEND_TM_CONVERSION)
+
+#ifdef TMP_FLOAT_BACKEND_CHARCONV
+std::chars_format tmp_to_std_flags(unsigned flags) {
+    std::chars_format result = std::chars_format::fixed;
+    if ((flags & PrintFlags::General) == PrintFlags::General) {
+        result = std::chars_format::fixed | std::chars_format::scientific;
+    } else if (flags & PrintFlags::Scientific) {
+        result = std::chars_format::scientific;
+    } else if (flags & PrintFlags::Hex) {
+        result = std::chars_format::hex;
+    }
+    return result;
+}
+
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, double value, const PrintFormat& format) {
+    TM_ASSERT(!dest || maxlen > 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+    TM_ASSERT(format.base >= 2 && format.base <= 36);
+
+    auto precision = format.precision;
+    std::to_chars_result std_result = {};
+    if (precision < 0) {
+        std_result = std::to_chars(dest, dest + maxlen, value, tmp_to_std_flags(format.flags));
+    } else {
+        std_result = std::to_chars(dest, dest + maxlen, value, tmp_to_std_flags(format.flags), precision);
+    }
+    if (std_result.ec == std::errc{}) {
+        return {(tm_size_t)(std_result.ptr - dest), TM_OK};
+    }
+    return {maxlen, TM_EOVERFLOW};
+}
+static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, float value, const PrintFormat& format) {
+    TM_ASSERT(!dest || maxlen > 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+    TM_ASSERT(format.base >= 2 && format.base <= 36);
+
+    auto precision = format.precision;
+    std::to_chars_result std_result = {};
+    if (precision < 0) {
+        std_result = std::to_chars(dest, dest + maxlen, value, tmp_to_std_flags(format.flags));
+    } else {
+        std_result = std::to_chars(dest, dest + maxlen, value, tmp_to_std_flags(format.flags), precision);
+    }
+    if (std_result.ec == std::errc{}) {
+        return {(tm_size_t)(std_result.ptr - dest), TM_OK};
+    }
+    return {maxlen, TM_EOVERFLOW};
+}
+#endif  // defined(TMP_FLOAT_BACKEND_CHARCONV)
+
+struct tmp_memory_printer {
+    char* data;
+    tm_size_t size;
+    tm_size_t capacity;
+    bool allowResize;
+    bool owns;
+    tm_errc ec = TM_OK;
+
+    ~tmp_memory_printer() {
+        if (owns) {
+            TMP_FREE(data);
+        }
+    }
+    bool grow(tm_size_t byAtLeast = 0) {
+        TM_ASSERT(allowResize);
+        tm_size_t newCapacity = 3 * ((capacity + 2) / 2);
+        if (newCapacity < capacity + byAtLeast) {
+            newCapacity = capacity + byAtLeast;
+        }
+        if (owns) {
+            data = TMP_REALLOC(char, data, newCapacity);
+            TM_ASSERT(data);
+            if (data) {
+                capacity = newCapacity;
+                return true;
+            }
+        } else {
+            char* newData = TMP_MALLOC(char, newCapacity);
+            TM_ASSERT(newData);
+            if (newData) {
+                TM_MEMCPY(newData, data, size);
+                data = newData;
+                capacity = newCapacity;
+                owns = true;
+                return true;
+            }
+        }
+        ec = TM_ENOMEM;
+        return false;
+    }
+    tm_size_t remaining() {
+        TM_ASSERT(size <= capacity);
+        return capacity - size;
+    }
+    char* end() { return data + size; }
+
+    template <class T>
+    bool print_value(T value, PrintFormat& format) {
+        PrintFormattedResult result = {};
+        do {
+            result = print_formatted(end(), remaining(), format, value);
+        } while (allowResize && result.ec == TM_EOVERFLOW && grow());
+        if (result.ec == TM_OK)
+            size += result.size;
+        else
+            ec = result.ec;
+        return result.ec == TM_OK;
+    }
+    bool print_string_value(const char* str, tm_size_t str_len, PrintFormat& format) {
+        tm_size_t len = (format.width > 0 && (tm_size_t)format.width > str_len) ? ((tm_size_t)format.width) : (str_len);
+
+        bool result = true;
+        if (len > remaining()) {
+            result = grow(len);
+        }
+        if (result) {
+            auto print_result = print_formatted(end(), remaining(), format, str, str_len);
+            if (print_result.ec == TM_OK) {
+                size += print_result.size;
+            } else {
+                result = false;
+            }
+        }
+        return result;
+    }
+#ifdef TMP_INT_BACKEND_TM_CONVERSION
+    template <class T>
+    bool print_unsigned(T value, PrintFormat& format, bool negative) {
+        auto sizes = tmp_get_print_sizes(value, format, negative);
+        if (sizes.size > remaining() && !(allowResize && grow(sizes.size))) {
+            if (!allowResize) ec = TM_EOVERFLOW;
+            return false;
+        }
+        auto result = print_formatted_unsigned(end(), remaining(), sizes, format, value, negative);
+        TM_ASSERT(result.ec == TM_OK);
+        size += result.size;
+        return result.ec == TM_OK;
+    }
+    bool print_value(int32_t value, PrintFormat& format) {
+        bool negative = value < 0;
+        if (negative) value = -value;
+        return print_unsigned((uint32_t)value, format, negative);
+    }
+    bool print_value(int64_t value, PrintFormat& format) {
+        bool negative = value < 0;
+        if (negative) value = -value;
+        return print_unsigned((uint64_t)value, format, negative);
+    }
+    bool print_value(uint32_t value, PrintFormat& format) { return print_unsigned(value, format, false); }
+    bool print_value(uint64_t value, PrintFormat& format) { return print_unsigned(value, format, false); }
+#endif  // defined(TMP_INT_BACKEND_TM_CONVERSION)
+
+    bool operator()(int type, const PrintValue& value, PrintFormat& format) {
+        switch (type) {
+            case PrintType::Char: {
+                if (format.flags & PrintFlags::Char) {
+                    if (remaining() || (allowResize && grow())) {
+                        *end() = value.c;
+                        ++size;
+                        return true;
+                    }
+                    return false;
+                } else {
+                    return print_value((int32_t)value.c, format);
+                }
+            }
+            case PrintType::Bool: {
+                return print_value(value.b, format);
+            }
+            case PrintType::Int32: {
+                return print_value(value.i32, format);
+            }
+            case PrintType::UInt32: {
+                return print_value(value.u32, format);
+            }
+            case PrintType::Int64: {
+                return print_value(value.i64, format);
+            }
+            case PrintType::UInt64: {
+                return print_value(value.u64, format);
+            }
+            case PrintType::Float: {
+#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
+                auto flags = format.flags;
+                format.flags |= PrintFlags::TrailingZeroes;
 #endif
+                bool result = print_value(value.f, format);
+#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
+                format.flags = flags;
+#endif
+                return result;
+            }
+            case PrintType::Double: {
+#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
+                auto flags = format.flags;
+                format.flags |= PrintFlags::TrailingZeroes;
+#endif
+                bool result = print_value(value.d, format);
+#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
+                format.flags = flags;
+#endif
+                return result;
+            }
+            case PrintType::String: {
+                TM_ASSERT(value.s);
+                return print_string_value(value.s, (tm_size_t)TM_STRLEN(value.s), format);
+            }
+            case PrintType::StringView: {
+                return print_string_value(value.v.data, (tm_size_t)value.v.size, format);
+            }
+#ifdef TMP_CUSTOM_PRINTING
+            case PrintType::Custom: {
+                bool result = true;
+                auto print_size = value.custom.customPrint(end(), remaining(), format, value.custom.data);
+                if (allowResize && print_size >= remaining()) {
+                    result = grow();
+                    if(result) {
+                        print_size = value.custom.customPrint(end(), remaining(), format, value.custom.data);
+                    }
+                }
+                if (print_size <= remaining()) {
+                    size += print_size;
+                }
+                return result;
+            }
+#endif
+            default: {
+                TM_ASSERT(0 && "invalid code path");
+                return false;
+            }
+        }
+    }
+    bool operator()(const char* str) { return operator()(str, (tm_size_t)TM_STRLEN(str)); }
+    bool operator()(const char* str, tm_size_t len) {
+        bool result = true;
+        if (len > remaining()) {
+            result = grow(len);
+        }
+        auto rem = remaining();
+        auto printSize = TMP_MIN(len, rem);
+        TM_ASSERT_VALID_SIZE(printSize);
+        TM_MEMCPY(end(), str, printSize);
+        size += printSize;
 
-static unsigned int parseFormatSpecifiers( const char* p, tmp_size_t len, PrintFormat* format,
-                                           unsigned int* currentIndex )
-{
-	unsigned int result = 0;
-	if( len != 0 ) {
-		auto end = p + len;
-		// parse what is inside {}
-		auto indexLen = scan_u32_n( p, (tmp_size_t)( end - p ), 10, currentIndex );
-		p += indexLen;
-		if( indexLen ) {
-			result |= FormatSpecifierFlags::IndexSpecified;
-		}
-		if( *p == ':' ) {
-			++p;
-			// custom formatting was defined, so we reject the initial formatting
-			*format = defaultPrintFormat();
-		}
-		// parse flags
-		{
-			bool parseFlags = true;
-			do {
-				switch( *p ) {
-					case '-': {
-						result |= FormatSpecifierFlags::LeftJustify;
-						++p;
-						break;
-					}
-					case '+': {
-						format->flags |= PF_SIGN;
-						++p;
-						break;
-					}
-					case ' ': {
-						// format->flags |= PF_SPACE_IF_POSITIVE;
-						++p;
-						break;
-					}
-					case '#': {
-						result |= FormatSpecifierFlags::PoundSpecified;
-						++p;
-						break;
-					}
-					case '0': {
-						format->flags |= PF_TRAILING_ZEROES;
-						++p;
-						break;
-					}
-					default: {
-						parseFlags = false;
-						break;
-					}
-				}
-			} while( parseFlags );
-		}
+        return result;
+    }
+};
 
-		// parse width
-		unsigned width   = 0;
-		auto widthLength = scan_u32_n( p, (tmp_size_t)( end - p ), 10, &width );
-		p += widthLength;
-		if( widthLength ) {
-			result |= FormatSpecifierFlags::WidthSpecified;
-		}
-		format->width = (int)width;
-
-		// parse precision
-		if( *p == '.' ) {
-			++p;
-			unsigned precision   = 0;
-			auto precisionLength = scan_u32_n( p, (tmp_size_t)( end - p ), 10, &precision );
-			p += precisionLength;
-			if( precisionLength ) {
-				result |= FormatSpecifierFlags::PrecisionSpecified;
-			}
-			format->precision = (int)precision;
-		}
-
-		switch( *p ) {
-			case 'x': {
-				format->flags |= PF_LOWERCASE;
-				// fallthrough into case 'X'
-			}
-			case 'X': {
-				format->base = 16;
-				if( result & FormatSpecifierFlags::PoundSpecified ) {
-					result |= FormatSpecifierFlags::PrependHex;
-				}
-				break;
-			}
-			case 'e': {
-				format->flags |= PF_LOWERCASE;
-				// fallthrough into case 'E'
-			}
-			case 'E': {
-				format->flags |= PF_SCIENTIFIC;
-				break;
-			}
-			case 'b': {
-				format->flags |= PF_LOWERCASE;
-				// fallthrough into case 'B'
-			}
-			case 'B': {
-				format->base = 2;
-				if( result & FormatSpecifierFlags::PoundSpecified ) {
-					result |= FormatSpecifierFlags::PrependBinary;
-				}
-				break;
-			}
-			case 'f': {
-				format->flags |= PF_TRAILING_ZEROES;
-				break;
-			}
-		}
-	}
-	return result;
+static const char* tmp_find(const char* first, const char* last, char c) {
+    return (const char*)TM_MEMCHR(first, c, last - first);
 }
 
-static const char* tmp_find( const char* first, const char* last, char c )
-{
-	return (const char*)TMP_MEMCHR( first, c, last - first );
+static void tmp_print_impl(const char* format, size_t formatLen, const PrintFormat& initialFormatting,
+                           const PrintArgList& args, tmp_memory_printer& printout) {
+    // sanitize flags
+    uint32_t format_flags = initialFormatting.flags & ((1u << PrintFlags::Count) - 1);
+
+    const char* formatFirst = format;
+    const char* formatLast = format + formatLen;
+    auto index = 0u;
+    const char* p = formatFirst;
+    auto flags = args.flags;
+    while (flags && (p = tmp_find(formatFirst, formatLast, '{')) != nullptr) {
+        if (!printout(formatFirst, (tm_size_t)(p - formatFirst))) return;
+        ++p;
+        if (*p == '{') {
+            if (!printout("{", 1)) return;
+            ++p;
+            formatFirst = p;
+            continue;
+        }
+
+        // parse until '}'
+        auto next = tmp_find(formatFirst, formatLast, '}');
+        if (!next) {
+            TM_ASSERT(0 && "illformed format");
+            break;
+        }
+
+        PrintFormat printFormat = initialFormatting;
+        printFormat.flags = format_flags;
+        auto currentIndex = index;
+        auto current = flags & PrintType::Mask;
+        auto formatFlags = tmp_parse_format_specifiers(p, (tm_size_t)(next - p), &printFormat, &currentIndex);
+        printFormat.flags |= formatFlags;
+
+        if (!(formatFlags & FormatSpecifierFlags::IndexSpecified)) {
+            ++index;
+            flags >>= PrintType::Bits;
+        } else {
+            current = (args.flags >> (currentIndex * PrintType::Bits)) & PrintType::Mask;
+        }
+        formatFirst = next + 1;
+
+        TM_ASSERT(currentIndex < args.size);
+        if ((formatFlags & FormatSpecifierFlags::PrecisionSpecified) &&
+            (current == PrintType::Int32 || current == PrintType::UInt32 || current == PrintType::Int64 ||
+             current == PrintType::UInt64)) {
+            if (formatFlags & FormatSpecifierFlags::WidthSpecified) {
+                printFormat.width = TMP_MIN(printFormat.precision, printFormat.width);
+            } else {
+                printFormat.width = printFormat.precision;
+            }
+        }
+        if (!printout((int)current, args.args[currentIndex], printFormat)) return;
+    }
+    if (formatFirst < formatLast) {
+        if (!printout(formatFirst, (tm_size_t)(formatLast - formatFirst))) return;
+    }
 }
+
 }  // anonymous namespace
 
-template < class Output >
-static void print_impl( const char* format, size_t formatLen, const PrintFormat& initialFormatting,
-                        const PrintArgList& args, Output&& printout )
-{
-	const char* formatFirst = format;
-	const char* formatLast  = format + formatLen;
-	auto index              = 0u;
-	const char* p           = formatFirst;
-	auto flags              = args.flags;
-	while( flags && ( p = tmp_find( formatFirst, formatLast, '{' ) ) != nullptr ) {
-		printout( formatFirst, ( tmp_size_t )( p - formatFirst ) );
-		++p;
-		if( *p == '{' ) {
-			printout( "{", 1 );
-			++p;
-			formatFirst = p;
-			continue;
-		}
+#ifndef TMP_NO_CRT_FILE_PRINTING
+TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintArgList& args) {
+    char sbo[TMP_SBO_SIZE];
+    tmp_memory_printer printer = {sbo, 0, TMP_SBO_SIZE, true, false};
 
-		// parse until '}'
-		auto next = tmp_find( formatFirst, formatLast, '}' );
-		if( !next ) {
-			TMP_ASSERT( 0 && "illformed format" );
-			break;
-		}
-
-		PrintFormat printFormat = initialFormatting;
-		auto currentIndex       = index;
-		auto current            = flags & PrintType::Mask;
-		auto formatFlags =
-		    parseFormatSpecifiers( p, ( tmp_size_t )( next - p ), &printFormat, &currentIndex );
-
-		if( !( formatFlags & FormatSpecifierFlags::IndexSpecified ) ) {
-			++index;
-			flags >>= PrintType::Bits;
-		} else {
-			current = ( args.flags >> ( currentIndex * PrintType::Bits ) ) & PrintType::Mask;
-		}
-		formatFirst = next + 1;
-
-		if( formatFlags & FormatSpecifierFlags::PrependHex ) {
-			printout( ( printFormat.flags & PF_LOWERCASE ) ? ( "0x" ) : ( "0X" ), 2 );
-		} else if( formatFlags & FormatSpecifierFlags::PrependBinary ) {
-			printout( ( printFormat.flags & PF_LOWERCASE ) ? ( "0b" ) : ( "0B" ), 2 );
-		}
-
-		TMP_ASSERT( currentIndex < args.size );
-		if( ( formatFlags & FormatSpecifierFlags::PrecisionSpecified )
-		    && ( current == PrintType::Int || current == PrintType::UInt ) ) {
-
-			if( formatFlags & FormatSpecifierFlags::WidthSpecified ) {
-				printFormat.width = TMP_MIN( printFormat.precision, printFormat.width );
-			} else {
-				printFormat.width = printFormat.precision;
-			}
-		}
-		printout( (int)current, args.args[currentIndex], printFormat );
-	}
-	if( *formatFirst ) {
-		printout( formatFirst, ( tmp_size_t )( formatLast - formatFirst ) );
-	}
-}
-
-namespace
-{
-#ifdef TMP_NO_TM_CONVERSION
-static tmp_size_t print_i32( char* dest, tmp_size_t maxlen, PrintFormat* format, tmp_int32 value );
-static tmp_size_t print_u32( char* dest, tmp_size_t maxlen, PrintFormat* format, tmp_uint32 value );
-static tmp_size_t print_i64( char* dest, tmp_size_t maxlen, PrintFormat* format, tmp_int64 value );
-static tmp_size_t print_u64( char* dest, tmp_size_t maxlen, PrintFormat* format, tmp_uint64 value );
-static tmp_size_t print_double( char* dest, tmp_size_t maxlen, PrintFormat* format, double value );
-static tmp_size_t print_float( char* dest, tmp_size_t maxlen, PrintFormat* format, float value );
-static tmp_size_t print_bool( char* dest, tmp_size_t maxlen, PrintFormat* format, bool value );
-#endif
-
-struct PrintStream {
-	char* data;
-	tmp_size_t remaining;
-};
-#ifndef TMP_NO_STDIO
-	struct fprinter {
-		FILE* out;
-
-		void operator()( int type, const PrintValue& value, PrintFormat& format )
-		{
-			enum { BUFFER_LEN = TMP_PRINTF_BUFFER_SIZE };
-			char buffer[BUFFER_LEN];
-			switch( type ) {
-				case PrintType::Char: {
-					fprintf( out, "%c", value.c );
-					break;
-				}
-				case PrintType::Bool: {
-					auto len = print_bool( buffer, BUFFER_LEN, &format, value.b );
-					fprintf( out, "%.*s", (int)len, buffer );
-					break;
-				}
-				case PrintType::Int: {
-					auto len = print_i32( buffer, BUFFER_LEN, &format, value.i );
-					fprintf( out, "%.*s", (int)len, buffer );
-					break;
-				}
-				case PrintType::UInt: {
-					auto len = print_u32( buffer, BUFFER_LEN, &format, value.u );
-					fprintf( out, "%.*s", (int)len, buffer );
-					break;
-				}
-				case PrintType::Int64: {
-					auto len = print_i64( buffer, BUFFER_LEN, &format, value.ll );
-					fprintf( out, "%.*s", (int)len, buffer );
-					break;
-				}
-				case PrintType::UInt64: {
-					auto len = print_u64( buffer, BUFFER_LEN, &format, value.ull );
-					fprintf( out, "%.*s", (int)len, buffer );
-					break;
-				}
-				case PrintType::Float: {
-					auto len = print_float( buffer, BUFFER_LEN, &format, value.f );
-					fprintf( out, "%.*s", (int)len, buffer );
-					break;
-				}
-				case PrintType::Double: {
-					auto len = print_double( buffer, BUFFER_LEN, &format, value.d );
-					fprintf( out, "%.*s", (int)len, buffer );
-					break;
-				}
-				case PrintType::String: {
-					operator()( value.s );
-					break;
-				}
-				case PrintType::StringView: {
-					operator()( value.v.data, value.v.size );
-					break;
-				}
-#ifdef TMP_CUSTOM_PRINTING
-			    case PrintType::Custom: {
-				    auto len =
-				        value.custom.customPrint( buffer, BUFFER_LEN, format, value.custom.data );
-					fprintf( out, "%.*s", (int)len, buffer );
-					break;
-				}
-#endif
-				default: {
-					TMP_ASSERT( 0 && "invalid code path" );
-					break;
-				}
-			}
-		}
-		void operator()( const char* str ) { fprintf( out, "%s", str ); }
-		void operator()( const char* str, tmp_size_t len )
-		{
-			fprintf( out, "%.*s", (int)len, str );
-		}
-	};
-#endif  // TMP_NO_STDIO
-
-struct memoryprinter {
-	char* data;
-	tmp_size_t remaining;
-
-	void operator()( int type, const PrintValue& value, PrintFormat& format )
-	{
-		switch( type ) {
-			case PrintType::Char: {
-				if( remaining ) {
-					*data = value.c;
-					++data;
-					--remaining;
-				}
-				break;
-			}
-			case PrintType::Bool: {
-				auto len = print_bool( data, remaining, &format, value.b );
-				TMP_ASSERT( len <= remaining );
-				data += len;
-				remaining -= len;
-				break;
-			}
-			case PrintType::Int: {
-				auto len = print_i32( data, remaining, &format, value.i );
-				TMP_ASSERT( len <= remaining );
-				data += len;
-				remaining -= len;
-				break;
-			}
-			case PrintType::UInt: {
-				auto len = print_u32( data, remaining, &format, value.u );
-				TMP_ASSERT( len <= remaining );
-				data += len;
-				remaining -= len;
-				break;
-			}
-			case PrintType::Int64: {
-				auto len = print_i64( data, remaining, &format, value.ll );
-				TMP_ASSERT( len <= remaining );
-				data += len;
-				remaining -= len;
-				break;
-			}
-			case PrintType::UInt64: {
-				auto len = print_u64( data, remaining, &format, value.ull );
-				TMP_ASSERT( len <= remaining );
-				data += len;
-				remaining -= len;
-				break;
-			}
-			case PrintType::Float: {
-				#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
-					auto flags = format.flags;
-					format.flags |= PF_TRAILING_ZEROES;
-				#endif
-				auto len = print_float( data, remaining, &format, value.f );
-				TMP_ASSERT( len <= remaining );
-				data += len;
-				remaining -= len;
-				#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
-					format.flags = flags;
-				#endif
-				break;
-			}
-			case PrintType::Double: {
-				#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
-					auto flags = format.flags;
-					format.flags |= PF_TRAILING_ZEROES;
-				#endif
-				auto len = print_double( data, remaining, &format, value.d );
-				TMP_ASSERT( len <= remaining );
-				data += len;
-				remaining -= len;
-				#ifdef TMP_FLOAT_ALWAYS_TRAILING_ZEROES
-					format.flags = flags;
-				#endif
-				break;
-			}
-			case PrintType::String: {
-				operator()( value.s, (tmp_size_t)TMP_STRLEN( value.s ) );
-				break;
-			}
-			case PrintType::StringView: {
-				operator()( value.v.data, (tmp_size_t)value.v.size );
-				break;
-			}
-#ifdef TMP_CUSTOM_PRINTING
-			case PrintType::Custom: {
-				auto len =  value.custom.customPrint( data, remaining, format, value.custom.data );
-				TMP_ASSERT( len <= remaining );
-				remaining -= len;
-				data += len;
-				break;
-			}
-#endif
-			default: {
-				TMP_ASSERT( 0 && "invalid code path" );
-				break;
-			}
-		}
-	}
-	void operator()( const char* str ) { operator()( str, (tmp_size_t)TMP_STRLEN( str ) ); }
-	void operator()( const char* str, tmp_size_t len )
-	{
-		auto size = TMP_MIN( len, remaining );
-		assert( size >= 0 );
-		TMP_MEMCPY( data, str, size );
-		remaining -= size;
-		data += size;
-	}
-};
-
-#ifdef TMP_NO_TM_CONVERSION
-static void print_make_format( memoryprinter& printout, PrintFormat* format, const char* type )
-{
-	auto flags = format->flags;
-	printout( "%0", 2 );
-	if( flags & PF_SIGN ) {
-		printout( "+", 1 );
-	}
-	if( *type == 'f' && format->precision == 0 ) {
-		// precision == 0 means something different for snprintf, it won't print 0 if precision is 0
-		format->precision = 1;
-	}
-
-	if( format->width ) {
-		if( flags & PF_SIGN ) {
-			// snprintf takes sign into account for width
-			++format->width;
-		}
-		printout( "*", 1 );
-	}
-	if( format->precision ) {
-		printout( ".*", 2 );
-	}
-	printout( type );
-	// make nullterminated
-	TMP_ASSERT( printout.remaining );
-	*printout.data = 0;
-}
-static void print_make_int_format( memoryprinter& printout, PrintFormat* format, const char* type )
-{
-	if( format->base == 2 ) {
-		// TMP_ASSERT( 0 && "not implemented" );
-		format->base = 10;
-	}
-	if( format->base == 16 ) {
-		if( *type == 'l' ) {
-			type = ( format->flags & PF_LOWERCASE ) ? ( "llx" ) : ( "llX" );
-		} else {
-			type = ( format->flags & PF_LOWERCASE ) ? ( "x" ) : ( "X" );
-		}
-	}
-	format->precision = 0;
-	print_make_format( printout, format, type );
-}
-template < class T >
-static tmp_size_t print_value( char* dest, tmp_size_t maxlen, PrintFormat* format,
-                               const char* formatBuffer, T value )
-{
-	if( format->width && format->precision ) {
-		return TMP_SNPRINTF( dest, (size_t)maxlen, formatBuffer, format->width, format->precision,
-		                     value );
-	} else if( format->width ) {
-		return TMP_SNPRINTF( dest, (size_t)maxlen, formatBuffer, format->width, value );
-	} else if( format->precision ) {
-		return TMP_SNPRINTF( dest, (size_t)maxlen, formatBuffer, format->precision, value );
-	} else {
-		return TMP_SNPRINTF( dest, (size_t)maxlen, formatBuffer, value );
-	}
-}
-
-static tmp_size_t print_i32( char* dest, tmp_size_t maxlen, PrintFormat* format, tmp_int32 value )
-{
-	TMP_ASSERT( format );
-	const int formatBufferSize = 10;
-	char formatBuffer[formatBufferSize];
-	memoryprinter snprint_format{formatBuffer, formatBufferSize};
-
-	print_make_int_format( snprint_format, format, "d" );
-	return print_value( dest, maxlen, format, formatBuffer, value );
-}
-static tmp_size_t print_u32( char* dest, tmp_size_t maxlen, PrintFormat* format, tmp_uint32 value )
-{
-	TMP_ASSERT( format );
-	const int formatBufferSize = 10;
-	char formatBuffer[formatBufferSize];
-	memoryprinter snprint_format{formatBuffer, formatBufferSize};
-
-	print_make_int_format( snprint_format, format, "u" );
-	return print_value( dest, maxlen, format, formatBuffer, value );
-}
-static tmp_size_t print_i64( char* dest, tmp_size_t maxlen, PrintFormat* format, tmp_int64 value )
-{
-	TMP_ASSERT( format );
-	const int formatBufferSize = 10;
-	char formatBuffer[formatBufferSize];
-	memoryprinter snprint_format{formatBuffer, formatBufferSize};
-
-	print_make_int_format( snprint_format, format, "lld" );
-	return print_value( dest, maxlen, format, formatBuffer, value );
-}
-static tmp_size_t print_u64( char* dest, tmp_size_t maxlen, PrintFormat* format, tmp_uint64 value )
-{
-	TMP_ASSERT( format );
-	const int formatBufferSize = 10;
-	char formatBuffer[formatBufferSize];
-	memoryprinter snprint_format{formatBuffer, formatBufferSize};
-
-	print_make_int_format( snprint_format, format, "llu" );
-	return print_value( dest, maxlen, format, formatBuffer, value );
-}
-static tmp_size_t print_double( char* dest, tmp_size_t maxlen, PrintFormat* format, double value )
-{
-	TMP_ASSERT( format );
-	const int formatBufferSize = 10;
-	char formatBuffer[formatBufferSize];
-	memoryprinter snprint_format{formatBuffer, formatBufferSize};
-
-	print_make_format( snprint_format, format, "f" );
-	return print_value( dest, maxlen, format, formatBuffer, value );
-}
-static tmp_size_t print_float( char* dest, tmp_size_t maxlen, PrintFormat* format, float value )
-{
-	TMP_ASSERT( format );
-	const int formatBufferSize = 10;
-	char formatBuffer[formatBufferSize];
-	memoryprinter snprint_format{formatBuffer, formatBufferSize};
-
-	print_make_format( snprint_format, format, "f" );
-	auto result = print_value( dest, maxlen, format, formatBuffer, value );
-	return result;
-}
-static tmp_size_t print_bool( char* dest, tmp_size_t maxlen, PrintFormat* format, bool value )
-{
-	TMP_ASSERT( format );
-	if( format->flags & PF_BOOL_AS_NUMBER ) {
-		if( maxlen ) {
-			*dest = ( value ) ? ( '1' ) : ( '0' );
-		}
-		return 1;
-	} else {
-		static const char* const strings[] = {"false", "true"};
-		static const tmp_size_t lengths[] = {sizeof( "false" ) - 1, sizeof( "true" ) - 1};
-		size_t index = value != 0;
-
-		auto size = TMP_MIN( lengths[index], maxlen );
-		TMP_MEMCPY( dest, strings[index], size );
-		return size;
-	}
-}
-#endif
-}
-
-#ifndef TMP_NO_STDIO
-	TMP_DEF void print( FILE* out, const char* format, const PrintArgList& args )
-	{
-		auto printFormat = defaultPrintFormat();
-		print_impl( format, TMP_STRLEN( format ), printFormat, args, fprinter{out} );
-	}
-	#ifdef TMP_STRING_VIEW
-		TMP_DEF void print( FILE* out, TMP_STRING_VIEW format, const PrintArgList& args )
-        {
-	        auto printFormat = defaultPrintFormat();
-	        print_impl( TMP_STRING_VIEW_DATA( format ), TMP_STRING_VIEW_SIZE( format ), printFormat,
-	                    args, fprinter{out} );
-        }
-	#endif
-#endif
-
-TMP_DEF tmp_size_t snprint( char* dest, tmp_size_t len, const char* format,
-                            const PrintArgList& args )
-{
-	memoryprinter mem{dest, len};
-	auto printFormat = defaultPrintFormat();
-	print_impl( format, TMP_STRLEN( format ), printFormat, args, mem );
-	return (tmp_size_t)( mem.data - dest );
-}
-TMP_DEF tmp_size_t snprint( char* dest, tmp_size_t len, const char* format,
-                            const PrintFormat& initialFormatting, const PrintArgList& args )
-{
-	memoryprinter mem{dest, len};
-	print_impl( format, TMP_STRLEN( format ), initialFormatting, args, mem );
-	return (tmp_size_t)( mem.data - dest );
+    tmp_print_impl(format, TM_STRLEN(format), defaultPrintFormat(), args, printer);
+    fwrite(printer.data, sizeof(char), printer.size, out);
+    return printer.ec;
 }
 #ifdef TMP_STRING_VIEW
-		TMP_DEF tmp_size_t snprint( char* dest, tmp_size_t len,TMP_STRING_VIEW format,
-		                            const PrintArgList& args )
-		{
-			memoryprinter mem{dest, len};
-			auto printFormat = defaultPrintFormat();
-	        print_impl( TMP_STRING_VIEW_DATA( format ), TMP_STRING_VIEW_SIZE( format ), printFormat,
-	                    args, mem );
-	        return (tmp_size_t)( mem.data - dest );
-        }
-        TMP_DEF tmp_size_t snprint( char* dest, tmp_size_t len, TMP_STRING_VIEW format,
-                                    const PrintFormat& initialFormatting, const PrintArgList& args )
-        {
-	        memoryprinter mem{dest, len};
-	        print_impl( TMP_STRING_VIEW_DATA( format ), TMP_STRING_VIEW_SIZE( format ),
-	                    initialFormatting, args, mem );
-	        return ( tmp_size_t )( mem.data - dest );
-        }
-#endif
+TMP_DEF tm_errc tmp_print(FILE* out, TMP_STRING_VIEW format, const PrintArgList& args) {
+    char sbo[TMP_SBO_SIZE];
+    tmp_memory_printer printer = {sbo, 0, TMP_SBO_SIZE, true, false};
 
-#endif
+    tmp_print_impl(TMP_STRING_VIEW_DATA(format), TMP_STRING_VIEW_SIZE(format), defaultPrintFormat(), args, printer);
+    fwrite(printer.data, sizeof(char), printer.size, out);
+    return printer.ec;
+}
+#endif  // defined(TMP_STRING_VIEW)
+#endif  // !defined(TMP_NO_CRT_FILE_PRINTING)
+
+TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
+                              const PrintArgList& args) {
+    tmp_memory_printer mem{dest, 0, len, false, false};
+    tmp_print_impl(format, TM_STRLEN(format), initialFormatting, args, mem);
+    return mem.size;
+}
+#ifdef TMP_STRING_VIEW
+TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const PrintFormat& initialFormatting,
+                              const PrintArgList& args) {
+    tmp_memory_printer mem{dest, 0, len, false, false};
+    tmp_print_impl(TMP_STRING_VIEW_DATA(format), TMP_STRING_VIEW_SIZE(format), initialFormatting, args, mem);
+    return mem.size;
+}
+#endif  // defined(TMP_STRING_VIEW)
+
+#endif // TM_PRINT_IMPLEMENTATION
+
+/*
+There are two licenses you can freely choose from - MIT or Public Domain
+---------------------------------------------------------------------------
+
+MIT License:
+Copyright (c) 2016 Tolga Mizrak
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---------------------------------------------------------------------------
+
+Public Domain (www.unlicense.org):
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
+
+---------------------------------------------------------------------------
+*/
