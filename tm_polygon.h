@@ -1,5 +1,5 @@
 /*
-tm_polygon.h v1.0c - public domain
+tm_polygon.h v1.0d - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -57,6 +57,7 @@ ISSUES
 		  AND of both polygons) the right result is being returned.
 
 HISTORY
+	v1.0d   25.08.18 added repository link
 	v1.0c   07.10.16 changed tmp prefix to tmpo prefix, since tm_print.h already uses tmp
 	                 removed using unsigned arithmetic when tmpo_size_t is signed
 	v1.0b	02.07.16 changed #include <memory.h> into string.h
