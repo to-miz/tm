@@ -1,5 +1,5 @@
 /*
-tm_arrayview.h v1.1.4b - public domain
+tm_arrayview.h v1.1.4c - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -36,6 +36,7 @@ SWITCHES
 	    std::container usage and UninitializedArrayView usage will require code changes.
 
 HISTORY
+	v1.1.4c 25.08.18 added repository link
 	v1.1.4b 10.02.17 removed inline since they are unnecessary
 	v1.1.4a 10.01.17 fixed a warning for signed/unsigned mismatch if tma_size_t is signed
 	v1.1.4  10.01.17 added a conversion operator overload from ArrayView< T > to
