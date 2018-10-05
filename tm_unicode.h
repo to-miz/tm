@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v1.0.1 - public domain
+tm_unicode.h v1.0.1a - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -16,10 +16,10 @@ NOTES
 	each other. This library assumes non nullterminated strings, so knowledge of the length of the
 	strings is needed when calling these functions.
 	Utf8 strings are handled by treating any sequence of chars as utf8 encoded strings, so the
-	functions can be called with ordinary c strings without casting.
+	functions can be called with ordinary C strings without casting.
 	Whenever a function wants a length or size, it refers to the number of entries in the string
-	array and NOT the number of codepoints (which may be less). To get the size of ordinary
-	c strings strlen may be used, even with utf8 encoded nullterminated strings.
+	array and NOT the number of codepoints (which may be fewer). To get the size of ordinary
+	C strings strlen may be used, even with utf8 encoded nullterminated strings.
 
 	Extracting codepoints from a utf8 string follows this formula:
 		const char* current = your_utf8_encoded_string_here;
@@ -39,10 +39,11 @@ NOTES
 
 		// go to prev codepoint
 		index -= utf8Retreat( str, index );
-	Advance and retreat are useful when for example implementing edit boxes and needing to move the
+	Advance and retreat are useful for example when implementing edit boxes and moving the
 	caret to the next codepoint.
 
 HISTORY
+	v1.0.1a 25.08.18 some wording changes to the description, added repository link
 	v1.0.1  07.10.16 removed forcing to use unsigned arithmetic when tmu_size_t is signed
 	v1.0b   02.07.16 changed #include <memory.h> into string.h
 	v1.0a   01.07.16 improved C99 conformity
