@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.9.3 - public domain - https://github.com/to-miz/tm
+tm_conversion.h v0.9.9.4 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -84,8 +84,8 @@ SWITCHES
             If defined to 1 output values of scan will be clamped to nearest max/min value when a
             range error is occured. Otherwise output values are untouched.
         TMC_CHECKED_WIDTH
-        	If defined, functions that end with _w will validate width while printing.
-        	This is only needed, if users call directly into these functions.
+            If defined, functions that end with _w will validate width while printing.
+            This is only needed, if users call directly into these functions.
 
 TODO
     - refactor to get rid of most code duplication
@@ -105,6 +105,7 @@ ISSUES
     - print_double, print_float need 64 bit arithmetic
 
 HISTORY
+    v0.9.9.4   05.10.18 added shortest flag for floating points
     v0.9.9.3   24.09.18 removed tm_bool32
                         removed print format structure
                         simplified signature of scan and print functions
@@ -150,7 +151,7 @@ HISTORY
                         added TMC_CPP_TEMPLATED
                         fixed compile error when using tm_strnrev
                         added PURPOSE, WHY, SWITCHES, EXAMPLES
-    v0.9.2	   07.08.16 fixed a bug in print_double not being able to print 10 (magnitude calculation
+    v0.9.2     07.08.16 fixed a bug in print_double not being able to print 10 (magnitude calculation
                         was wrong)
                         fixed a bug in print_double rounding wrong for 0.99 and precision 1
     v0.9.1     10.07.16 strncasecmp to strnicmp & print_Reverse to tm_strnrev
@@ -173,25 +174,25 @@ Note that examples use <cstdio> and printf just to demonstrate that the outputs 
 #include <cstdio>
 
 int main() {
-	const char* str = "1234 5678 0xFF not_a_number";
-	int32_t base        = 0;  // scan will attempt to determine base depending on input if base is 0
-	for(;;) {
-		// set a default value
-		int value = 0;
-		tmc_conv_result scan_result = scan_i32(str, base, &value);
-		str += scan_result.size;  // advance str by number of bytes consumed by scan
-		printf("%d\n", value);
-		if(scan_result.size == 0 || scan_result.ec != TM_OK) {
-			// scan will not consume any bytes if input isn't a number
-			break;
-		}
-		if(*str) {
-			++str;  // skip space
-		} else {
-			break;
-		}
-	}
-	return 0;
+    const char* str = "1234 5678 0xFF not_a_number";
+    int32_t base        = 0;  // scan will attempt to determine base depending on input if base is 0
+    for(;;) {
+        // set a default value
+        int value = 0;
+        tmc_conv_result scan_result = scan_i32(str, base, &value);
+        str += scan_result.size;  // advance str by number of bytes consumed by scan
+        printf("%d\n", value);
+        if(scan_result.size == 0 || scan_result.ec != TM_OK) {
+            // scan will not consume any bytes if input isn't a number
+            break;
+        }
+        if(*str) {
+            ++str;  // skip space
+        } else {
+            break;
+        }
+    }
+    return 0;
 }
 
 /*
@@ -216,45 +217,45 @@ OUTPUT:
 #include <cstring>
 
 struct string_builder {
-	char* ptr;
-	size_t sz;
-	size_t cap;
-	PrintFormat format;
-	tm_errc ec;
+    char* ptr;
+    size_t sz;
+    size_t cap;
+    PrintFormat format;
+    tm_errc ec;
 
-	char* data() { return ptr; }
-	size_t size() { return sz; }
-	char* end() { return ptr + sz; }
-	size_t remaining() { return cap - sz; }
-	void clear() {
-		sz = 0;
-		ec = TM_OK;
-	}
+    char* data() { return ptr; }
+    size_t size() { return sz; }
+    char* end() { return ptr + sz; }
+    size_t remaining() { return cap - sz; }
+    void clear() {
+        sz = 0;
+        ec = TM_OK;
+    }
 
-	string_builder(char* ptr, size_t cap) : ptr(ptr), sz(0), cap(cap), format(defaultPrintFormat()) {}
-	template <class T>
-	string_builder& operator<<(T value) {
-		auto print_result = tmc::print(end(), remaining(), &format, value);
-		sz += print_result.size;
-		ec = tmc_combine_errc(ec, print_result.ec);
-		return *this;
-	}
-	string_builder& operator<<(const char* str) {
-		auto print_result = tmc_print_string(end(), remaining(), str, strlen(str));
-		sz += print_result.size;
-		ec = tmc_combine_errc(ec, print_result.ec);
-		return *this;
-	}
+    string_builder(char* ptr, size_t cap) : ptr(ptr), sz(0), cap(cap), format(defaultPrintFormat()) {}
+    template <class T>
+    string_builder& operator<<(T value) {
+        auto print_result = tmc::print(end(), remaining(), &format, value);
+        sz += print_result.size;
+        ec = tmc_combine_errc(ec, print_result.ec);
+        return *this;
+    }
+    string_builder& operator<<(const char* str) {
+        auto print_result = tmc_print_string(end(), remaining(), str, strlen(str));
+        sz += print_result.size;
+        ec = tmc_combine_errc(ec, print_result.ec);
+        return *this;
+    }
 };
 
 int main() {
-	const size_t bufferSize = 10000;
-	char buffer[bufferSize];
-	string_builder builder = {buffer, bufferSize};
-	builder << "Hello World! " << 10 << " " << 3.1;
+    const size_t bufferSize = 10000;
+    char buffer[bufferSize];
+    string_builder builder = {buffer, bufferSize};
+    builder << "Hello World! " << 10 << " " << 3.1;
 
-	printf("%.*s\n", (int)builder.size(), builder.data());
-	return 0;
+    printf("%.*s\n", (int)builder.size(), builder.data());
+    return 0;
 }
 
 // OUTPUT: Hello World! 10 3.1
@@ -269,23 +270,23 @@ int main() {
 // extremely simplified string_view class just for demonstration
 // it represents non nullterminated views into strings
 struct string_view {
-	const char* ptr = nullptr;
-	size_t sz       = 0;
+    const char* ptr = nullptr;
+    size_t sz       = 0;
 
-	string_view() = default;
-	string_view(const char* str) : ptr(str), sz((str) ? (strlen(str)) : (0)) {}
-	string_view(const char* str, size_t len) : ptr(str), sz(len) {}
-	const char* data() { return ptr; }
-	size_t size() { return sz; }
-	string_view substr(size_t pos, size_t len = (size_t)-1) {
-		if(pos > sz) {
-			pos = sz;
-		}
-		if(len > sz - pos) {
-			len = sz - pos;
-		}
-		return string_view(ptr + pos, len);
-	}
+    string_view() = default;
+    string_view(const char* str) : ptr(str), sz((str) ? (strlen(str)) : (0)) {}
+    string_view(const char* str, size_t len) : ptr(str), sz(len) {}
+    const char* data() { return ptr; }
+    size_t size() { return sz; }
+    string_view substr(size_t pos, size_t len = (size_t)-1) {
+        if(pos > sz) {
+            pos = sz;
+        }
+        if(len > sz - pos) {
+            len = sz - pos;
+        }
+        return string_view(ptr + pos, len);
+    }
 };
 
 #define TM_CONVERSION_IMPLEMENTATION
@@ -299,12 +300,12 @@ struct string_view {
 #include <cstdio>
 
 int main() {
-	string_view str  = "12345678";
-	string_view sub0 = str.substr(2, 4);  // sub0 is "3456"
-	int value        = 0;
-	tmc::scan(sub0, 10, &value);
+    string_view str  = "12345678";
+    string_view sub0 = str.substr(2, 4);  // sub0 is "3456"
+    int value        = 0;
+    tmc::scan(sub0, 10, &value);
 
-	printf("%d\n", value);
+    printf("%d\n", value);
 }
 // OUTPUT: 3456
 #endif
@@ -313,45 +314,47 @@ int main() {
 
 /* assert */
 #ifndef TM_ASSERT
-	#include <assert.h>
-	#define TM_ASSERT assert
+  #include <assert.h>
+  #define TM_ASSERT assert
 #endif /* !defined(TM_ASSERT) */
 
 #ifdef TM_CONVERSION_IMPLEMENTATION
-	/* Define these to avoid external dependencies */
+    /* Define these to avoid external dependencies */
 
-	/* ctype.h dependency */
-	#if !defined(TM_ISDIGIT) || !defined(TM_ISUPPER) || !defined(TM_ISLOWER) || !defined(TM_TOUPPER)
-		#include <ctype.h>
-		#define TM_ISDIGIT isdigit
-		#define TM_ISUPPER isupper
-		#define TM_ISLOWER islower
-		#define TM_TOUPPER toupper
-	#endif
+    /* ctype.h dependency */
+    #if !defined(TM_ISDIGIT) || !defined(TM_ISUPPER) || !defined(TM_ISLOWER) || !defined(TM_TOUPPER)
+        #include <ctype.h>
+        #define TM_ISDIGIT isdigit
+        #define TM_ISUPPER isupper
+        #define TM_ISLOWER islower
+        #define TM_TOUPPER toupper
+    #endif
 
-	/* string.h dependency */
-	#if !defined(TM_MEMCPY) || !defined(TM_MEMSET)
-		#include <string.h>
-		#define TM_MEMCPY memcpy
-		#define TM_MEMSET memset
-	#endif
+    /* string.h dependency */
+    #if !defined(TM_MEMCPY) || !defined(TM_MEMSET)
+        #include <string.h>
+        #define TM_MEMCPY memcpy
+        #define TM_MEMSET memset
+    #endif
 
-	/* math.h dependency */
-	#if !defined(TM_SIGNBIT) || !defined(TM_ISNAN) || !defined(TM_ISINF)
-		#include <math.h>
-		#define TM_SIGNBIT signbit
-		#define TM_ISNAN isnan
-		#define TM_ISINF isinf
-	#endif
+    /* math.h dependency */
+    #if !defined(TM_SIGNBIT) || !defined(TM_ISNAN) || !defined(TM_ISINF)
+        #include <math.h>
+        #define TM_SIGNBIT signbit
+        #define TM_ISNAN isnan
+        #define TM_ISINF isinf
+    #endif
 
-	#ifndef TM_STRNICMP
-		#define TM_IMPLEMENT_STRNICMP
-		#define TM_STRNICMP tm_strnicmp
-	#endif
+    #ifndef TM_STRNICMP
+        #define TM_IMPLEMENT_STRNICMP
+        #define TM_STRNICMP tm_strnicmp
+    #endif
 #endif
 
 #ifndef _TM_CONVERSION_H_INCLUDED_
 #define _TM_CONVERSION_H_INCLUDED_
+
+#define TMC_VERSION 0x00090904u
 
 /* Fixed width ints. Include C version so identifiers are in global namespace. */
 #include <stdint.h>
@@ -359,62 +362,63 @@ int main() {
 /* Linkage defaults to extern, to override define TMC_DEF before including this file.
    Examples of possible override values are static or __declspec(dllexport). */
 #ifndef TMC_DEF
-	#define TMC_DEF extern
+    #define TMC_DEF extern
 #endif
 
 /* size_t is unsigned by default, but we also allow for signed and/or 32bit size_t.
    You can override this block by defining TM_SIZE_T_DEFINED and the typedefs before including this file. */
 #ifndef TM_SIZE_T_DEFINED
-	#define TM_SIZE_T_DEFINED
-	#define TM_SIZE_T_IS_SIGNED 0 /* define to 1 if tm_size_t is signed */
-	#include <stddef.h> /* include C version so identifiers are in global namespace */
-	typedef size_t tm_size_t;
+    #define TM_SIZE_T_DEFINED
+    #define TM_SIZE_T_IS_SIGNED 0 /* define to 1 if tm_size_t is signed */
+    #include <stddef.h> /* include C version so identifiers are in global namespace */
+    typedef size_t tm_size_t;
 #endif /* !defined(TM_SIZE_T_DEFINED) */
 
 /* Native bools, override by defining TM_BOOL_DEFINED yourself before including this file. */
 #ifndef TM_BOOL_DEFINED
-	#define TM_BOOL_DEFINED
-	#ifdef __cplusplus
-		typedef bool tm_bool;
-		#define TM_TRUE true
-		#define TM_FALSE false
-	#else
-		typedef _Bool tm_bool;
-		#define TM_TRUE 1
-		#define TM_FALSE 0
-	#endif
+    #define TM_BOOL_DEFINED
+    #ifdef __cplusplus
+        typedef bool tm_bool;
+        #define TM_TRUE true
+        #define TM_FALSE false
+    #else
+        typedef _Bool tm_bool;
+        #define TM_TRUE 1
+        #define TM_FALSE 0
+    #endif
 #endif /* !defined(TM_BOOL_DEFINED) */
 
 /* Common POSIX compatible error codes. You can override the definitions by defining TM_ERRC_DEFINED
    before including this file. */
 #ifndef TM_ERRC_DEFINED
-	#define TM_ERRC_DEFINED
-	enum TM_ERRC_CODES {
-		TM_OK        = 0,   /* same as std::errc() */
-		TM_EOVERFLOW = 75,  /* same as std::errc::value_too_large */
-		TM_ERANGE    = 34,  /* same as std::errc::result_out_of_range */
-		TM_EINVAL    = 22,  /* same as std::errc::invalid_argument */
-	};
-	typedef int tm_errc;
+    #define TM_ERRC_DEFINED
+    enum TM_ERRC_CODES {
+        TM_OK        = 0,   /* same as std::errc() */
+        TM_EOVERFLOW = 75,  /* same as std::errc::value_too_large */
+        TM_ERANGE    = 34,  /* same as std::errc::result_out_of_range */
+        TM_EINVAL    = 22,  /* same as std::errc::invalid_argument */
+    TM_ENOMEM    = 12,  /* same as std::errc::not_enough_memory */
+    };
+    typedef int tm_errc;
 #endif
 
 /* C++ string_view support. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA and TM_STRING_VIEW_SIZE.
    Example:
-		#include <string_view>
-		#define TM_STRING_VIEW std::string_view
-		#define TM_STRING_VIEW_DATA(str) (str).data()
-		#define TM_STRING_VIEW_SIZE(str) (str).size()
+        #include <string_view>
+        #define TM_STRING_VIEW std::string_view
+        #define TM_STRING_VIEW_DATA(str) (str).data()
+        #define TM_STRING_VIEW_SIZE(str) (str).size()
 */
 #ifdef TM_STRING_VIEW
-	#if !defined(TM_STRING_VIEW_DATA) || !defined(TM_STRING_VIEW_SIZE)
-		#error Invalid TM_STRINV_VIEW. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA and TM_STRING_VIEW_SIZE.
-	#endif
+    #if !defined(TM_STRING_VIEW_DATA) || !defined(TM_STRING_VIEW_SIZE)
+        #error Invalid TM_STRINV_VIEW. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA and TM_STRING_VIEW_SIZE.
+    #endif
 #endif
 
 #ifdef __cplusplus
-	#define TMC_UNDERLYING_U32 : uint32_t
+    #define TMC_UNDERLYING_U32 : uint32_t
 #else
-	#define TMC_UNDERLYING_U32
+    #define TMC_UNDERLYING_U32
 #endif
 
 
@@ -424,9 +428,9 @@ extern "C" {
 
 /* Call this function with true to enable debug printing */
 #if !defined(TMC_NO_DEBUG) && (defined(_DEBUG) || defined(TM_DEBUG)) && !defined(NDEBUG)
-	extern void tmc_debug_enabled(tm_bool enabled);
+    extern void tmc_debug_enabled(tm_bool enabled);
 #else
-	#define tmc_debug_enabled(x) ((void)0)
+    #define tmc_debug_enabled(x) ((void)0)
 #endif
 
 /* clang-format on */
@@ -478,14 +482,17 @@ TMC_DEF tmc_conv_result scan_double_n(const char* str, tm_size_t len, double* ou
 TMC_DEF tmc_conv_result scan_bool(const char* nullterminated, tm_bool* out);
 TMC_DEF tmc_conv_result scan_bool_n(const char* str, tm_size_t len, tm_bool* out);
 
-enum PrintFlags TMC_UNDERLYING_U32 {
+enum tmc_print_flags TMC_UNDERLYING_U32 {
     PF_FIXED = (1u << 0u),      /* NOTE: Not implemented yet */
     PF_SCIENTIFIC = (1u << 1u), /* NOTE: Not implemented yet */
     PF_HEX = (1u << 2u),        /* NOTE: Not implemented yet */
-    PF_TRAILING_ZEROES = (1u << 3u),
-    PF_BOOL_AS_NUMBER = (1u << 4u),
-    PF_LOWERCASE = (1u << 5u),
-    PF_SIGNBIT = (1u << 6u) /* Whether to output -0 or 0 for negative 0. */
+    PF_SHORTEST = (1u << 3u),
+    PF_TRAILING_ZEROES = (1u << 4u),
+    PF_BOOL_AS_NUMBER = (1u << 5u),
+    PF_LOWERCASE = (1u << 6u),
+    PF_SIGNBIT = (1u << 7u), /* Whether to output -0 or 0 for negative 0. */
+
+    PF_COUNT = 8
 };
 
 /*
@@ -495,7 +502,7 @@ Params:
     maxlen:    Max length of buffer.
     base:      What base to print in, valid values are 2 <= base <= 36.
     lowercase: Whether to print lowercase or uppercase digits when base > 10.
-        flags: A combination of PrintFlags PF_* that control the printing behavior.
+        flags: A combination of tmc_print_flags PF_* that control the printing behavior.
     precision: How many digits to print after the dot. A value of -1 denotes short(-ish) result.
     value:     Value to be printed.
 Return: Returns number of bytes printed and error code if any.
@@ -726,16 +733,16 @@ inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, bool* out) {
 
 /* clang-format off */
 #ifndef TMC_CLAMP_ON_RANGE_ERROR
-	#define TMC_CLAMP_ON_RANGE_ERROR 0
+    #define TMC_CLAMP_ON_RANGE_ERROR 0
 #endif
 
 #ifndef TM_ASSERT_VALID_SIZE
-	#if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
-		#define TM_ASSERT_VALID_SIZE(x) TM_ASSERT((x) >= 0)
-	#else
-		/* always true if size_t is unsigned */
-		#define TM_ASSERT_VALID_SIZE(x) ((void)0)
-	#endif
+    #if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
+        #define TM_ASSERT_VALID_SIZE(x) TM_ASSERT((x) >= 0)
+    #else
+        /* always true if size_t is unsigned */
+        #define TM_ASSERT_VALID_SIZE(x) ((void)0)
+    #endif
 #endif /* !defined(TM_ASSERT_VALID_SIZE) */
 
 #ifdef __cplusplus
@@ -747,25 +754,25 @@ extern "C" {
 #define TMC_DEFAULT_BASE 10
 
 #ifdef TMC_CHECKED_WIDTH
-	#define TMC_CW(x) x
+    #define TMC_CW(x) x
 #else
-	#define TMC_CW(x)
+    #define TMC_CW(x)
 #endif
 
 #if !defined(TMC_NO_DEBUG) && (defined(_DEBUG) || defined(TM_DEBUG)) && !defined(NDEBUG)
-	#include <stdio.h>
+    #include <stdio.h>
 
-	static tm_bool tmc_global_debug_enabled = TM_FALSE;
-	extern void tmc_debug_enabled(tm_bool enabled) { tmc_global_debug_enabled = enabled; }
+    static tm_bool tmc_global_debug_enabled = TM_FALSE;
+    extern void tmc_debug_enabled(tm_bool enabled) { tmc_global_debug_enabled = enabled; }
 
-	#define TMC_DEBUG(x)                    \
-	    do {                                \
-	        if (tmc_global_debug_enabled) { \
-	            x;                          \
-	        }                               \
-	    } while (0)
+    #define TMC_DEBUG(x)                    \
+        do {                                \
+            if (tmc_global_debug_enabled) { \
+                x;                          \
+            }                               \
+        } while (0)
 #else
-	#define TMC_DEBUG(x) ((void)0)
+    #define TMC_DEBUG(x) ((void)0)
 #endif
 /* clang-format on */
 
@@ -1937,7 +1944,7 @@ TMC_DEF tm_size_t get_digits_count_decimal_u32(uint32_t number) {
 
 TMC_DEF tmc_conv_result print_decimal_u32_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value) {
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
     /* See comment on declaration for why width has to equal a specific value. */
     TM_ASSERT(width > 0);
     TM_ASSERT(width == get_digits_count_decimal_u32(value));
@@ -1985,7 +1992,7 @@ TMC_DEF tmc_conv_result print_decimal_u32_w(char* dest, tm_size_t maxlen, tm_siz
 TMC_DEF tmc_conv_result print_decimal_u64_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value) {
     TM_ASSERT_VALID_SIZE(width);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
     /* See comment on declaration for why width has to equal a specific value. */
     TM_ASSERT(width > 0);
     TM_ASSERT(width == get_digits_count_decimal_u64(value));
@@ -2033,7 +2040,7 @@ TMC_DEF tmc_conv_result print_decimal_u64_w(char* dest, tm_size_t maxlen, tm_siz
 
 TMC_DEF tmc_conv_result print_decimal_i32(char* dest, tm_size_t maxlen, int32_t value) {
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
 
     tmc_conv_result result = {0, TM_OK};
     if (value < 0) {
@@ -2057,7 +2064,7 @@ TMC_DEF tmc_conv_result print_decimal_u32(char* dest, tm_size_t maxlen, uint32_t
 }
 TMC_DEF tmc_conv_result print_decimal_i64(char* dest, tm_size_t maxlen, int64_t value) {
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
 
     tmc_conv_result result = {0, TM_OK};
     if (value < 0) {
@@ -2140,7 +2147,7 @@ TMC_DEF tmc_conv_result print_hex_u32_w(char* dest, tm_size_t maxlen, tm_size_t 
                                         tm_bool lowercase) {
     TM_ASSERT_VALID_SIZE(width);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
     /* See comment on declaration for why width has to equal a specific value. */
     TM_ASSERT(width > 0);
     TM_ASSERT(width == get_digits_count_hex_u32(value));
@@ -2188,7 +2195,7 @@ TMC_DEF tmc_conv_result print_hex_u64_w(char* dest, tm_size_t maxlen, tm_size_t 
                                         tm_bool lowercase) {
     TM_ASSERT_VALID_SIZE(width);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
     /* See comment on declaration for why width has to equal a specific value. */
     TM_ASSERT(width > 0);
     TM_ASSERT(width == get_digits_count_hex_u64(value));
@@ -2235,7 +2242,7 @@ TMC_DEF tmc_conv_result print_hex_u64_w(char* dest, tm_size_t maxlen, tm_size_t 
 
 TMC_DEF tmc_conv_result print_hex_i32(char* dest, tm_size_t maxlen, int32_t value, tm_bool lowercase) {
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
 
     tmc_conv_result result = {0, TM_OK};
     if (value < 0) {
@@ -2259,7 +2266,7 @@ TMC_DEF tmc_conv_result print_hex_u32(char* dest, tm_size_t maxlen, uint32_t val
 }
 TMC_DEF tmc_conv_result print_hex_i64(char* dest, tm_size_t maxlen, int64_t value, tm_bool lowercase) {
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
 
     tmc_conv_result result = {0, TM_OK};
     if (value < 0) {
@@ -2285,7 +2292,7 @@ TMC_DEF tmc_conv_result print_hex_u64(char* dest, tm_size_t maxlen, uint64_t val
 TMC_DEF tmc_conv_result print_i32(char* dest, tm_size_t maxlen, int32_t value, int32_t base, tm_bool lowercase) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
 
     tmc_conv_result result = {0, TM_OK};
     if (value < 0) {
@@ -2306,7 +2313,7 @@ TMC_DEF tmc_conv_result print_u32_w(char* dest, tm_size_t maxlen, tm_size_t widt
                                     tm_bool lowercase) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
     /* See comment on declaration for why width has to equal a specific value. */
     TM_ASSERT(width > 0);
     TM_ASSERT(width == get_digits_count_u32(value, base));
@@ -2348,7 +2355,7 @@ TMC_DEF tmc_conv_result print_u32_w(char* dest, tm_size_t maxlen, tm_size_t widt
 TMC_DEF tmc_conv_result print_u32(char* dest, tm_size_t maxlen, uint32_t value, int32_t base, tm_bool lowercase) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
 
     switch (base) {
         case 10: {
@@ -2365,7 +2372,7 @@ TMC_DEF tmc_conv_result print_u32(char* dest, tm_size_t maxlen, uint32_t value, 
 TMC_DEF tmc_conv_result print_i64(char* dest, tm_size_t maxlen, int64_t value, int32_t base, tm_bool lowercase) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
 
     tmc_conv_result result = {0, TM_OK};
     if (value < 0) {
@@ -2386,7 +2393,7 @@ TMC_DEF tmc_conv_result print_u64_w(char* dest, tm_size_t maxlen, tm_size_t widt
                                     tm_bool lowercase) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
     /* See comment on declaration for why width has to equal a specific value. */
     TM_ASSERT(width > 0);
     TM_ASSERT(width == get_digits_count_u64(value, base));
@@ -2428,7 +2435,7 @@ TMC_DEF tmc_conv_result print_u64_w(char* dest, tm_size_t maxlen, tm_size_t widt
 TMC_DEF tmc_conv_result print_u64(char* dest, tm_size_t maxlen, uint64_t value, int32_t base, tm_bool lowercase) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(maxlen);
-    TM_ASSERT(dest || maxlen <= 0);
+    TM_ASSERT(dest || maxlen == 0);
 
     switch (base) {
         case 10: {
@@ -2496,7 +2503,7 @@ TMC_DEF tmc_conv_result print_double(char* dest, tm_size_t maxlen, double value,
         }
     }
 
-    tm_bool keep_short = precision < 0;
+    tm_bool keep_short = (precision < 0) || (flags & PF_SHORTEST);
     TMC_DEBUG(printf("keep_short is: %d\n", keep_short));
     if (keep_short) {
         precision = TMC_MAX_PRECISION;
@@ -2569,7 +2576,7 @@ TMC_DEF tmc_conv_result print_double(char* dest, tm_size_t maxlen, double value,
                 tmc_conv_result result = {start - maxlen, TM_EOVERFLOW};
                 return result;
             }
-            if (!(flags & PF_TRAILING_ZEROES)) {
+            if (!(flags & PF_TRAILING_ZEROES) || keep_short) {
                 /* get rid of trailing zeroes */
                 for (;;) {
                     uint64_t digit = fractionalDigits % 10;
