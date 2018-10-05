@@ -1,0 +1,48 @@
+{
+	"folders":
+	[
+		{
+			"path": "./../../",
+			"folder_exclude_patterns": ["build", "builds", ".git", "tools"],
+			"file_exclude_patterns": ["tm_print.h"],
+		},
+		{
+			"path": "."
+		}
+	],
+	"build_systems": [
+		{
+			"name": "make",
+			"cmd": "make tm_print-merge",
+
+			"windows": {
+				"shell": false,
+				"file_regex": "(.*)\\(([0-9]+)\\): (error|note|warning)",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../",
+			},
+
+			"linux": {
+				"shell": true,
+				"file_regex": "^(..[^:\n]*):([0-9]+):?([0-9]+)?:? (.*)$",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../",
+			},
+
+			"variants": [
+				{
+					"name": "build unmerged",
+					"cmd": "make tm_print-unmerged"
+				},
+				{
+					"name": "build tests",
+					"cmd": "make tm_print-tests"
+				},
+				{
+					"name": "run tests",
+					"cmd": "make tm_print-run-tests"
+				}
+			]
+		}
+	]
+}
