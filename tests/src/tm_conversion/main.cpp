@@ -15,43 +15,34 @@
 #define TMC_CHECKED_WIDTH
 #include <tm_conversion.h>
 
+#include <string_view>
+
 // helpers
 
-bool compare_results(const char* dest, tmc_conv_result result, tm_errc expected_ec, const char* expected_string) {
+void compare_results(const char* dest, tmc_conv_result result, tm_errc expected_ec, const char* expected_string) {
+    CHECK(result.ec == expected_ec);
     if (result.ec != expected_ec) {
-        printf("error codes don't match\n");
-        return false;
+        return;
     }
     if (result.ec == TM_OK) {
-        bool success = false;
-        if (expected_string) {
-            success = true;
-            size_t expected_len = std::strlen(expected_string);
-            if (expected_len != result.size) {
-                success = false;
-            }
-            if (success) success = std::strncmp(dest, expected_string, result.size) == 0;
-            if (!success) {
-                printf("expected: %s; got: %.*s\n", expected_string, (int)result.size, dest);
-            }
-        }
-        return success;
+        std::string_view printed = {dest, result.size};
+        std::string_view expected = {expected_string};
+        CHECK(printed == expected);
     }
-    return true;
 }
 
 template <class T, class func>
-bool test_float_printing(func f, char* dest, tm_size_t maxlen, T value, uint32_t flags, int32_t precision,
+void check_float_printing(func f, char* dest, tm_size_t maxlen, T value, uint32_t flags, int32_t precision,
                          tm_errc expected_ec, const char* expected_string) {
     auto result = f(dest, maxlen, value, flags, precision);
-    return compare_results(dest, result, expected_ec, expected_string);
+    compare_results(dest, result, expected_ec, expected_string);
 }
 
 template <class T, class func>
-bool test_int_printing(func f, char* dest, tm_size_t maxlen, T value, int32_t base, tm_bool lowercase,
+void check_int_printing(func f, char* dest, tm_size_t maxlen, T value, int32_t base, tm_bool lowercase,
                        tm_errc expected_ec, const char* expected_string) {
     auto result = f(dest, maxlen, value, base, lowercase);
-    return compare_results(dest, result, expected_ec, expected_string);
+    compare_results(dest, result, expected_ec, expected_string);
 }
 
 TEST_CASE("Test scan invariants") {
@@ -183,60 +174,61 @@ TEST_CASE("Test print invariants") {
     }
 
 TEST_CASE("Simple float printing") {
-    auto test = [](auto func) {
+    auto test = [](auto func, auto v) {
+        typedef decltype(v) float_type;
         const int len = 5;
         char buffer[len];
 
         // positive value
-        CHECK(test_float_printing(func, buffer, len, 0.0, 0, 0, TM_OK, "0"));
-        CHECK(test_float_printing(func, buffer, len, 1.0, 0, 0, TM_OK, "1"));
-        CHECK(test_float_printing(func, buffer, len, 0.0, 0, -1, TM_OK, "0"));
-        CHECK(test_float_printing(func, buffer, len, 1.0, 0, -1, TM_OK, "1"));
-        CHECK(test_float_printing(func, buffer, len, 0.0, PF_TRAILING_ZEROES, -1, TM_OK, "0.0"));
-        CHECK(test_float_printing(func, buffer, len, 1.0, PF_TRAILING_ZEROES, -1, TM_OK, "1.0"));
+        check_float_printing(func, buffer, len, (float_type)0.0, 0, 0, TM_OK, "0");
+        check_float_printing(func, buffer, len, (float_type)1.0, 0, 0, TM_OK, "1");
+        check_float_printing(func, buffer, len, (float_type)0.0, 0, -1, TM_OK, "0");
+        check_float_printing(func, buffer, len, (float_type)1.0, 0, -1, TM_OK, "1");
+        check_float_printing(func, buffer, len, (float_type)0.0, PF_TRAILING_ZEROES, -1, TM_OK, "0.0");
+        check_float_printing(func, buffer, len, (float_type)1.0, PF_TRAILING_ZEROES, -1, TM_OK, "1.0");
 
-        CHECK(test_float_printing(func, buffer, len, 0.0, PF_TRAILING_ZEROES, 0, TM_OK, "0"));
-        CHECK(test_float_printing(func, buffer, len, 1.0, PF_TRAILING_ZEROES, 0, TM_OK, "1"));
+        check_float_printing(func, buffer, len, (float_type)0.0, PF_TRAILING_ZEROES, 0, TM_OK, "0");
+        check_float_printing(func, buffer, len, (float_type)1.0, PF_TRAILING_ZEROES, 0, TM_OK, "1");
 
-        CHECK(test_float_printing(func, buffer, len, 0.0, PF_TRAILING_ZEROES, 2, TM_OK, "0.00"));
-        CHECK(test_float_printing(func, buffer, len, 1.0, PF_TRAILING_ZEROES, 2, TM_OK, "1.00"));
+        check_float_printing(func, buffer, len, (float_type)0.0, PF_TRAILING_ZEROES, 2, TM_OK, "0.00");
+        check_float_printing(func, buffer, len, (float_type)1.0, PF_TRAILING_ZEROES, 2, TM_OK, "1.00");
 
         // negative value
-        CHECK(test_float_printing(func, buffer, len, -0.0, 0, 0, TM_OK, "0"));
-        CHECK(test_float_printing(func, buffer, len, -0.0, 0, -1, TM_OK, "0"));
-        CHECK(test_float_printing(func, buffer, len, -1.0, 0, 0, TM_OK, "-1"));
-        CHECK(test_float_printing(func, buffer, len, -1.0, 0, -1, TM_OK, "-1"));
+        check_float_printing(func, buffer, len, (float_type)-0.0, 0, 0, TM_OK, "0");
+        check_float_printing(func, buffer, len, (float_type)-0.0, 0, -1, TM_OK, "0");
+        check_float_printing(func, buffer, len, (float_type)-1.0, 0, 0, TM_OK, "-1");
+        check_float_printing(func, buffer, len, (float_type)-1.0, 0, -1, TM_OK, "-1");
 
-        CHECK(test_float_printing(func, buffer, len, -0.0, PF_SIGNBIT, 0, TM_OK, "-0"));
-        CHECK(test_float_printing(func, buffer, len, -0.0, PF_SIGNBIT, -1, TM_OK, "-0"));
+        check_float_printing(func, buffer, len, (float_type)-0.0, PF_SIGNBIT, 0, TM_OK, "-0");
+        check_float_printing(func, buffer, len, (float_type)-0.0, PF_SIGNBIT, -1, TM_OK, "-0");
 
-        CHECK(test_float_printing(func, buffer, len, -0.0, PF_TRAILING_ZEROES, -1, TM_OK, "0.0"));
-        CHECK(test_float_printing(func, buffer, len, -1.0, PF_TRAILING_ZEROES, -1, TM_OK, "-1.0"));
-        CHECK(test_float_printing(func, buffer, len, -0.0, PF_TRAILING_ZEROES, 0, TM_OK, "0"));
-        CHECK(test_float_printing(func, buffer, len, -1.0, PF_TRAILING_ZEROES, 0, TM_OK, "-1"));
+        check_float_printing(func, buffer, len, (float_type)-0.0, PF_TRAILING_ZEROES, -1, TM_OK, "0.0");
+        check_float_printing(func, buffer, len, (float_type)-1.0, PF_TRAILING_ZEROES, -1, TM_OK, "-1.0");
+        check_float_printing(func, buffer, len, (float_type)-0.0, PF_TRAILING_ZEROES, 0, TM_OK, "0");
+        check_float_printing(func, buffer, len, (float_type)-1.0, PF_TRAILING_ZEROES, 0, TM_OK, "-1");
 
-        CHECK(test_float_printing(func, buffer, len, -0.0, PF_TRAILING_ZEROES | PF_SIGNBIT, -1, TM_OK, "-0.0"));
-        CHECK(test_float_printing(func, buffer, len, -0.0, PF_TRAILING_ZEROES | PF_SIGNBIT, 0, TM_OK, "-0"));
+        check_float_printing(func, buffer, len, (float_type)-0.0, PF_TRAILING_ZEROES | PF_SIGNBIT, -1, TM_OK, "-0.0");
+        check_float_printing(func, buffer, len, (float_type)-0.0, PF_TRAILING_ZEROES | PF_SIGNBIT, 0, TM_OK, "-0");
 
-        CHECK(test_float_printing(func, buffer, len, -0.0, PF_TRAILING_ZEROES, 2, TM_OK, "0.00"));
-        CHECK(test_float_printing(func, buffer, len, -1.0, PF_TRAILING_ZEROES, 2, TM_OK, "-1.00"));
+        check_float_printing(func, buffer, len, (float_type)-0.0, PF_TRAILING_ZEROES, 2, TM_OK, "0.00");
+        check_float_printing(func, buffer, len, (float_type)-1.0, PF_TRAILING_ZEROES, 2, TM_OK, "-1.00");
 
-        CHECK(test_float_printing(func, buffer, len, -0.0, PF_TRAILING_ZEROES | PF_SIGNBIT, 2, TM_OK, "-0.00"));
+        check_float_printing(func, buffer, len, (float_type)-0.0, PF_TRAILING_ZEROES | PF_SIGNBIT, 2, TM_OK, "-0.00");
 
         // inf and nan
-        CHECK(test_float_printing(func, buffer, len, INFINITY, 0, -1, TM_OK, "INF"));
-        CHECK(test_float_printing(func, buffer, len, -INFINITY, 0, -1, TM_OK, "-INF"));
-        CHECK(test_float_printing(func, buffer, len, NAN, 0, -1, TM_OK, "NAN"));
-        CHECK(test_float_printing(func, buffer, len, -NAN, 0, -1, TM_OK, "NAN"));
+        check_float_printing(func, buffer, len, INFINITY, 0, -1, TM_OK, "INF");
+        check_float_printing(func, buffer, len, -INFINITY, 0, -1, TM_OK, "-INF");
+        check_float_printing(func, buffer, len, NAN, 0, -1, TM_OK, "NAN");
+        check_float_printing(func, buffer, len, -NAN, 0, -1, TM_OK, "NAN");
 
-        CHECK(test_float_printing(func, buffer, len, INFINITY, PF_LOWERCASE, -1, TM_OK, "inf"));
-        CHECK(test_float_printing(func, buffer, len, -INFINITY, PF_LOWERCASE, -1, TM_OK, "-inf"));
-        CHECK(test_float_printing(func, buffer, len, NAN, PF_LOWERCASE, -1, TM_OK, "nan"));
-        CHECK(test_float_printing(func, buffer, len, -NAN, PF_LOWERCASE, -1, TM_OK, "nan"));
+        check_float_printing(func, buffer, len, INFINITY, PF_LOWERCASE, -1, TM_OK, "inf");
+        check_float_printing(func, buffer, len, -INFINITY, PF_LOWERCASE, -1, TM_OK, "-inf");
+        check_float_printing(func, buffer, len, NAN, PF_LOWERCASE, -1, TM_OK, "nan");
+        check_float_printing(func, buffer, len, -NAN, PF_LOWERCASE, -1, TM_OK, "nan");
     };
 
-    test(print_float);
-    test(print_double);
+    test(print_float, 1.0f);
+    test(print_double, 1.0);
 }
 
 TEST_CASE("Test print overflow") {
@@ -251,9 +243,9 @@ TEST_CASE("Test print overflow") {
     SUBCASE("float after dot") {
         char buffer[5];
         CHECK(print_float(buffer, 2, 1, PF_TRAILING_ZEROES, -1).ec == TM_EOVERFLOW);
-        CHECK(print_float(buffer, 2, 1.1, 0, -1).ec == TM_EOVERFLOW);
+        CHECK(print_float(buffer, 2, 1.1f, 0, -1).ec == TM_EOVERFLOW);
         CHECK(print_float(buffer, 3, 1, PF_TRAILING_ZEROES, 4).ec == TM_EOVERFLOW);
-        CHECK(print_float(buffer, 3, 1.11, 0, 4).ec == TM_EOVERFLOW);
+        CHECK(print_float(buffer, 3, 1.11f, 0, 4).ec == TM_EOVERFLOW);
         CHECK(print_double(buffer, 2, 1, PF_TRAILING_ZEROES, -1).ec == TM_EOVERFLOW);
         CHECK(print_double(buffer, 2, 1.1, 0, -1).ec == TM_EOVERFLOW);
         CHECK(print_double(buffer, 3, 1, PF_TRAILING_ZEROES, 4).ec == TM_EOVERFLOW);
@@ -444,48 +436,48 @@ TEST_CASE("Test integer printing") {
     SUBCASE("Generic") {
         auto positive = [](auto func) {
             char buffer[16];
-            CHECK(test_int_printing(func, buffer, 16, 0, 10, false, TM_OK, "0"));
-            CHECK(test_int_printing(func, buffer, 16, 1, 10, false, TM_OK, "1"));
-            CHECK(test_int_printing(func, buffer, 16, 32767, 10, false, TM_OK, "32767"));
-            CHECK(test_int_printing(func, buffer, 16, 65535, 10, false, TM_OK, "65535"));
-            CHECK(test_int_printing(func, buffer, 16, 2147483647, 10, false, TM_OK, "2147483647"));
+            check_int_printing(func, buffer, 16, 0, 10, false, TM_OK, "0");
+            check_int_printing(func, buffer, 16, 1, 10, false, TM_OK, "1");
+            check_int_printing(func, buffer, 16, 32767, 10, false, TM_OK, "32767");
+            check_int_printing(func, buffer, 16, 65535, 10, false, TM_OK, "65535");
+            check_int_printing(func, buffer, 16, 2147483647, 10, false, TM_OK, "2147483647");
 
-            CHECK(test_int_printing(func, buffer, 16, 0, 16, false, TM_OK, "0"));
-            CHECK(test_int_printing(func, buffer, 16, 1, 16, false, TM_OK, "1"));
-            CHECK(test_int_printing(func, buffer, 16, 32767, 16, false, TM_OK, "7FFF"));
-            CHECK(test_int_printing(func, buffer, 16, 65535, 16, false, TM_OK, "FFFF"));
-            CHECK(test_int_printing(func, buffer, 16, 2147483647, 16, false, TM_OK, "7FFFFFFF"));
-            CHECK(test_int_printing(func, buffer, 16, 2147483647, 16, true, TM_OK, "7fffffff"));
+            check_int_printing(func, buffer, 16, 0, 16, false, TM_OK, "0");
+            check_int_printing(func, buffer, 16, 1, 16, false, TM_OK, "1");
+            check_int_printing(func, buffer, 16, 32767, 16, false, TM_OK, "7FFF");
+            check_int_printing(func, buffer, 16, 65535, 16, false, TM_OK, "FFFF");
+            check_int_printing(func, buffer, 16, 2147483647, 16, false, TM_OK, "7FFFFFFF");
+            check_int_printing(func, buffer, 16, 2147483647, 16, true, TM_OK, "7fffffff");
 
-            CHECK(test_int_printing(func, buffer, 16, 3829, 2, false, TM_OK, "111011110101"));
-            CHECK(test_int_printing(func, buffer, 16, 3829, 36, false, TM_OK, "2YD"));
-            CHECK(test_int_printing(func, buffer, 16, 2147483647, 36, true, TM_OK, "zik0zj"));
+            check_int_printing(func, buffer, 16, 3829, 2, false, TM_OK, "111011110101");
+            check_int_printing(func, buffer, 16, 3829, 36, false, TM_OK, "2YD");
+            check_int_printing(func, buffer, 16, 2147483647, 36, true, TM_OK, "zik0zj");
         };
 
         auto negative = [](auto func) {
             char buffer[16];
-            CHECK(test_int_printing(func, buffer, 16, -1, 10, false, TM_OK, "-1"));
-            CHECK(test_int_printing(func, buffer, 16, -32767, 10, false, TM_OK, "-32767"));
-            CHECK(test_int_printing(func, buffer, 16, -65535, 10, false, TM_OK, "-65535"));
-            CHECK(test_int_printing(func, buffer, 16, -2147483647, 10, false, TM_OK, "-2147483647"));
-            CHECK(test_int_printing(func, buffer, 16, -2147483648, 10, false, TM_OK, "-2147483648"));
+            check_int_printing(func, buffer, 16, -1, 10, false, TM_OK, "-1");
+            check_int_printing(func, buffer, 16, -32767, 10, false, TM_OK, "-32767");
+            check_int_printing(func, buffer, 16, -65535, 10, false, TM_OK, "-65535");
+            check_int_printing(func, buffer, 16, -2147483647, 10, false, TM_OK, "-2147483647");
+            check_int_printing(func, buffer, 16, -2147483647 - 1, 10, false, TM_OK, "-2147483648");
 
-            CHECK(test_int_printing(func, buffer, 16, -1, 16, false, TM_OK, "-1"));
-            CHECK(test_int_printing(func, buffer, 16, -32767, 16, false, TM_OK, "-7FFF"));
-            CHECK(test_int_printing(func, buffer, 16, -65535, 16, false, TM_OK, "-FFFF"));
-            CHECK(test_int_printing(func, buffer, 16, -2147483647, 16, false, TM_OK, "-7FFFFFFF"));
-            CHECK(test_int_printing(func, buffer, 16, -2147483648, 16, false, TM_OK, "-80000000"));
-            CHECK(test_int_printing(func, buffer, 16, -2147483647, 16, true, TM_OK, "-7fffffff"));
+            check_int_printing(func, buffer, 16, -1, 16, false, TM_OK, "-1");
+            check_int_printing(func, buffer, 16, -32767, 16, false, TM_OK, "-7FFF");
+            check_int_printing(func, buffer, 16, -65535, 16, false, TM_OK, "-FFFF");
+            check_int_printing(func, buffer, 16, -2147483647, 16, false, TM_OK, "-7FFFFFFF");
+            check_int_printing(func, buffer, 16, -2147483647 - 1, 16, false, TM_OK, "-80000000");
+            check_int_printing(func, buffer, 16, -2147483647, 16, true, TM_OK, "-7fffffff");
 
-            CHECK(test_int_printing(func, buffer, 16, -3829, 2, false, TM_OK, "-111011110101"));
-            CHECK(test_int_printing(func, buffer, 16, -3829, 36, false, TM_OK, "-2YD"));
-            CHECK(test_int_printing(func, buffer, 16, -2147483647, 36, true, TM_OK, "-zik0zj"));
+            check_int_printing(func, buffer, 16, -3829, 2, false, TM_OK, "-111011110101");
+            check_int_printing(func, buffer, 16, -3829, 36, false, TM_OK, "-2YD");
+            check_int_printing(func, buffer, 16, -2147483647, 36, true, TM_OK, "-zik0zj");
         };
 
         auto unsigned_int = [](auto func) {
             char buffer[16];
-            CHECK(test_int_printing(func, buffer, 16, 0xdeadbeef, 16, true, TM_OK, "deadbeef"));
-            CHECK(test_int_printing(func, buffer, 16, 0xdeadbeef, 36, true, TM_OK, "1ps9wxb"));
+            check_int_printing(func, buffer, 16, 0xdeadbeef, 16, true, TM_OK, "deadbeef");
+            check_int_printing(func, buffer, 16, 0xdeadbeef, 36, true, TM_OK, "1ps9wxb");
         };
 
         positive(print_i32);
@@ -494,8 +486,8 @@ TEST_CASE("Test integer printing") {
         positive(print_u64);
 
         char buffer[16];
-        CHECK(test_int_printing(print_i32, buffer, 16, 0xdeadbeef, 16, true, TM_OK, "-21524111"));
-        CHECK(test_int_printing(print_i32, buffer, 16, 0xdeadbeef, 36, true, TM_OK, "-98u51t"));
+        check_int_printing(print_i32, buffer, 16, 0xdeadbeef, 16, true, TM_OK, "-21524111");
+        check_int_printing(print_i32, buffer, 16, 0xdeadbeef, 36, true, TM_OK, "-98u51t");
 
         negative(print_i32);
         negative(print_i64);
@@ -507,29 +499,29 @@ TEST_CASE("Test integer printing") {
     SUBCASE("limits") {
         char buffer[64];
 
-        CHECK(test_int_printing(print_i32, buffer, 64, INT32_MIN, 8, false, TM_OK, "-20000000000"));
-        CHECK(test_int_printing(print_i32, buffer, 64, INT32_MIN, 10, false, TM_OK, "-2147483648"));
-        CHECK(test_int_printing(print_i32, buffer, 64, INT32_MIN, 16, false, TM_OK, "-80000000"));
+        check_int_printing(print_i32, buffer, 64, INT32_MIN, 8, false, TM_OK, "-20000000000");
+        check_int_printing(print_i32, buffer, 64, INT32_MIN, 10, false, TM_OK, "-2147483648");
+        check_int_printing(print_i32, buffer, 64, INT32_MIN, 16, false, TM_OK, "-80000000");
 
-        CHECK(test_int_printing(print_i32, buffer, 64, INT32_MAX, 8, false, TM_OK, "17777777777"));
-        CHECK(test_int_printing(print_i32, buffer, 64, INT32_MAX, 10, false, TM_OK, "2147483647"));
-        CHECK(test_int_printing(print_i32, buffer, 64, INT32_MAX, 16, false, TM_OK, "7FFFFFFF"));
+        check_int_printing(print_i32, buffer, 64, INT32_MAX, 8, false, TM_OK, "17777777777");
+        check_int_printing(print_i32, buffer, 64, INT32_MAX, 10, false, TM_OK, "2147483647");
+        check_int_printing(print_i32, buffer, 64, INT32_MAX, 16, false, TM_OK, "7FFFFFFF");
 
-        CHECK(test_int_printing(print_u32, buffer, 64, UINT32_MAX, 8, false, TM_OK, "37777777777"));
-        CHECK(test_int_printing(print_u32, buffer, 64, UINT32_MAX, 10, false, TM_OK, "4294967295"));
-        CHECK(test_int_printing(print_u32, buffer, 64, UINT32_MAX, 16, false, TM_OK, "FFFFFFFF"));
+        check_int_printing(print_u32, buffer, 64, UINT32_MAX, 8, false, TM_OK, "37777777777");
+        check_int_printing(print_u32, buffer, 64, UINT32_MAX, 10, false, TM_OK, "4294967295");
+        check_int_printing(print_u32, buffer, 64, UINT32_MAX, 16, false, TM_OK, "FFFFFFFF");
 
-        CHECK(test_int_printing(print_i64, buffer, 64, INT64_MIN, 8, false, TM_OK, "-1000000000000000000000"));
-        CHECK(test_int_printing(print_i64, buffer, 64, INT64_MIN, 10, false, TM_OK, "-9223372036854775808"));
-        CHECK(test_int_printing(print_i64, buffer, 64, INT64_MIN, 16, false, TM_OK, "-8000000000000000"));
+        check_int_printing(print_i64, buffer, 64, INT64_MIN, 8, false, TM_OK, "-1000000000000000000000");
+        check_int_printing(print_i64, buffer, 64, INT64_MIN, 10, false, TM_OK, "-9223372036854775808");
+        check_int_printing(print_i64, buffer, 64, INT64_MIN, 16, false, TM_OK, "-8000000000000000");
 
-        CHECK(test_int_printing(print_i64, buffer, 64, INT64_MAX, 8, false, TM_OK, "777777777777777777777"));
-        CHECK(test_int_printing(print_i64, buffer, 64, INT64_MAX, 10, false, TM_OK, "9223372036854775807"));
-        CHECK(test_int_printing(print_i64, buffer, 64, INT64_MAX, 16, false, TM_OK, "7FFFFFFFFFFFFFFF"));
+        check_int_printing(print_i64, buffer, 64, INT64_MAX, 8, false, TM_OK, "777777777777777777777");
+        check_int_printing(print_i64, buffer, 64, INT64_MAX, 10, false, TM_OK, "9223372036854775807");
+        check_int_printing(print_i64, buffer, 64, INT64_MAX, 16, false, TM_OK, "7FFFFFFFFFFFFFFF");
 
-        CHECK(test_int_printing(print_u64, buffer, 64, UINT64_MAX, 8, false, TM_OK, "1777777777777777777777"));
-        CHECK(test_int_printing(print_u64, buffer, 64, UINT64_MAX, 10, false, TM_OK, "18446744073709551615"));
-        CHECK(test_int_printing(print_u64, buffer, 64, UINT64_MAX, 16, false, TM_OK, "FFFFFFFFFFFFFFFF"));
+        check_int_printing(print_u64, buffer, 64, UINT64_MAX, 8, false, TM_OK, "1777777777777777777777");
+        check_int_printing(print_u64, buffer, 64, UINT64_MAX, 10, false, TM_OK, "18446744073709551615");
+        check_int_printing(print_u64, buffer, 64, UINT64_MAX, 16, false, TM_OK, "FFFFFFFFFFFFFFFF");
     }
 }
 
