@@ -69,11 +69,6 @@ HISTORY
     v1.0b     02.07.16 changed #include <memory.h> into string.h
     v1.0a     01.07.16 improved C99 conformity
     v1.0      26.06.16 initial commit
-
-LICENSE
-    This software is dual-licensed to the public domain and under the following
-    license: you are granted a perpetual, irrevocable license to copy, modify,
-    publish, and distribute this file as you see fit.
 */
 
 /* clang-format off */
