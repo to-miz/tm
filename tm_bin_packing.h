@@ -1,11 +1,14 @@
 /*
-tm_bin_packing.h v1.0.4a - public domain - https://github.com/to-miz/tm
+tm_bin_packing.h v1.0.5 - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
 
 C99 port of algorithms by Jukka Jylänki, see https://github.com/juj/RectangleBinPack (also public
 domain)
+
+LICENSE
+    see license notes at end of file
 
 USAGE
     This file works as both the header and implementation.
@@ -205,6 +208,7 @@ SAMPLES
         }
 
 HISTORY
+    v1.0.5  28.05.17 added binPackReset
     v1.0.4a 28.08.18 added repository link
     v1.0.4  28.05.17 changed how the allocator works
                      added binPackCreateEx
@@ -218,11 +222,6 @@ HISTORY
     v1.0b   09.10.16 fixed a typo
     v1.0a   07.10.16 removed using forced unsigned arithmetic when tmbp_size_t is signed
     v1.0    20.07.16 initial commit
-
-LICENSE
-    This software is dual-licensed to the public domain and under the following
-    license: you are granted a perpetual, irrevocable license to copy, modify,
-    publish, and distribute this file as you see fit.
 */
 
 // define these to avoid crt
@@ -361,6 +360,8 @@ TMBP_DEF void binPackDestroy(BinPack* pack);
 
 // clears given BinPack without freeing memory
 TMBP_DEF void binPackClear(BinPack* pack);
+// clears given BinPack and resets to new size without freeing memory
+TMBP_DEF void binPackReset(BinPack* pack, tmbp_int width, tmbp_int height);
 
 // frees unused memory of a dynamic BinPack that was created using binPackCreate
 TMBP_DEF void binPackFitToSize(BinPack* pack);
@@ -417,7 +418,7 @@ TMBP_DEF BinPackResult guillotineInsertChoice(BinPack* pack, tmbp_int width, tmb
 // heuristic score see NOTES for more information
 TMBP_DEF tmbp_size_t guillotineInsertBatch(BinPack* pack, BinPackBatchDim* dims, BinPackBatchResult* results,
                                            tmbp_size_t count, GuillotineFreeRectChoiceHeuristic freeChoice,
-                                           GuillotineSplitHeuristic splitChoice, tmbp_bool canFlip);
+                                           GuillotineSplitHeuristic splitChoice, tmbp_bool canFlip, tmbp_bool merge);
 
 // returns a value between 0 and 1 for how much area is occupied in the pack
 TMBP_DEF float guillotineOccupancy(const BinPack* pack);
@@ -577,8 +578,8 @@ TMBP_DEF BinPack binPackCreateEx(tmbp_int width, tmbp_int height, void* allocato
 }
 TMBP_DEF void binPackDestroy(BinPack* pack) {
     if(pack->allocator.freeFunc) {
-        pack->allocator.freeFunc(pack->allocator.state, pack->freeRects.data, pack->freeRects.size);
-        pack->allocator.freeFunc(pack->allocator.state, pack->usedRects.data, pack->usedRects.size);
+        pack->allocator.freeFunc(pack->allocator.state, pack->freeRects.data, pack->freeRects.capacity);
+        pack->allocator.freeFunc(pack->allocator.state, pack->usedRects.data, pack->usedRects.capacity);
     }
     pack->freeRects.data     = TMBP_NULL;
     pack->freeRects.size     = 0;
@@ -587,12 +588,18 @@ TMBP_DEF void binPackDestroy(BinPack* pack) {
     pack->usedRects.size     = 0;
     pack->usedRects.capacity = 0;
 }
-TMBP_DEF void binPackClear(BinPack* pack) {
+TMBP_DEF void binPackReset(BinPack* pack, tmbp_int width, tmbp_int height) {
     TMBP_ASSERT(pack);
-    pack->freeRects.size = 0;
+    if(pack->freeRects.capacity) {
+        pack->freeRects.size    = 1;
+        pack->freeRects.data[0] = {0, 0, width, height};
+    } else {
+        pack->freeRects.size = 0;
+    }
     pack->usedRects.size = 0;
     pack->usedArea       = 0;
 }
+TMBP_DEF void binPackClear(BinPack* pack) { binPackReset(pack, pack->width, pack->height); }
 TMBP_DEF void binPackFitToSize(BinPack* pack) {
     pack->freeRects.data = pack->allocator.reallocateFunc(pack->allocator.state, pack->freeRects.data,
                                                           pack->freeRects.capacity, pack->freeRects.size);
@@ -987,7 +994,7 @@ TMBP_DEF BinPackResult guillotineInsertChoice(BinPack* pack, tmbp_int width, tmb
 }
 TMBP_DEF tmbp_size_t guillotineInsertBatch(BinPack* pack, BinPackBatchDim* dims, BinPackBatchResult* results,
                                            tmbp_size_t count, GuillotineFreeRectChoiceHeuristic freeChoice,
-                                           GuillotineSplitHeuristic splitChoice, tmbp_bool canFlip) {
+                                           GuillotineSplitHeuristic splitChoice, tmbp_bool canFlip, tmbp_bool merge) {
     tmbp_size_t dimsCount          = count;
     GuillotineHeuristicResult best = {0};
     while(dimsCount > 0) {
@@ -1018,6 +1025,10 @@ TMBP_DEF tmbp_size_t guillotineInsertBatch(BinPack* pack, BinPackBatchDim* dims,
         BinPackBatchResult* result = results++;
         result->result   = guillotineInsert(pack, dims[bestIndex].dim.width, dims[bestIndex].dim.height, &best, splitChoice);
         result->userData = dims[bestIndex].userData;
+
+        if(result->result.placed && merge) {
+            guillotineMergeFreeRects(pack);
+        }
 
         // we processed bestIndex already, move it to the back of the array and decrease dimsCount
         --dimsCount;
@@ -1611,3 +1622,59 @@ TMBP_DEF float maxRectsOccupancy(const BinPack* pack) { return guillotineOccupan
 #endif
 
 #endif  // defined( TM_BIN_PACKING_IMPLEMENTATION )
+
+/*
+There are two licenses you can freely choose from - MIT or Public Domain
+---------------------------------------------------------------------------
+
+MIT License:
+Copyright (c) 2017 Tolga Mizrak
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---------------------------------------------------------------------------
+
+Public Domain (www.unlicense.org):
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
+
+---------------------------------------------------------------------------
+*/
