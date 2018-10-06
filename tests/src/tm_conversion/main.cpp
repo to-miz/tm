@@ -10,11 +10,15 @@
 #include <assert_throws.h>
 #include <assert_throws.cpp>
 
+#include <string_view>
+
 #define TM_CONVERSION_IMPLEMENTATION
 #define TMC_CHECKED_WIDTH
+#define TM_STRING_VIEW std::string_view
+#define TM_STRING_VIEW_DATA(x) (x).data()
+#define TM_STRING_VIEW_SIZE(x) ((tm_size_t)(x).size())
+#define TMC_CPP_OVERLOADS
 #include <tm_conversion.h>
-
-#include <string_view>
 
 // helpers
 

@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.9.4 - public domain - https://github.com/to-miz/tm
+tm_conversion.h v0.9.9.5 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -105,6 +105,7 @@ ISSUES
     - print_double, print_float need 64 bit arithmetic
 
 HISTORY
+    v0.9.9.5   06.10.18 fixed compilation errors when TMC_CPP_OVERLOADS is defined
     v0.9.9.4   05.10.18 added shortest flag for floating points
     v0.9.9.3   24.09.18 removed tm_bool32
                         removed print format structure
@@ -354,7 +355,7 @@ int main() {
 #ifndef _TM_CONVERSION_H_INCLUDED_
 #define _TM_CONVERSION_H_INCLUDED_
 
-#define TMC_VERSION 0x00090904u
+#define TMC_VERSION 0x00090905u
 
 /* Fixed width ints. Include C version so identifiers are in global namespace. */
 #include <stdint.h>
@@ -603,16 +604,16 @@ tmc_conv_result scan(const char* nullterminated, int32_t* out, int32_t base = 10
 tmc_conv_result scan(const char* nullterminated, uint32_t* out, int32_t base = 10);
 tmc_conv_result scan(const char* nullterminated, int64_t* out, int32_t base = 10);
 tmc_conv_result scan(const char* nullterminated, uint64_t* out, int32_t base = 10);
-tmc_conv_result scan(const char* nullterminated, float* out, uint32_t flags);
-tmc_conv_result scan(const char* nullterminated, double* out, uint32_t flags);
+tmc_conv_result scan(const char* nullterminated, float* out, uint32_t flags = 0);
+tmc_conv_result scan(const char* nullterminated, double* out, uint32_t flags = 0);
 tmc_conv_result scan(const char* nullterminated, bool* out);
 
 tmc_conv_result scan(const char* str, tm_size_t len, int32_t* out, int32_t base = 10);
 tmc_conv_result scan(const char* str, tm_size_t len, uint32_t* out, int32_t base = 10);
 tmc_conv_result scan(const char* str, tm_size_t len, int64_t* out, int32_t base = 10);
 tmc_conv_result scan(const char* str, tm_size_t len, uint64_t* out, int32_t base = 10);
-tmc_conv_result scan(const char* str, tm_size_t len, float* out, uint32_t flags);
-tmc_conv_result scan(const char* str, tm_size_t len, double* out, uint32_t flags);
+tmc_conv_result scan(const char* str, tm_size_t len, float* out, uint32_t flags = 0);
+tmc_conv_result scan(const char* str, tm_size_t len, double* out, uint32_t flags = 0);
 tmc_conv_result scan(const char* str, tm_size_t len, bool* out);
 
 tmc_conv_result print(char* dest, tm_size_t maxlen, int32_t value, int32_t base = 10, tm_bool lowercase = false);
@@ -630,8 +631,8 @@ tmc_conv_result scan(TM_STRING_VIEW str, int32_t* out, int32_t base = 10);
 tmc_conv_result scan(TM_STRING_VIEW str, uint32_t* out, int32_t base = 10);
 tmc_conv_result scan(TM_STRING_VIEW str, int64_t* out, int32_t base = 10);
 tmc_conv_result scan(TM_STRING_VIEW str, uint64_t* out, int32_t base = 10);
-tmc_conv_result scan(TM_STRING_VIEW str, float* out);
-tmc_conv_result scan(TM_STRING_VIEW str, double* out);
+tmc_conv_result scan(TM_STRING_VIEW str, float* out, uint32_t flags = 0);
+tmc_conv_result scan(TM_STRING_VIEW str, double* out, uint32_t flags = 0);
 tmc_conv_result scan(TM_STRING_VIEW str, bool* out);
 #endif /* TM_STRING_VIEW */
 } /* namespace tmc */
@@ -701,29 +702,29 @@ inline tmc_conv_result tmc::print(char* dest, tm_size_t maxlen, bool value, uint
 }
 
 #ifdef TM_STRING_VIEW
-inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, int32_t base, int32_t* out) {
-    return scan_i32_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), base, out);
+inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, int32_t* out, int32_t base) {
+    return scan_i32_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out, base);
 }
-inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, int32_t base, uint32_t* out) {
-    return scan_u32_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), base, out);
+inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, uint32_t* out, int32_t base) {
+    return scan_u32_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out, base);
 }
-inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, int32_t base, int64_t* out) {
-    return scan_i64_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), base, out);
+inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, int64_t* out, int32_t base) {
+    return scan_i64_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out, base);
 }
-inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, int32_t base, uint64_t* out) {
-    return scan_u64_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), base, out);
+inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, uint64_t* out, int32_t base) {
+    return scan_u64_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out, base);
 }
-inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, float* out) {
-    return scan_float_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out);
+inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, float* out, uint32_t flags) {
+    return scan_float_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out, flags);
 }
-inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, double* out) {
-    return scan_double_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out);
+inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, double* out, uint32_t flags) {
+    return scan_double_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out, flags);
 }
 inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, bool* out) {
     return scan_bool_n(TM_STRING_VIEW_DATA(str), TM_STRING_VIEW_SIZE(str), out);
 }
 #endif /* TM_STRING_VIEW */
-#endif /* defined( TMC_CPP_OVERLOADS ) && defined( __cplusplus ) */
+#endif /* defined(TMC_CPP_OVERLOADS) && defined(__cplusplus) */
 
 #endif
 

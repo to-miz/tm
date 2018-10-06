@@ -91,7 +91,7 @@ TEST_CASE("Test float format specifiers") {
     check_output("{:g}", 1.0, "1");
 
 // check scientific output
-#if !defined(TMP_FLOAT_BACKEND_TM_CONVERSION) || (defined(TMC_VERSION)) && TMC_VERSION > 0x00090904u
+#if !defined(TMP_FLOAT_BACKEND_TM_CONVERSION) || (defined(TMC_VERSION)) && TMC_VERSION > 0x00090905u
     check_output("{:e}", 1.0, "1.000000e+00");
     check_output("{:E}", 1.0, "1.000000E+00");
 
