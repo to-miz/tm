@@ -109,10 +109,10 @@ ISSUES
       json objects should be turned into hashmaps manually when applicable
 
 HISTORY
-        v0.1.5  06.10.18  refactored preprocessor
-        v0.1.4b 25.08.18  added repository link
-        v0.1.4a 22.07.18  fixed some warnings on C99 compilation
-        v0.1.4  22.07.18  removed overloads of C functions for C++, updated licensing
+    v0.1.5  06.10.18  refactored preprocessor
+    v0.1.4b 25.08.18  added repository link
+    v0.1.4a 22.07.18  fixed some warnings on C99 compilation
+    v0.1.4  22.07.18  removed overloads of C functions for C++, updated licensing
     v0.1.3  10.02.17  string view operators are now preferred to const char* operators in JsonObject
     v0.1.2  28.01.17  added jsonObjectArray for usage with C++11 range based loops
     v0.1.1d 10.01.17  minor change from static const char* to static const char* const in some places
