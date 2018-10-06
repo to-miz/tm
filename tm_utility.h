@@ -31,7 +31,7 @@ HISTORY
     v1.1.0a 15.09.16 added an alternate implementation of countof
     v1.1.0  12.09.16 added isAligned
                      added versions of min/max/minmax/median that take a Compare functor
-    v1.0.9a 24.08.16 changed countof to use tmut_size_t
+    v1.0.9a 24.08.16 changed countof to use tm_size_t
     v1.0.9  24.08.16 added countof, lerp and remap
     v1.0.8  23.08.16 changed min and max to use operator < instead of operator <= and added minmax
                      removed assertion in strnicmp, because count >= 0 is always true
@@ -57,17 +57,19 @@ HISTORY
 #ifdef TM_UTILITY_IMPLEMENTATION
     // Define TMUT_IMPLEMENT_CTYPE_FUNCTIONS to implement the ctype.h family of functions with C++ overloads.
     #ifndef TMUT_IMPLEMENT_CTYPE_FUNCTIONS
-        #ifndef TMUT_TOUPPER
+        #ifndef TM_TOUPPER
             #include <cctype>
-            #define TMUT_TOUPPER toupper
+            #define TM_TOUPPER toupper
         #endif
     #else
-        #define TMUT_TOUPPER toupper
+        #ifndef TM_TOUPPER
+            #define TM_TOUPPER toupper
+        #endif
     #endif
 
-    #ifndef TMUT_STRLEN
+    #ifndef TM_STRLEN
         #include <cstring>
-        #define TMUT_STRLEN strlen
+        #define TM_STRLEN strlen
     #endif
 #endif
 
@@ -311,7 +313,7 @@ template <class result_type, class value_type>
 result_type bit_cast(const value_type& value);
 
 // return index of value in contiguous container
-template <class Container, class ValueType, class ReturnType = tmut_size_t>
+template <class Container, class ValueType, class ReturnType = tm_size_t>
 ReturnType indexof(const Container& container, const ValueType& value);
 
 // get type of value without it being a reference type
@@ -334,7 +336,7 @@ TM_CONSTEXPR typename std::underlying_type<EnumType>::type valueof(EnumType valu
         template <typename T, unsigned N>
         char (&InternalComputeArraySize(T (&)[N]))[N];
 
-        #define countof(array) ((tmut_size_t)sizeof(InternalComputeArraySize(array)))
+        #define countof(array) ((tm_size_t)sizeof(InternalComputeArraySize(array)))
     #else
         #define countof(x) (sizeof(x) / sizeof(x[0]))
     #endif  // (defined(TMUT_SAFE_COUNTOF) || defined(_DEBUG))
@@ -770,24 +772,24 @@ extern "C" {
 #ifndef TMUT_NO_STRICMP
 extern int stricmp(const char* a, const char* b) {
     while (*a && *b) {
-        auto aUpper = TMUT_TOUPPER(char_to_int(*a));
-        auto bUpper = TMUT_TOUPPER(char_to_int(*b));
+        auto aUpper = TM_TOUPPER(char_to_int(*a));
+        auto bUpper = TM_TOUPPER(char_to_int(*b));
         if (aUpper != bUpper) {
             break;
         }
         ++a;
         ++b;
     }
-    auto aUpper = TMUT_TOUPPER(char_to_int(*a));
-    auto bUpper = TMUT_TOUPPER(char_to_int(*b));
+    auto aUpper = TM_TOUPPER(char_to_int(*a));
+    auto bUpper = TM_TOUPPER(char_to_int(*b));
     return aUpper - bUpper;
 }
 #endif
 #ifndef TMUT_NO_STRNICMP
 extern int strnicmp(const char* a, const char* b, size_t count) {
     while (*a && *b && count--) {
-        auto aUpper = TMUT_TOUPPER(char_to_int(*a));
-        auto bUpper = TMUT_TOUPPER(char_to_int(*b));
+        auto aUpper = TM_TOUPPER(char_to_int(*a));
+        auto bUpper = TM_TOUPPER(char_to_int(*b));
         if (aUpper != bUpper) {
             break;
         }
@@ -797,8 +799,8 @@ extern int strnicmp(const char* a, const char* b, size_t count) {
     if (!count) {
         return 0;
     }
-    auto aUpper = TMUT_TOUPPER(char_to_int(*a));
-    auto bUpper = TMUT_TOUPPER(char_to_int(*b));
+    auto aUpper = TM_TOUPPER(char_to_int(*a));
+    auto bUpper = TM_TOUPPER(char_to_int(*b));
     return aUpper - bUpper;
 }
 #endif
