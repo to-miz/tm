@@ -11,7 +11,6 @@
 #include <assert_throws.cpp>
 
 #define TM_CONVERSION_IMPLEMENTATION
-#define TM_ASSERT(x) assert_throws(x, __FILE__, __LINE__)
 #define TMC_CHECKED_WIDTH
 #include <tm_conversion.h>
 
@@ -63,13 +62,13 @@ TEST_CASE("Test scan invariants") {
     CHECK(scan_bool_n(nullptr, 0, nullptr).ec == TM_EINVAL);
 
     // Assertions should fail because str is nullptr while maxlen is 1
-    CHECK_THROWS(scan_i32_n(nullptr, 1, nullptr, 10));
-    CHECK_THROWS(scan_u32_n(nullptr, 1, nullptr, 10));
-    CHECK_THROWS(scan_i64_n(nullptr, 1, nullptr, 10));
-    CHECK_THROWS(scan_u64_n(nullptr, 1, nullptr, 10));
-    CHECK_THROWS(scan_float_n(nullptr, 1, nullptr, 0));
-    CHECK_THROWS(scan_double_n(nullptr, 1, nullptr, 0));
-    CHECK_THROWS(scan_bool_n(nullptr, 1, nullptr));
+    CHECK_ASSERTION_FAILURE(scan_i32_n(nullptr, 1, nullptr, 10));
+    CHECK_ASSERTION_FAILURE(scan_u32_n(nullptr, 1, nullptr, 10));
+    CHECK_ASSERTION_FAILURE(scan_i64_n(nullptr, 1, nullptr, 10));
+    CHECK_ASSERTION_FAILURE(scan_u64_n(nullptr, 1, nullptr, 10));
+    CHECK_ASSERTION_FAILURE(scan_float_n(nullptr, 1, nullptr, 0));
+    CHECK_ASSERTION_FAILURE(scan_double_n(nullptr, 1, nullptr, 0));
+    CHECK_ASSERTION_FAILURE(scan_bool_n(nullptr, 1, nullptr));
 
     const char* num = "1";
 
@@ -94,54 +93,54 @@ TEST_CASE("Test scan invariants") {
 TEST_CASE("Test print invariants") {
     SUBCASE("2 <= base <= 36") {
         char buffer[10];
-        CHECK_THROWS(print_i32(buffer, 10, 0, /*base=*/1, false));
-        CHECK_THROWS(print_u32(buffer, 10, 0, /*base=*/1, false));
-        CHECK_THROWS(print_i64(buffer, 10, 0, /*base=*/1, false));
-        CHECK_THROWS(print_u64(buffer, 10, 0, /*base=*/1, false));
+        CHECK_ASSERTION_FAILURE(print_i32(buffer, 10, 0, /*base=*/1, false));
+        CHECK_ASSERTION_FAILURE(print_u32(buffer, 10, 0, /*base=*/1, false));
+        CHECK_ASSERTION_FAILURE(print_i64(buffer, 10, 0, /*base=*/1, false));
+        CHECK_ASSERTION_FAILURE(print_u64(buffer, 10, 0, /*base=*/1, false));
 
-        CHECK_THROWS(print_i32(buffer, 10, 0, /*base=*/37, false));
-        CHECK_THROWS(print_u32(buffer, 10, 0, /*base=*/37, false));
-        CHECK_THROWS(print_i64(buffer, 10, 0, /*base=*/37, false));
-        CHECK_THROWS(print_u64(buffer, 10, 0, /*base=*/37, false));
+        CHECK_ASSERTION_FAILURE(print_i32(buffer, 10, 0, /*base=*/37, false));
+        CHECK_ASSERTION_FAILURE(print_u32(buffer, 10, 0, /*base=*/37, false));
+        CHECK_ASSERTION_FAILURE(print_i64(buffer, 10, 0, /*base=*/37, false));
+        CHECK_ASSERTION_FAILURE(print_u64(buffer, 10, 0, /*base=*/37, false));
 
         for (int base = 2; base <= 36; ++base) {
-            CHECK_NOTHROW(print_i32(buffer, 10, 0, /*base=*/base, false));
-            CHECK_NOTHROW(print_u32(buffer, 10, 0, /*base=*/base, false));
-            CHECK_NOTHROW(print_i64(buffer, 10, 0, /*base=*/base, false));
-            CHECK_NOTHROW(print_u64(buffer, 10, 0, /*base=*/base, false));
+            CHECK_NOASSERT(print_i32(buffer, 10, 0, /*base=*/base, false));
+            CHECK_NOASSERT(print_u32(buffer, 10, 0, /*base=*/base, false));
+            CHECK_NOASSERT(print_i64(buffer, 10, 0, /*base=*/base, false));
+            CHECK_NOASSERT(print_u64(buffer, 10, 0, /*base=*/base, false));
         }
     }
 
     SUBCASE("dest must be not null if maxlen > 0") {
-        CHECK_THROWS(print_i32(nullptr, 10, 0, 10, false));
-        CHECK_THROWS(print_u32(nullptr, 10, 0, 10, false));
-        CHECK_THROWS(print_i64(nullptr, 10, 0, 10, false));
-        CHECK_THROWS(print_u64(nullptr, 10, 0, 10, false));
-        CHECK_THROWS(print_double(nullptr, 10, 0, 0, 0));
-        CHECK_THROWS(print_float(nullptr, 10, 0, 0, 0));
-        CHECK_THROWS(print_bool(nullptr, 10, 0, 0));
-        CHECK_THROWS(print_decimal_i32(nullptr, 10, 0));
-        CHECK_THROWS(print_decimal_u32(nullptr, 10, 0));
-        CHECK_THROWS(print_decimal_i64(nullptr, 10, 0));
-        CHECK_THROWS(print_decimal_u64(nullptr, 10, 0));
-        CHECK_THROWS(print_hex_i32(nullptr, 10, 0, false));
-        CHECK_THROWS(print_hex_u32(nullptr, 10, 0, false));
-        CHECK_THROWS(print_hex_i64(nullptr, 10, 0, false));
-        CHECK_THROWS(print_hex_u64(nullptr, 10, 0, false));
-        CHECK_THROWS(print_decimal_u32_w(nullptr, 10, 1, 0));
-        CHECK_THROWS(print_decimal_u64_w(nullptr, 10, 1, 0));
-        CHECK_THROWS(print_hex_u32_w(nullptr, 10, 1, 0, false));
-        CHECK_THROWS(print_hex_u64_w(nullptr, 10, 1, 0, false));
+        CHECK_ASSERTION_FAILURE(print_i32(nullptr, 10, 0, 10, false));
+        CHECK_ASSERTION_FAILURE(print_u32(nullptr, 10, 0, 10, false));
+        CHECK_ASSERTION_FAILURE(print_i64(nullptr, 10, 0, 10, false));
+        CHECK_ASSERTION_FAILURE(print_u64(nullptr, 10, 0, 10, false));
+        CHECK_ASSERTION_FAILURE(print_double(nullptr, 10, 0, 0, 0));
+        CHECK_ASSERTION_FAILURE(print_float(nullptr, 10, 0, 0, 0));
+        CHECK_ASSERTION_FAILURE(print_bool(nullptr, 10, 0, 0));
+        CHECK_ASSERTION_FAILURE(print_decimal_i32(nullptr, 10, 0));
+        CHECK_ASSERTION_FAILURE(print_decimal_u32(nullptr, 10, 0));
+        CHECK_ASSERTION_FAILURE(print_decimal_i64(nullptr, 10, 0));
+        CHECK_ASSERTION_FAILURE(print_decimal_u64(nullptr, 10, 0));
+        CHECK_ASSERTION_FAILURE(print_hex_i32(nullptr, 10, 0, false));
+        CHECK_ASSERTION_FAILURE(print_hex_u32(nullptr, 10, 0, false));
+        CHECK_ASSERTION_FAILURE(print_hex_i64(nullptr, 10, 0, false));
+        CHECK_ASSERTION_FAILURE(print_hex_u64(nullptr, 10, 0, false));
+        CHECK_ASSERTION_FAILURE(print_decimal_u32_w(nullptr, 10, 1, 0));
+        CHECK_ASSERTION_FAILURE(print_decimal_u64_w(nullptr, 10, 1, 0));
+        CHECK_ASSERTION_FAILURE(print_hex_u32_w(nullptr, 10, 1, 0, false));
+        CHECK_ASSERTION_FAILURE(print_hex_u64_w(nullptr, 10, 1, 0, false));
     }
 
     SUBCASE("Width based prints should assert on width being valid") {
         char buffer[10];
-        CHECK_THROWS(print_decimal_u32_w(buffer, 10, 0, 100));
-        CHECK_THROWS(print_decimal_u64_w(buffer, 10, 0, 100));
-        CHECK_THROWS(print_hex_u32_w(buffer, 10, 0, 100, false));
-        CHECK_THROWS(print_hex_u64_w(buffer, 10, 0, 100, false));
-        CHECK_THROWS(print_u32_w(buffer, 10, 0, 100, 8, false));
-        CHECK_THROWS(print_u64_w(buffer, 10, 0, 100, 8, false));
+        CHECK_ASSERTION_FAILURE(print_decimal_u32_w(buffer, 10, 0, 100));
+        CHECK_ASSERTION_FAILURE(print_decimal_u64_w(buffer, 10, 0, 100));
+        CHECK_ASSERTION_FAILURE(print_hex_u32_w(buffer, 10, 0, 100, false));
+        CHECK_ASSERTION_FAILURE(print_hex_u64_w(buffer, 10, 0, 100, false));
+        CHECK_ASSERTION_FAILURE(print_u32_w(buffer, 10, 0, 100, 8, false));
+        CHECK_ASSERTION_FAILURE(print_u64_w(buffer, 10, 0, 100, 8, false));
     }
 
 #ifdef TMC_CHECKED_WIDTH
@@ -396,17 +395,17 @@ TEST_CASE("Test digits count") {
         }
     }
     SUBCASE("invariants") {
-        CHECK_THROWS(get_digits_count_u32(0, 0));
-        CHECK_THROWS(get_digits_count_u64(0, 0));
-        CHECK_THROWS(get_digits_count_u32(0, 37));
-        CHECK_THROWS(get_digits_count_u64(0, 37));
+        CHECK_ASSERTION_FAILURE(get_digits_count_u32(0, 0));
+        CHECK_ASSERTION_FAILURE(get_digits_count_u64(0, 0));
+        CHECK_ASSERTION_FAILURE(get_digits_count_u32(0, 37));
+        CHECK_ASSERTION_FAILURE(get_digits_count_u64(0, 37));
 
-        CHECK_NOTHROW(get_digits_count_u32(0, 2));
-        CHECK_NOTHROW(get_digits_count_u32(0, 36));
-        CHECK_NOTHROW(get_digits_count_u32(0, 10));
-        CHECK_NOTHROW(get_digits_count_u64(0, 2));
-        CHECK_NOTHROW(get_digits_count_u64(0, 36));
-        CHECK_NOTHROW(get_digits_count_u64(0, 10));
+        CHECK_NOASSERT(get_digits_count_u32(0, 2));
+        CHECK_NOASSERT(get_digits_count_u32(0, 36));
+        CHECK_NOASSERT(get_digits_count_u32(0, 10));
+        CHECK_NOASSERT(get_digits_count_u64(0, 2));
+        CHECK_NOASSERT(get_digits_count_u64(0, 36));
+        CHECK_NOASSERT(get_digits_count_u64(0, 10));
     }
     SUBCASE("generic") {
         auto test = [](auto func, const auto start) {
