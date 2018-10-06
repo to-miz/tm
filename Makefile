@@ -40,10 +40,11 @@ INCLUDE_DIRS :=
 # tests
 
 TESTS_INCLUDE_DIRS  := tests/external ./ tests/src/
+TESTS_DOCTEST_DEP   := tests/external/doctest/doctest.h
 
 # tm_conversion
 TM_CONVERSION_SRC  := tests/src/tm_conversion/main.cpp
-TM_CONVERSION_DEPS := ${build_dir} ${TM_CONVERSION_SRC} tm_conversion.h tests/external/doctest/doctest.h
+TM_CONVERSION_DEPS := ${build_dir} ${TM_CONVERSION_SRC} tm_conversion.h ${TESTS_DOCTEST_DEP}
 TM_CONVERSION_DEPS += tests/src/assert_throws.h tests/src/assert_throws.cpp
 TM_CONVERSION_OUT  := ${build_dir}/tm_conversion_tests${ext}
 
@@ -196,11 +197,17 @@ space := ${empty} ${empty}
 
 clang-tidy-flags := -header-filter=.*
 
-# compile command
+# compile output parameter
 OUT_FILE.gcc = -o
 OUT_FILE.clang = -o
 OUT_FILE.cl = /link /OUT:
 
+# compile command
+# ${1} is the source
+# ${2} is output filename
+# ${3} are include directories
+# ${4} are additional definitions
+override compile = ${CXX} ${CXXFLAGS} ${call INCLUDECOMMAND.${COMPILER},${3}} $(call DEFINECOMMAND.${COMPILER},${4}) ${1} ${OUT_FILE.${COMPILER}}${2} ${LDFLAGS} ${LDLIBS}
 
 # targets
 all: directories
@@ -264,7 +271,7 @@ tm_conversion-check: tm_conversion
 TM_PRINT_UNMERGED := ${build_dir}/tm_print-unmerged${ext}
 
 TM_PRINT_SRC  := tests/src/tm_print/main.cpp
-TM_PRINT_DEPS := ${build_dir} ${TM_PRINT_SRC} ./tm_print.h tm_conversion.h tests/external/doctest/doctest.h
+TM_PRINT_DEPS := ${build_dir} ${TM_PRINT_SRC} ./tm_print.h tm_conversion.h ${TESTS_DOCTEST_DEP}
 TM_PRINT_DEPS += tests/src/assert_throws.h tests/src/assert_throws.cpp
 TM_PRINT_OUT  := ${build_dir}/tm_print_tests${ext}
 
@@ -383,6 +390,17 @@ tm_print-run-tests: tm_print-tests
 	@${TM_PRINT_TESTS_CHARCONV}
 	@echo TESTING: charconv backend (only int, since float not implemented yet in any stl) with signed size_t
 	@${TM_PRINT_TESTS_CHARCONV_SIGNED_SIZE_T}
+
+# tm_json
+
+TM_JSON_DEPS := ${build_dir} ${TESTS_DOCTEST_DEP} tm_json.h tests/src/tm_json/main.cpp
+TM_JSON_SRC := tests/src/tm_json/main.cpp
+TM_JSON_TESTS_OUT := ${build_dir}/tm_json_tests${ext}
+
+${TM_JSON_TESTS_OUT}: ${TM_JSON_DEPS}
+	@$(call compile,${TM_JSON_SRC},$@,${TESTS_INCLUDE_DIRS},)
+
+tm_json-tests: ${TM_JSON_TESTS_OUT}
 
 directories: ${build_dir}
 
