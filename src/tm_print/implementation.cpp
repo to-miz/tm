@@ -1,14 +1,7 @@
-#define TMP_MIN(a, b) ((a) < (b) ? (a) : (b))
+#include "../common/tm_min.inc"
 
 // clang-format off
-#ifndef TM_ASSERT_VALID_SIZE
-    #if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
-        #define TM_ASSERT_VALID_SIZE(x) TM_ASSERT((x) >= 0)
-    #else
-        /* always true if size_t is unsigned */
-        #define TM_ASSERT_VALID_SIZE(x) ((void)0)
-    #endif
-#endif /* !defined(TM_ASSERT_VALID_SIZE) */
+#include "../common/tm_assert_valid_size.inc"
 
 namespace {
 
@@ -537,7 +530,7 @@ static void tmp_print_impl(const char* format, size_t formatLen, const PrintForm
             (current == PrintType::Int32 || current == PrintType::UInt32 || current == PrintType::Int64 ||
              current == PrintType::UInt64)) {
             if (formatFlags & FormatSpecifierFlags::WidthSpecified) {
-                printFormat.width = TMP_MIN(printFormat.precision, printFormat.width);
+                printFormat.width = TM_MIN(printFormat.precision, printFormat.width);
             } else {
                 printFormat.width = printFormat.precision;
             }

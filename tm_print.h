@@ -14,22 +14,15 @@ USAGE
     in ONE C or C++ source file before #including this header.
 
 ISSUES
-    - The output between tm_conversion.h and snprintf based output isn't the same for floating
-    points.
-    The tm_conversion.h library doesn't output trailing zeroes by default, while printf will output
-    trailing zeroes when using %f. To make the tm_conversion based implementation always output
-    trailing zeroes, define:
-        #define TMP_FLOAT_ALWAYS_TRAILING_ZEROES
-    See Switches for more info.
-    Otherwise outputting floats with {:f} will always produce trailing zeroes for both
-    implementations.
-
     - The tm_conversion based implementation always outputs '.' as the decimal point character
     regardless of the locale, while the snprintf based output outputs the decimal point based on the
     current locale.
 
 HISTORY
+    v0.0.8  06.10.18 refactored some common macro blocks into include files
     v0.0.7  02.10.18 refactored into multiple files that get merged
+                     added multiple backends for int and float printing
+                     added a couple more formatting options like o, a and c
     v0.0.6  25.09.18 reworked many printing functions because of breaking changes to tm_conversion
     v0.0.5  01.09.18 added MIT license option
                      refactored fillPrintArgList to not be dependend on preprocessor switches
@@ -737,7 +730,9 @@ tm_size_t snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const Print
 #endif  // _TM_PRINT_H_INCLUDED_
 
 #ifdef TM_PRINT_IMPLEMENTATION
-#define TMP_MIN(a, b) ((a) < (b) ? (a) : (b))
+#ifndef TM_MIN
+	#define TM_MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 
 // clang-format off
 #ifndef TM_ASSERT_VALID_SIZE
@@ -1691,7 +1686,7 @@ struct tmp_memory_printer {
             result = grow(len);
         }
         auto rem = remaining();
-        auto printSize = TMP_MIN(len, rem);
+        auto printSize = TM_MIN(len, rem);
         TM_ASSERT_VALID_SIZE(printSize);
         TM_MEMCPY(end(), str, printSize);
         size += printSize;
@@ -1751,7 +1746,7 @@ static void tmp_print_impl(const char* format, size_t formatLen, const PrintForm
             (current == PrintType::Int32 || current == PrintType::UInt32 || current == PrintType::Int64 ||
              current == PrintType::UInt64)) {
             if (formatFlags & FormatSpecifierFlags::WidthSpecified) {
-                printFormat.width = TMP_MIN(printFormat.precision, printFormat.width);
+                printFormat.width = TM_MIN(printFormat.precision, printFormat.width);
             } else {
                 printFormat.width = printFormat.precision;
             }

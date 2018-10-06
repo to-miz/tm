@@ -1,8 +1,4 @@
-/* assert */
-#ifndef TM_ASSERT
-    #include <assert.h>
-    #define TM_ASSERT assert
-#endif /* !defined(TM_ASSERT) */
+#include "../common/tm_assert.inc"
 
 /* Fixed width ints. Include C version so identifiers are in global namespace. */
 #include <stdint.h>

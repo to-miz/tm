@@ -187,7 +187,7 @@ struct tmp_memory_printer {
             result = grow(len);
         }
         auto rem = remaining();
-        auto printSize = TMP_MIN(len, rem);
+        auto printSize = TM_MIN(len, rem);
         TM_ASSERT_VALID_SIZE(printSize);
         TM_MEMCPY(end(), str, printSize);
         size += printSize;
