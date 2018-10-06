@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.7 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.8 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,6 +19,8 @@ ISSUES
     current locale.
 
 HISTORY
+    v0.0.8  06.10.18 refactored some common macro blocks into include files
+                     fixed compilation error when TM_STRING_VIEW is defined
     v0.0.7  02.10.18 refactored into multiple files that get merged
                      added multiple backends for int and float printing
                      added a couple more formatting options like o, a and c
@@ -156,7 +158,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#define TMP_VERSION 0x00000007u
+#define TMP_VERSION 0x00000008u
 
 /* assert */
 #ifndef TM_ASSERT
@@ -489,9 +491,9 @@ template <class... Types>
 struct tmp_type_flags<const char*, Types...> {
     enum : uint64_t { Value = PrintType::String | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
 };
-#ifdef TMP_STRING_VIEW
+#ifdef TM_STRING_VIEW
 template <class... Types>
-struct tmp_type_flags<TMP_STRING_VIEW, Types...> {
+struct tmp_type_flags<TM_STRING_VIEW, Types...> {
     enum : uint64_t { Value = PrintType::StringView | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
 };
 #endif
@@ -592,11 +594,11 @@ void fillPrintArgList(PrintArgList* list, const char* value, const Types&... arg
     list->args[list->size++].s = value;
     fillPrintArgList(list, args...);
 }
-#ifdef TMP_STRING_VIEW
+#ifdef TM_STRING_VIEW
 template <class... Types>
-void fillPrintArgList(PrintArgList* list, TMP_STRING_VIEW value, const Types&... args) {
-    list->args[list->size].v.data = TMP_STRING_VIEW_DATA(value);
-    list->args[list->size].v.size = TMP_STRING_VIEW_SIZE(value);
+void fillPrintArgList(PrintArgList* list, TM_STRING_VIEW value, const Types&... args) {
+    list->args[list->size].v.data = TM_STRING_VIEW_DATA(value);
+    list->args[list->size].v.size = TM_STRING_VIEW_SIZE(value);
     ++list->size;
     fillPrintArgList(list, args...);
 }
@@ -675,22 +677,22 @@ tm_errc print(FILE* out, const char* format, const Types&... args) {
 }
 // impl
 
-#ifdef TMP_STRING_VIEW
+#ifdef TM_STRING_VIEW
 template <class... Types>
-tm_errc print(TMP_STRING_VIEW format, const Types&... args) {
+tm_errc print(TM_STRING_VIEW format, const Types&... args) {
     static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
     PrintArgList argList;
     makePrintArgList(&argList, args...);
     return tmp_print(stdout, format, argList);
 }
 template <class... Types>
-tm_errc print(FILE* out, TMP_STRING_VIEW format, const Types&... args) {
+tm_errc print(FILE* out, TM_STRING_VIEW format, const Types&... args) {
     static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
     PrintArgList argList;
     makePrintArgList(&argList, args...);
     return tmp_print(out, format, argList);
 }
-#endif  // defined( TMP_STRING_VIEW )
+#endif  // defined( TM_STRING_VIEW )
 #endif  // TMP_NO_STDIO
 
 template <class... Types>
@@ -708,23 +710,23 @@ tm_size_t snprint(char* dest, tm_size_t len, const char* format, const PrintForm
     makePrintArgList(&argList, args...);
     return tmp_snprint(dest, len, format, initialFormatting, argList);
 }
-#ifdef TMP_STRING_VIEW
+#ifdef TM_STRING_VIEW
 template <class... Types>
-tm_size_t snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const Types&... args) {
+tm_size_t snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const Types&... args) {
     static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
     PrintArgList argList;
     makePrintArgList(&argList, args...);
     return tmp_snprint(dest, len, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
-tm_size_t snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const PrintFormat& initialFormatting,
+tm_size_t snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
                   const Types&... args) {
     static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
     PrintArgList argList;
     makePrintArgList(&argList, args...);
     return tmp_snprint(dest, len, format, initialFormatting, argList);
 }
-#endif  // defined( TMP_STRING_VIEW )
+#endif  // defined( TM_STRING_VIEW )
 
 #endif  // _TM_PRINT_H_INCLUDED_
 

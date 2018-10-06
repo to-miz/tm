@@ -20,6 +20,7 @@ ISSUES
 
 HISTORY
     v0.0.8  06.10.18 refactored some common macro blocks into include files
+                     fixed compilation error when TM_STRING_VIEW is defined
     v0.0.7  02.10.18 refactored into multiple files that get merged
                      added multiple backends for int and float printing
                      added a couple more formatting options like o, a and c
