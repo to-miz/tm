@@ -426,3 +426,14 @@ ${TM_BIN_PACKING_TESTS_OUT_C}: ${TM_BIN_PACKING_DEPS} tests/src/tm_bin_packing/m
 	@$(call c_compile,${TM_BIN_PACKING_SRC_C},$@,${TESTS_INCLUDE_DIRS},)
 
 tm_bin_packing-c-build: ${TM_BIN_PACKING_TESTS_OUT_C}
+
+# tm_polygon.h
+
+TM_POLYGON_DEPS := ${build_dir} ${TESTS_DOCTEST_DEP} tm_polygon.h
+TM_POLYGON_SRC_C := tests/src/tm_polygon/main.c
+TM_POLYGON_TESTS_OUT_C := ${build_dir}/tm_polygon_tests${ext}
+
+${TM_POLYGON_TESTS_OUT_C}: ${TM_POLYGON_DEPS} tests/src/tm_polygon/main.c
+	@$(call c_compile,${TM_POLYGON_SRC_C},$@,${TESTS_INCLUDE_DIRS},)
+
+tm_polygon-c-build: ${TM_POLYGON_TESTS_OUT_C}
