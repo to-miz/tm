@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.7 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.8 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,6 +19,7 @@ ISSUES
     current locale.
 
 HISTORY
+    v0.0.8  06.10.18 refactored some common macro blocks into include files
     v0.0.7  02.10.18 refactored into multiple files that get merged
                      added multiple backends for int and float printing
                      added a couple more formatting options like o, a and c
@@ -54,7 +55,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#define TMP_VERSION 0x00000007u
+#define TMP_VERSION 0x00000008u
 
 #include "dependencies_header.h"
 
@@ -161,16 +162,16 @@ struct PrintArgList {
 // clang-format off
 #ifndef TMP_NO_CRT_FILE_PRINTING
     TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintArgList& args);
-    #ifdef TMP_STRING_VIEW
-        TMP_DEF tm_errc tmp_print(FILE* out, TMP_STRING_VIEW format, const PrintArgList& args);
-    #endif  // TMP_STRING_VIEW
+    #ifdef TM_STRING_VIEW
+        TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintArgList& args);
+    #endif  // TM_STRING_VIEW
 #endif  // TMP_NO_STDIO
 // clang-format on
 
 TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
                               const PrintArgList& args);
-#ifdef TMP_STRING_VIEW
-TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const PrintFormat& initialFormatting,
+#ifdef TM_STRING_VIEW
+TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
                               const PrintArgList& args);
 #endif
 

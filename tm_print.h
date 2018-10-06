@@ -19,7 +19,6 @@ ISSUES
     current locale.
 
 HISTORY
-    v0.0.8  06.10.18 refactored some common macro blocks into include files
     v0.0.7  02.10.18 refactored into multiple files that get merged
                      added multiple backends for int and float printing
                      added a couple more formatting options like o, a and c
@@ -302,16 +301,16 @@ struct PrintArgList {
 // clang-format off
 #ifndef TMP_NO_CRT_FILE_PRINTING
     TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintArgList& args);
-    #ifdef TMP_STRING_VIEW
-        TMP_DEF tm_errc tmp_print(FILE* out, TMP_STRING_VIEW format, const PrintArgList& args);
-    #endif  // TMP_STRING_VIEW
+    #ifdef TM_STRING_VIEW
+        TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintArgList& args);
+    #endif  // TM_STRING_VIEW
 #endif  // TMP_NO_STDIO
 // clang-format on
 
 TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
                               const PrintArgList& args);
-#ifdef TMP_STRING_VIEW
-TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const PrintFormat& initialFormatting,
+#ifdef TM_STRING_VIEW
+TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
                               const PrintArgList& args);
 #endif
 
@@ -1769,16 +1768,16 @@ TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintArgList& arg
     fwrite(printer.data, sizeof(char), printer.size, out);
     return printer.ec;
 }
-#ifdef TMP_STRING_VIEW
-TMP_DEF tm_errc tmp_print(FILE* out, TMP_STRING_VIEW format, const PrintArgList& args) {
+#ifdef TM_STRING_VIEW
+TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintArgList& args) {
     char sbo[TMP_SBO_SIZE];
     tmp_memory_printer printer = {sbo, 0, TMP_SBO_SIZE, true, false};
 
-    tmp_print_impl(TMP_STRING_VIEW_DATA(format), TMP_STRING_VIEW_SIZE(format), defaultPrintFormat(), args, printer);
+    tmp_print_impl(TM_STRING_VIEW_DATA(format), TM_STRING_VIEW_SIZE(format), defaultPrintFormat(), args, printer);
     fwrite(printer.data, sizeof(char), printer.size, out);
     return printer.ec;
 }
-#endif  // defined(TMP_STRING_VIEW)
+#endif  // defined(TM_STRING_VIEW)
 #endif  // !defined(TMP_NO_CRT_FILE_PRINTING)
 
 TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
@@ -1787,14 +1786,14 @@ TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, con
     tmp_print_impl(format, TM_STRLEN(format), initialFormatting, args, mem);
     return mem.size;
 }
-#ifdef TMP_STRING_VIEW
-TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TMP_STRING_VIEW format, const PrintFormat& initialFormatting,
+#ifdef TM_STRING_VIEW
+TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
                               const PrintArgList& args) {
     tmp_memory_printer mem{dest, 0, len, false, false};
-    tmp_print_impl(TMP_STRING_VIEW_DATA(format), TMP_STRING_VIEW_SIZE(format), initialFormatting, args, mem);
+    tmp_print_impl(TM_STRING_VIEW_DATA(format), TM_STRING_VIEW_SIZE(format), initialFormatting, args, mem);
     return mem.size;
 }
-#endif  // defined(TMP_STRING_VIEW)
+#endif  // defined(TM_STRING_VIEW)
 
 #endif // TM_PRINT_IMPLEMENTATION
 
