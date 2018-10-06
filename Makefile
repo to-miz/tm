@@ -197,7 +197,7 @@ space := ${empty} ${empty}
 
 clang-tidy-flags := -header-filter=.*
 
-# compile output parameter
+# cxx_compile output parameter
 OUT_FILE.gcc = -o
 OUT_FILE.clang = -o
 OUT_FILE.cl = /link /OUT:
@@ -207,11 +207,25 @@ OUT_FILE.cl = /link /OUT:
 # ${2} is output filename
 # ${3} are include directories
 # ${4} are additional definitions
-override compile = ${CXX} ${CXXFLAGS} ${call INCLUDECOMMAND.${COMPILER},${3}} $(call DEFINECOMMAND.${COMPILER},${4}) ${1} ${OUT_FILE.${COMPILER}}${2} ${LDFLAGS} ${LDLIBS}
+override cxx_compile = ${CXX} ${CXXFLAGS} ${call INCLUDECOMMAND.${COMPILER},${3}} $(call DEFINECOMMAND.${COMPILER},${4}) ${1} ${OUT_FILE.${COMPILER}}${2} ${LDFLAGS} ${LDLIBS}
+override c_compile = ${CC} ${CFLAGS} ${call INCLUDECOMMAND.${COMPILER},${3}} $(call DEFINECOMMAND.${COMPILER},${4}) ${1} ${OUT_FILE.${COMPILER}}${2} ${LDFLAGS} ${LDLIBS}
 
 # targets
 all: directories
 
+directories: ${build_dir}
+
+${build_dir}:
+	@$(call MKDIR_CMD,$@)
+
+clean:
+	rm -rf ${build_dir}
+
+check-all: ${CXX_SRC}
+	clang-tidy-8 $^ ${clang-tidy-flags} -checks=$(subst ${space},${empty},${clang-tidy-checks}) \
+	-- ${CXXFLAGS.clang} ${CXXINCLUDEFLAGS} $^ ${OUT_FILE.clang} ${exe_file.CXX} ${LDFLAGS} ${LDLIBS}
+
+.PHONY: clean all check-all tm_conversion-tests tm_conversion-fast-tests tm_conversion-check
 
 # merge
 
@@ -391,27 +405,24 @@ tm_print-run-tests: tm_print-tests
 	@echo TESTING: charconv backend (only int, since float not implemented yet in any stl) with signed size_t
 	@${TM_PRINT_TESTS_CHARCONV_SIGNED_SIZE_T}
 
-# tm_json
+# tm_json.h
 
 TM_JSON_DEPS := ${build_dir} ${TESTS_DOCTEST_DEP} tm_json.h tests/src/tm_json/main.cpp
 TM_JSON_SRC := tests/src/tm_json/main.cpp
 TM_JSON_TESTS_OUT := ${build_dir}/tm_json_tests${ext}
 
 ${TM_JSON_TESTS_OUT}: ${TM_JSON_DEPS}
-	@$(call compile,${TM_JSON_SRC},$@,${TESTS_INCLUDE_DIRS},)
+	@$(call cxx_compile,${TM_JSON_SRC},$@,${TESTS_INCLUDE_DIRS},)
 
 tm_json-tests: ${TM_JSON_TESTS_OUT}
 
-directories: ${build_dir}
+# tm_bin_packing.h
 
-${build_dir}:
-	@$(call MKDIR_CMD,$@)
+TM_BIN_PACKING_DEPS := ${build_dir} ${TESTS_DOCTEST_DEP} tm_bin_packing.h
+TM_BIN_PACKING_SRC_C := tests/src/tm_bin_packing/main.c
+TM_BIN_PACKING_TESTS_OUT_C := ${build_dir}/tm_bin_packing_tests${ext}
 
-clean:
-	rm -rf ${build_dir}
+${TM_BIN_PACKING_TESTS_OUT_C}: ${TM_BIN_PACKING_DEPS} tests/src/tm_bin_packing/main.c
+	@$(call c_compile,${TM_BIN_PACKING_SRC_C},$@,${TESTS_INCLUDE_DIRS},)
 
-check-all: ${CXX_SRC}
-	clang-tidy-8 $^ ${clang-tidy-flags} -checks=$(subst ${space},${empty},${clang-tidy-checks}) \
-	-- ${CXXFLAGS.clang} ${CXXINCLUDEFLAGS} $^ ${OUT_FILE.clang} ${exe_file.CXX} ${LDFLAGS} ${LDLIBS}
-
-.PHONY: clean all check-all tm_conversion-tests tm_conversion-fast-tests tm_conversion-check
+tm_bin_packing-c-build: ${TM_BIN_PACKING_TESTS_OUT_C}
