@@ -21,6 +21,7 @@ ISSUES
 HISTORY
     v0.0.8  06.10.18 refactored some common macro blocks into include files
                      fixed compilation error when TM_STRING_VIEW is defined
+                     added TMP_DEFAULT_FLAGS
     v0.0.7  02.10.18 refactored into multiple files that get merged
                      added multiple backends for int and float printing
                      added a couple more formatting options like o, a and c
@@ -60,6 +61,11 @@ HISTORY
 
 #include "dependencies_header.h"
 
+// default print flags value
+#ifndef TMP_DEFAULT_FLAGS
+    #define TMP_DEFAULT_FLAGS 0u
+#endif
+
 // clang-format on
 
 namespace PrintFlags {
@@ -74,7 +80,7 @@ enum Values : unsigned int {
     Sign = (1u << 7u),
     Char = (1u << 8u),
 
-    Default = 0,
+    Default = TMP_DEFAULT_FLAGS,
 
     Count = 9,
     General = Fixed | Scientific
