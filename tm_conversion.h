@@ -313,14 +313,14 @@ int main() {
 
 /* clang-format off */
 
-/* assert */
-#ifndef TM_ASSERT
-  #include <assert.h>
-  #define TM_ASSERT assert
-#endif /* !defined(TM_ASSERT) */
-
 #ifdef TM_CONVERSION_IMPLEMENTATION
     /* Define these to avoid external dependencies */
+
+    /* assert */
+    #ifndef TM_ASSERT
+        #include <assert.h>
+        #define TM_ASSERT assert
+    #endif /* !defined(TM_ASSERT) */
 
     /* ctype.h dependency */
     #if !defined(TM_ISDIGIT) || !defined(TM_ISUPPER) || !defined(TM_ISLOWER) || !defined(TM_TOUPPER)
