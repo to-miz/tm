@@ -4,12 +4,23 @@
 		{
 			"path": "./../../",
 			"folder_exclude_patterns": ["build", "builds", ".git", "tools"],
-			"file_exclude_patterns": ["tm_print.h"],
+			"file_exclude_patterns": [
+				"tm_print.h",
+				"tm_cli.h"
+			],
 		},
 		{
 			"path": "."
 		}
 	],
+	"settings": {
+		"read_only_files": [
+			"tm_print.h",
+			"tm_cli.h"
+		],
+		"read_only_folders": [
+		]
+	},
 	"build_systems": [
 		{
 			"name": "make",
