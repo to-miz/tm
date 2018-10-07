@@ -264,6 +264,73 @@ struct merge_result {
     bool changed;
 };
 
+struct indentation_result {
+    int amount;
+    bool use_spaces;
+};
+
+indentation_result get_indent(std::vector<char>::iterator first, std::vector<char>::iterator last) {
+    indentation_result result = {};
+    auto spaces = 0;
+    --last;
+    for (auto it = last; it != first; --it) {
+        auto c = *it;
+        if (c == '\t') {
+            ++result.amount;
+        } else if (c == ' ') {
+            result.use_spaces = true;
+            ++spaces;
+            if (spaces == 4) {
+                ++result.amount;
+                spaces = 0;
+            }
+        } else {
+            break;
+        }
+    }
+    return result;
+}
+void indent_range(std::vector<char>& data, std::vector<char>::iterator first, std::vector<char>::iterator last,
+                  indentation_result indentation) {
+    if(indentation.amount == 0) {
+        return;
+    }
+    // indent parsed lines based on indentation level of the directive
+
+    const char* indent_spaces = "    ";
+    const char* indent_tabs = "\t";
+    const char* indent_chars_begin = nullptr;
+    const char* indent_chars_end = nullptr;
+
+    if (indentation.use_spaces) {
+        indent_chars_begin = indent_spaces;
+        indent_chars_end = indent_spaces + 4;
+    } else {
+        indent_chars_begin = indent_tabs;
+        indent_chars_end = indent_tabs + 1;
+    }
+
+    // Skip first line, since it already is indented.
+    first = std::find(first, last, '\n');
+    while (first != last && (*first == '\r' || *first == '\n')) {
+        ++first;
+    }
+    if (first == last) return;
+    for (;;) {
+        auto dist = std::distance(first, last);
+        for (auto i = 0; i < indentation.amount; ++i) {
+            first = data.insert(first, indent_chars_begin, indent_chars_end);
+            first += std::distance(indent_chars_begin, indent_chars_end);
+        }
+        last = first + dist;
+        first = std::find(first, last, '\n');
+        while (first != last && (*first == '\r' || *first == '\n')) {
+            ++first;
+        }
+        if (first == last) return;
+    }
+}
+
 merge_error_t merge_include_statement(stream_t* stream, const char* dir, size_t dir_len,
                                       const std::vector<merge_definition>& definitions,
                                       const std::vector<std::string>& already_included, merge_result& out) {
@@ -319,9 +386,11 @@ merge_error_t merge_include_statement(stream_t* stream, const char* dir, size_t 
             pos += def.value_len;
         }
     }
-    if(std::find(out.merged_files.begin(), out.merged_files.end(), name) == out.merged_files.end()) {
+    if (std::find(out.merged_files.begin(), out.merged_files.end(), name) == out.merged_files.end()) {
         out.merged_files.emplace_back(std::move(name));
     }
+    auto indentation = get_indent(out.data.begin(), out.data.end());
+    indent_range(file.data, file.data.begin(), file.data.end(), indentation);
     out.data.insert(out.data.end(), file.data.begin(), file.data.end());
     guard.dismiss();
     return merge_ok;
@@ -346,7 +415,7 @@ merge_result merge(const std::vector<char>& in, const char* dir, const std::vect
     for (;;) {
         auto prev = stream.p;
         auto token = next_token(&stream);
-        if(token.type != tok_eof && prev != token.str) {
+        if (token.type != tok_eof && prev != token.str) {
             // output everything that comes before the token
             result.data.insert(result.data.end(), prev, token.str);
             prev = token.str;

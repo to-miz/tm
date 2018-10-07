@@ -30,12 +30,8 @@
 
 			"variants": [
 				{
-					"name": "build tests",
-					"cmd": "make merge-tests"
-				},
-				{
-					"name": "run tests",
-					"cmd": "make merge-run-tests"
+					"name": "build test merge",
+					"cmd": "make merge-test-merge"
 				}
 			]
 		}

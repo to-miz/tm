@@ -244,6 +244,12 @@ ${MERGE_OUT}: ${MERGE_DEPS}
 
 merge: ${MERGE_OUT}
 
+tools/merge/tests/out.cpp: ${MERGE_OUT} tools/merge/tests/test.cpp
+	@echo merging tools/merge/tests/out.cpp
+	@${MERGE_OUT} tools/merge/tests/test.cpp tools/merge/tests/out.cpp tools/merge/tests/
+
+merge-test-merge: tools/merge/tests/out.cpp
+
 # tm_conversion
 tm_conversion-c: ${TM_CONVERSION_DEPS_C}
 	@${CC} ${CFLAGS} \
@@ -448,3 +454,37 @@ ${TM_BEZIER_TESTS_OUT_C}: ${TM_BEZIER_DEPS} tests/src/tm_bezier/main.c
 	@$(call c_compile,${TM_BEZIER_SRC_C},$@,${TESTS_INCLUDE_DIRS},)
 
 tm_bezier-c-build: ${TM_BEZIER_TESTS_OUT_C}
+
+# tm_cli
+
+TM_CLI_UNMERGED := ${build_dir}/tm_cli-unmerged${ext}
+
+TM_CLI_SRC  := tests/src/tm_cli/main.cpp
+TM_CLI_DEPS := ${build_dir} ${TM_CLI_SRC} ./tm_cli.h tm_conversion.h ${TESTS_DOCTEST_DEP}
+TM_CLI_DEPS += tests/src/assert_throws.h tests/src/assert_throws.cpp
+TM_CLI_OUT  := ${build_dir}/tm_cli_tests${ext}
+
+TM_CLI_TESTS_DEFAULT := ${build_dir}/tm_cli_default${ext}
+TM_CLI_TESTS_CRT := ${build_dir}/tm_cli_crt${ext}
+TM_CLI_TESTS_CRT_SIGNED_SIZE_T := ${build_dir}/tm_cli_crt_signed_size_t${ext}
+TM_CLI_TESTS_TM_CONVERSION := ${build_dir}/tm_cli_tm_conversion${ext}
+TM_CLI_TESTS_TM_CONVERSION_SIGNED_SIZE_T := ${build_dir}/tm_cli_tm_conversion_signed_size_t${ext}
+TM_CLI_TESTS_CHARCONV := ${build_dir}/tm_cli_charconv${ext}
+TM_CLI_TESTS_CHARCONV_SIGNED_SIZE_T := ${build_dir}/tm_cli_charconv_signed_size_t${ext}
+
+TM_CLI_ALL_CONFIGS_DEPS := ${TM_CLI_TESTS_DEFAULT}
+TM_CLI_ALL_CONFIGS_DEPS += ${TM_CLI_TESTS_CRT} ${TM_CLI_TESTS_CRT_SIGNED_SIZE_T}
+TM_CLI_ALL_CONFIGS_DEPS += ${TM_CLI_TESTS_TM_CONVERSION}
+TM_CLI_ALL_CONFIGS_DEPS += ${TM_CLI_TESTS_TM_CONVERSION_SIGNED_SIZE_T}
+TM_CLI_ALL_CONFIGS_DEPS += ${TM_CLI_TESTS_CHARCONV} ${TM_CLI_TESTS_CHARCONV_SIGNED_SIZE_T}
+
+tm_cli.h: ${TM_CLI_UNMERGED} ${MERGE_OUT} src/tm_cli/*.cpp
+	@echo merging tm_cli.h
+	@${MERGE_OUT} src/tm_cli/main.cpp $@ src/tm_cli -r
+
+tm_cli-merge: tm_cli.h
+
+${TM_CLI_UNMERGED}: src/tm_cli/*.cpp
+	@$(call c_compile,src/tm_cli/test.cpp,$@,src/tm_cli ./,)
+
+tm_cli-unmerged: ${TM_CLI_UNMERGED}
