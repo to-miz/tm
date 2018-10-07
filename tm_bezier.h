@@ -1,5 +1,5 @@
 /*
-tm_bezier.h v1.0.0.1 - public domain - https://github.com/to-miz/tm
+tm_bezier.h v1.1 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -35,7 +35,7 @@ NOTES
     natively.
 
 HISTORY
-    v1.0.0.1  06.10.18 changed formatting
+    v1.1      06.10.18 changed formatting
     v1.0b     25.08.18 added repository link, changed some wording in the description
     v1.0a     01.07.16 improved C99 conformity
     v1.0      24.06.16 initial commit

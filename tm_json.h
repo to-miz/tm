@@ -1,5 +1,5 @@
 /*
-tm_json.h v.0.1.4b - public domain - https://github.com/to-miz/tm
+tm_json.h v0.1.5 - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
