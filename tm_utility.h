@@ -1,5 +1,5 @@
 /*
-tm_utility v1.1.4 - public domain - public domain - https://github.com/to-miz/tm
+tm_utility v1.1.5 - public domain - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,6 +19,7 @@ NOTES
     See comments at declarations for more info.
 
 HISTORY
+    v1.1.5  07.10.18 moved CRT extension functions to tm_stringutil.h
     v1.1.4  19.08.17 made integer swapEndian functions constexpr
     v1.1.3a 13.06.17 added TMUT_NO_FLOAT, TMUT_NO_COUNTOF
     v1.1.3  28.02.17 changed definition of countof macro
@@ -55,18 +56,6 @@ HISTORY
 
 // clang-format off
 #ifdef TM_UTILITY_IMPLEMENTATION
-    // Define TMUT_IMPLEMENT_CTYPE_FUNCTIONS to implement the ctype.h family of functions with C++ overloads.
-    #ifndef TMUT_IMPLEMENT_CTYPE_FUNCTIONS
-        #ifndef TM_TOUPPER
-            #include <cctype>
-            #define TM_TOUPPER toupper
-        #endif
-    #else
-        #ifndef TM_TOUPPER
-            #define TM_TOUPPER toupper
-        #endif
-    #endif
-
     #ifndef TM_STRLEN
         #include <cstring>
         #define TM_STRLEN strlen
@@ -568,27 +557,6 @@ double swapEndian(double val);
 #define TMUT_ARG_1(a, ...) a
 #define TMUT_ARG_2_OR_1(a, b, ...) TMUT_ARG_2_OR_1_IMPL(__VA_ARGS__, __VA_ARGS__)
 
-// crt extensions, that are non standard and may not be provided
-extern "C" {
-#ifndef TMUT_NO_STRICMP
-extern int stricmp(const char* a, const char* b);
-#endif
-#ifndef TMUT_NO_STRNICMP
-extern int strnicmp(const char* a, const char* b, size_t count);
-#endif
-
-#ifndef TMUT_NO_STRREV
-extern char* strrev(char* str);
-#endif
-#ifndef TMUT_NO_STRNREV
-extern char* strnrev(char* str, size_t count);
-#endif
-
-#ifndef TMUT_NO_MEMRCHR
-extern void* memrchr(const void* ptr, int value, size_t len);
-#endif
-}
-
 #define TMUT_WHITESPACE " \t\n\v\f\r"
 namespace utility {
 const char whitespace[6] = {' ', '\t', '\n', '\v', '\f', '\r'};
@@ -766,73 +734,6 @@ double swapEndian(double val) {
     static_assert(sizeof(double) == sizeof(unsigned long long), "size mismatch");
     return bit_cast<double>(swapEndian(bit_cast<unsigned long long>(val)));
 }
-
-// crt extensions
-extern "C" {
-#ifndef TMUT_NO_STRICMP
-extern int stricmp(const char* a, const char* b) {
-    while (*a && *b) {
-        auto aUpper = TM_TOUPPER(char_to_int(*a));
-        auto bUpper = TM_TOUPPER(char_to_int(*b));
-        if (aUpper != bUpper) {
-            break;
-        }
-        ++a;
-        ++b;
-    }
-    auto aUpper = TM_TOUPPER(char_to_int(*a));
-    auto bUpper = TM_TOUPPER(char_to_int(*b));
-    return aUpper - bUpper;
-}
-#endif
-#ifndef TMUT_NO_STRNICMP
-extern int strnicmp(const char* a, const char* b, size_t count) {
-    while (*a && *b && count--) {
-        auto aUpper = TM_TOUPPER(char_to_int(*a));
-        auto bUpper = TM_TOUPPER(char_to_int(*b));
-        if (aUpper != bUpper) {
-            break;
-        }
-        ++a;
-        ++b;
-    }
-    if (!count) {
-        return 0;
-    }
-    auto aUpper = TM_TOUPPER(char_to_int(*a));
-    auto bUpper = TM_TOUPPER(char_to_int(*b));
-    return aUpper - bUpper;
-}
-#endif
-
-#ifndef TMUT_NO_STRREV
-extern char* strrev(char* str) { return strnrev(str, strlen(str)); }
-#endif
-#ifndef TMUT_NO_STRNREV
-extern char* strnrev(char* str, size_t count) {
-    for (size_t i = 0, j = count - 1; i < j; ++i, --j) {
-        char tmp = str[i];
-        str[i] = str[j];
-        str[j] = tmp;
-    }
-    return str;
-}
-#endif
-
-#ifndef TMUT_NO_MEMRCHR
-extern void* memrchr(const void* ptr, int value, size_t len) {
-    const char* p = (const char*)ptr + len;
-    while (len) {
-        --len;
-        --p;
-        if ((unsigned char)*p == value) {
-            return (void*)p;
-        }
-    }
-    return nullptr;
-}
-#endif
-}  // extern "C"
 
 #endif  // TM_UTILITY_IMPLEMENTATION
 

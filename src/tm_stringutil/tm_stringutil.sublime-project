@@ -1,0 +1,48 @@
+{
+	"folders":
+	[
+		{
+			"path": "./../../",
+			"folder_exclude_patterns": ["build", "builds", ".git", "tools"]
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"read_only_files": [
+			"tm_print.h",
+			"tm_cli.h",
+			"tm_stringutil.h"
+		],
+		"read_only_folders": [
+		]
+	},
+	"build_systems": [
+		{
+			"name": "make",
+			"cmd": "make tm_stringutil-merge",
+
+			"windows": {
+				"shell": false,
+				"file_regex": "(.*)\\(([0-9]+)\\): (error|note|warning)",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../",
+			},
+
+			"linux": {
+				"shell": true,
+				"file_regex": "^(..[^:\n]*):([0-9]+):?([0-9]+)?:? (.*)$",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../",
+			},
+
+			"variants": [
+				{
+					"name": "build unmerged",
+					"cmd": "make tm_stringutil-unmerged"
+				}
+			]
+		}
+	]
+}

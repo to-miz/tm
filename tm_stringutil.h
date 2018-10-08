@@ -1,0 +1,941 @@
+/*
+tm_stringutil.h v0.1 - public domain - https://github.com/to-miz/tm
+author: Tolga Mizrak 2018
+
+no warranty; use at your own risk
+
+First release not hit yet. Probably very buggy.
+
+LICENSE
+    see license notes at end of file
+
+USAGE
+    This file works as both the header and implementation.
+    To implement the interfaces in this header,
+        #define TM_STRINGUTIL_IMPLEMENTATION
+    in ONE C or C++ source file before #including this header.
+
+PURPOSE
+    Some string based utility functions for searching and tokenizing.
+    Most functions have versions that work on nullterminated and length based strings.
+
+HISTORY
+    v0.1   07.10.18 initial commit
+*/
+
+/* This is a generated file, do not modify directly. You can find the generator files in the src directory. */
+
+/* clang-format off */
+#ifdef TM_STRINGUTIL_IMPLEMENTATION
+    /* Define these to get rid of crt dependency. */
+
+    /* assert */
+    #ifndef TM_ASSERT
+        #include <assert.h>
+        #define TM_ASSERT assert
+    #endif /* !defined(TM_ASSERT) */
+
+    #if !defined(TM_MEMCHR) || !defined(TM_STRCHR) || !defined(TM_STRLEN) || !defined(TM_STRNCMP) || !defined(TM_MEMCMP)
+        #include <string.h>
+        #ifndef TM_MEMCHR
+            #define TM_MEMCHR memchr
+        #endif
+        #ifndef TM_STRCHR
+            #define TM_STRCHR strchr
+        #endif
+        #ifndef TM_STRLEN
+            #define TM_STRLEN strlen
+        #endif
+        #ifndef TM_STRSTR
+            #define TM_STRSTR strstr
+        #endif
+        #ifndef TM_STRNCMP
+            #define TM_STRNCMP strncmp
+        #endif
+        #ifndef TM_MEMCMP
+            #define TM_MEMCMP memcmp
+        #endif
+    #endif
+
+    #if !defined(TM_TOUPPER) || !defined(TM_TOLOWER) || !defined(TM_ISDIGIT) || !defined(TM_ISSPACE)
+        #include <ctype.h>
+        #ifndef TM_TOUPPER
+            #define TM_TOUPPER toupper
+        #endif
+        #ifndef TM_TOLOWER
+            #define TM_TOLOWER tolower
+        #endif
+        #ifndef TM_ISDIGIT
+            #define TM_ISDIGIT isdigit
+        #endif
+        #ifndef TM_ISSPACE
+            #define TM_ISSPACE isspace
+        #endif
+    #endif
+#endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
+
+#ifndef _TM_STRINGUTIL_INCLUDED_49458961_DD38_441D_B888_A589548CA6F5_
+#define _TM_STRINGUTIL_INCLUDED_49458961_DD38_441D_B888_A589548CA6F5_
+
+/* size_t is unsigned by default, but we also allow for signed and/or 32bit size_t.
+   You can override this block by defining TM_SIZE_T_DEFINED and the typedefs before including this file. */
+#ifndef TM_SIZE_T_DEFINED
+    #define TM_SIZE_T_DEFINED
+    #define TM_SIZE_T_IS_SIGNED 0 /* define to 1 if tm_size_t is signed */
+    #include <stddef.h> /* include C version so identifiers are in global namespace */
+    typedef size_t tm_size_t;
+#endif /* !defined(TM_SIZE_T_DEFINED) */
+
+/* Native bools, override by defining TM_BOOL_DEFINED yourself before including this file. */
+#ifndef TM_BOOL_DEFINED
+    #define TM_BOOL_DEFINED
+    #ifdef __cplusplus
+        typedef bool tm_bool;
+        #define TM_TRUE true
+        #define TM_FALSE false
+    #else
+        typedef _Bool tm_bool;
+        #define TM_TRUE 1
+        #define TM_FALSE 0
+    #endif
+#endif /* !defined(TM_BOOL_DEFINED) */
+
+/* Linkage defaults to extern, to override define TMSU_DEF before including this file.
+   Examples of possible override values are static or __declspec(dllexport). */
+#ifndef TMSU_DEF
+    #define TMSU_DEF extern
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if defined(TM_STRINGVIEW) && defined(__cplusplus)
+    typedef TM_STRINGVIEW tmsu_stringview;
+    #define TMSU_STRINGVIEW_DATA(x) TM_STRINGVIEW_DATA(x)
+    #define TMSU_STRINGVIEW_SIZE(x) TM_STRINGVIEW_SIZE(x)
+    #define TMSU_STRINGVIEW_MAKE(str, size) TM_STRINGVIEW{(str), (size)}
+#else
+    typedef struct {
+        const char* data;
+        tm_size_t size;
+    } tmsu_stringview;
+    #define TMSU_STRINGVIEW_DATA(x) (x).data
+    #define TMSU_STRINGVIEW_SIZE(x) (x).size
+    #define TMSU_STRINGVIEW_MAKE(str, size) tmsu_make_stringview(str, size)
+#endif
+
+/* clang-format on */
+
+/*
+Find functions for nullterminated strings.
+Params:
+    str:      String to search in. Must not be NULL.
+    find_str: String to search for. Must not be NULL.
+Return pointer to first character of the match, or pointer to the nullterminator if no match is found.
+*/
+TMSU_DEF const char* tmsu_find_char(const char* str, char c);
+TMSU_DEF const char* tmsu_find_char2(const char* str, char a, char b);
+TMSU_DEF const char* tmsu_find_last_char(const char* str, char c);
+TMSU_DEF const char* tmsu_find(const char* str, const char* find_str);
+TMSU_DEF const char* tmsu_find_last(const char* str, const char* find_str);
+TMSU_DEF const char* tmsu_find_first_not_of(const char* str, const char* find_str);
+TMSU_DEF const char* tmsu_find_first_of(const char* str, const char* find_str);
+TMSU_DEF const char* tmsu_find_last_not_of(const char* str, const char* find_str);
+TMSU_DEF const char* tmsu_find_last_of(const char* str, const char* find_str);
+
+/* Ignores case for ascii range utf8 characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case(const char* str, char c);
+TMSU_DEF const char* tmsu_find_ignore_case(const char* str, const char* find_str);
+
+/*
+Find functions for length based strings/iterators. They return str_last if no match is found (even the *_last versions).
+Params:
+    str_first, str_last:           Iterator pair to search in. They can be equal for empty ranges.
+    find_str_first, find_str_last: Iterator pair to search for. They can be equal for empty ranges.
+Return pointer to first character of the match, or str_last if no match is found (even the *_last versions).
+*/
+TMSU_DEF const char* tmsu_find_char_n(const char* str_first, const char* str_last, char c);
+TMSU_DEF const char* tmsu_find_char2_n(const char* str_first, const char* str_last, char a, char b);
+TMSU_DEF const char* tmsu_find_last_char_n(const char* str_first, const char* str_last, char c);
+TMSU_DEF const char* tmsu_find_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                 const char* find_str_last);
+TMSU_DEF const char* tmsu_find_last_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                      const char* find_str_last);
+TMSU_DEF const char* tmsu_find_first_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                          const char* find_str_last);
+TMSU_DEF const char* tmsu_find_first_not_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                              const char* find_str_last);
+TMSU_DEF const char* tmsu_find_last_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                         const char* find_str_last);
+TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                             const char* find_str_last);
+
+/* Ignores case for ascii range utf8 characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case_n(const char* str_first, const char* str_last, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                             const char* find_str_last);
+
+typedef struct {
+    const char* current;
+} tmsu_tokenizer;
+
+/* Tokenizer for nullterminated strings. Alternative to strtok. */
+TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str);
+/*
+Returns true if a token could be extracted. Delimeters can be different between calls.
+The start and length of the token is then stored into the output parameter out.
+*/
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_stringview* out);
+
+typedef struct {
+    const char* first;
+    const char* last;
+} tmsu_tokenizer_n;
+
+/* Tokenizer for length based strings/iterators. Alternative to strtok. */
+TMSU_DEF tmsu_tokenizer_n tmsu_make_tokenizer_n(const char* first, const char* last);
+/*
+Returns true if a token could be extracted. Delimeters can be different between calls.
+The start and length of the token is then stored into the output parameter out.
+*/
+TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
+                                   const char* delimiters_last, tmsu_stringview* out);
+
+/* Whitespace trimming */
+
+TMSU_DEF const char* tmsu_trim_left(const char* str);
+/* Trims whitespace from both sides. */
+TMSU_DEF tmsu_stringview tmsu_trim(const char* str);
+
+/* Trims whitespace from the left. Returns new left/first boundary. */
+TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last);
+/* Trims whitespace from the right. Returns new right/last boundary. */
+TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
+/* Trims whitespace from both sides. */
+TMSU_DEF tmsu_stringview tmsu_trim_n(const char* first, const char* last);
+
+/* Comparisons */
+
+TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
+                                        const char* b_last);
+/* String comparison for humans. See http://stereopsis.com/strcmp4humans.html. */
+TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+
+TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str);
+TMSU_DEF tm_bool tmsu_ends_with(const char* str, const char* find_str);
+
+TMSU_DEF tm_bool tmsu_starts_with_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+TMSU_DEF tm_bool tmsu_ends_with_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                  const char* find_str_last);
+
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case(const char* str, const char* find_str);
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case(const char* str, const char* find_str);
+
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
+                                                const char* b_last);
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                              const char* find_str_last);
+
+/* Crt extensions, that are non standard and may not be provided. */
+
+/* Only checks chars from '0' to '9'. Assumes utf8 codepoint. */
+TMSU_DEF tm_bool tmsu_isdigit(unsigned c);
+
+TMSU_DEF const char* tmsu_stristr(const char* str, const char* find_str);
+TMSU_DEF int tmsu_stricmp(const char* a, const char* b);
+TMSU_DEF int tmsu_strnicmp(const char* a, const char* b, size_t count);
+TMSU_DEF char* tmsu_strrev(char* str);
+TMSU_DEF char* tmsu_strnrev(char* str, size_t count);
+TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* !defined(_TM_STRINGUTIL_INCLUDED_49458961_DD38_441D_B888_A589548CA6F5_) */
+
+#ifdef TM_STRINGUTIL_IMPLEMENTATION
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Use null of the underlying language. */
+#ifndef TM_NULL
+    #ifdef __cplusplus
+        #define TM_NULL nullptr
+    #else
+        #define TM_NULL NULL
+    #endif
+#endif
+
+#define TMSU_STRINGVIEW_BEGIN(x) TMSU_STRINGVIEW_DATA(x)
+#define TMSU_STRINGVIEW_END(x) (TMSU_STRINGVIEW_DATA(x) + TMSU_STRINGVIEW_SIZE(x))
+
+#define TMSU_C2I(x) ((unsigned char)(x))
+
+inline static tmsu_stringview tmsu_make_stringview(const char* data, tm_size_t size) {
+    tmsu_stringview result;
+    result.data = data;
+    result.size = size;
+    return result;
+}
+
+inline static tm_size_t tmsu_distance(const char* first, const char* last) {
+    TM_ASSERT(first <= last);
+    return (tm_size_t)(last - first);
+}
+inline static size_t tmsu_distance_sz(const char* first, const char* last) {
+    TM_ASSERT(first <= last);
+    return (size_t)(last - first);
+}
+
+TMSU_DEF const char* tmsu_find_char(const char* str, char c) {
+    TM_ASSERT(str);
+    for (; *str; ++str) {
+        if (*str == c) return str;
+    }
+    return str;
+}
+TMSU_DEF const char* tmsu_find_char2(const char* str, char a, char b) {
+    TM_ASSERT(str);
+    for (; *str; ++str) {
+        if (*str == a || *str == b) return str;
+    }
+    return str;
+}
+
+TMSU_DEF const char* tmsu_find_last_char(const char* str, char c) {
+    TM_ASSERT(str);
+    return tmsu_find_last_char_n(str, str + TM_STRLEN(str), c);
+}
+
+TMSU_DEF const char* tmsu_find_char_n(const char* str_first, const char* str_last, char c) {
+    const void* result = TM_MEMCHR(str_first, TMSU_C2I(c), tmsu_distance_sz(str_first, str_last));
+    return (result) ? (const char*)result : str_last;
+}
+TMSU_DEF const char* tmsu_find_char2_n(const char* str_first, const char* str_last, char a, char b) {
+    /* TODO: Is it better to call memchr twice, or do a manual loop? */
+#if 1
+    size_t len = tmsu_distance_sz(str_first, str_last);
+    if (!len) return str_last;
+    const char* a_match = (const char*)TM_MEMCHR(str_first, TMSU_C2I(a), len);
+    const char* b_match = (const char*)TM_MEMCHR(str_first, TMSU_C2I(b), len);
+    if (!a_match) a_match = str_last;
+    if (!b_match) b_match = str_last;
+    return (a_match < b_match) ? a_match : b_match;
+#else
+    for (; str_first != str_last; ++str_first) {
+        char current = TMSU_C2I(*str_first);
+        if (current == a || current == b) return str_first;
+    }
+    return str_first;
+#endif
+}
+
+TMSU_DEF const char* tmsu_find_last_char_n(const char* str_first, const char* str_last, char c) {
+    TM_ASSERT(str_first <= str_last);
+#ifdef TM_MEMRCHR
+    void* result = TM_MEMRCHR(str_first, TMSU_C2I(c), tmsu_distance_sz(str_first, str_last));
+    return (result) ? (const char*)result : str_last;
+#else
+    const char* cur = str_last;
+    while (str_first != cur) {
+        --cur;
+        if (TMSU_C2I(*cur) == TMSU_C2I(c)) {
+            return cur;
+        }
+    };
+    return str_last;
+#endif
+}
+
+TMSU_DEF const char* tmsu_find_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                 const char* find_str_last) {
+    TM_ASSERT(str_first && str_first <= str_last);
+    TM_ASSERT(find_str_first && find_str_first <= find_str_last);
+
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (!find_str_len) return str_first;                                       /* Empty string always matches */
+    if (find_str_len > tmsu_distance_sz(str_first, str_last)) return str_last; /* Not enough room for a match. */
+
+    /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
+    str_last -= find_str_len;
+    const char* cur = str_first;
+    while ((cur = tmsu_find_char_n(cur, str_last, *find_str_first)) != str_last) {
+        if (TM_MEMCMP(cur, find_str_first, find_str_len) == 0) {
+            return cur;
+        }
+        ++cur;
+    }
+    return str_last;
+}
+
+TMSU_DEF const char* tmsu_find_last_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                      const char* find_str_last) {
+    TM_ASSERT(str_first && str_first <= str_last);
+    TM_ASSERT(find_str_first && find_str_first <= find_str_last);
+
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (!find_str_len) return str_first;                                       /* Empty string always matches */
+    if (find_str_len > tmsu_distance_sz(str_first, str_last)) return str_last; /* Not enough room for a match. */
+
+    /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
+    str_last -= find_str_len;
+    const char* prev = str_last;
+    const char* cur = str_last;
+    while ((cur = tmsu_find_last_char_n(str_first, prev, *find_str_first)) != prev) {
+        if (TM_MEMCMP(cur, find_str_first, find_str_len) == 0) {
+            return cur;
+        }
+        prev = cur;
+    }
+    return str_last;
+}
+
+TMSU_DEF const char* tmsu_find(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+
+#ifdef TM_STRSTR
+    return TM_STRSTR(str, find_str);
+#else
+    /* TODO: is this better than calling the _n variant with two strlens? */
+#if 0
+    return tmsu_find_n(str, str + TM_STRLEN(str), find_str, TM_STRLEN(find_str));
+#else
+    size_t find_str_len = TM_STRLEN(find_str);
+    if (!find_str || !*find_str) return str;
+    for (;;) {
+        while (*str && *str != *find_str) {
+            ++str;
+        }
+        if (!*str) {
+            return str;
+        }
+        const char* other = find_str;
+        while (*str && *other && *str == *other) {
+            ++str;
+            ++other;
+        }
+        if (!*str && !*other) {
+            return str;
+        }
+    }
+#endif
+#endif
+}
+
+TMSU_DEF const char* tmsu_find_last(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+    return tmsu_find_last_n(str, str + TM_STRLEN(str), find_str, find_str + TM_STRLEN(find_str));
+}
+
+TMSU_DEF const char* tmsu_find_first_not_of(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+    while (*str && TM_STRCHR(find_str, TMSU_C2I(*str))) {
+        ++str;
+    }
+    return str;
+}
+
+TMSU_DEF const char* tmsu_find_first_of(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+
+    while (*str && TM_STRCHR(find_str, TMSU_C2I(*str)) == TM_NULL) {
+        ++str;
+    }
+    return str;
+}
+
+TMSU_DEF const char* tmsu_find_last_not_of(const char* str, const char* find_str) {
+    const char* last = str + TM_STRLEN(str) - 1;
+    while (last != str && TM_STRCHR(find_str, TMSU_C2I(*last))) {
+        --last;
+    }
+    return last;
+}
+
+TMSU_DEF const char* tmsu_find_last_of(const char* str, const char* find_str) {
+    const char* last = str + TM_STRLEN(str) - 1;
+    while (last != str && TM_STRCHR(find_str, TMSU_C2I(*last)) == TM_NULL) {
+        --last;
+    }
+    return last;
+}
+
+TMSU_DEF const char* tmsu_find_first_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                          const char* find_str_last) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    while (str_first != str_last && TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len) == TM_NULL) {
+        ++str_first;
+    }
+    return str_first;
+}
+
+TMSU_DEF const char* tmsu_find_first_not_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                              const char* find_str_last) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    while (str_first != str_last && TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len)) {
+        ++str_first;
+    }
+    return str_first;
+}
+
+TMSU_DEF const char* tmsu_find_last_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                         const char* find_str_last) {
+    if (str_first == str_last) {
+        return str_last;
+    }
+    --str_last;
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    while (str_last != str_first && TM_MEMCHR(find_str_first, TMSU_C2I(*str_last), find_str_len) == TM_NULL) {
+        --str_last;
+    }
+    return str_last;
+}
+
+TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                             const char* find_str_last) {
+    if (str_first == str_last) {
+        return str_last;
+    }
+    --str_last;
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    while (str_last != str_first && TM_MEMCHR(find_str_first, TMSU_C2I(*str_last), find_str_len)) {
+        --str_last;
+    }
+    return str_last;
+}
+
+/* Case insensitive */
+
+TMSU_DEF const char* tmsu_find_char_ignore_case(const char* str, char c) {
+    char upper = (char)TM_TOUPPER(TMSU_C2I(c));
+    char lower = (char)TM_TOLOWER(TMSU_C2I(c));
+    if (upper == lower) {
+        return tmsu_find_char(str, c);
+    }
+    return tmsu_find_char2(str, (char)upper, (char)lower);
+}
+TMSU_DEF const char* tmsu_find_ignore_case(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+    return tmsu_find_ignore_case_n(str, str + TM_STRLEN(str), find_str, find_str + TM_STRLEN(find_str));
+}
+
+TMSU_DEF const char* tmsu_find_char_ignore_case_n(const char* str_first, const char* str_last, char c) {
+    TM_ASSERT(str_first <= str_last);
+
+    size_t len = tmsu_distance_sz(str_first, str_last);
+    if (!len) return str_last;
+    char upper = (char)(TM_TOUPPER(TMSU_C2I(c)));
+    char lower = (char)(TM_TOLOWER(TMSU_C2I(c)));
+    if (upper == lower) {
+        const char* match = (const char*)TM_MEMCHR(str_first, TMSU_C2I(c), len);
+        return (match) ? match : str_last;
+    }
+    return tmsu_find_char2_n(str_first, str_last, upper, lower);
+}
+TMSU_DEF const char* tmsu_find_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                             const char* find_str_last) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (!find_str_len) return str_first;                                       /* Empty string always matches */
+    if (find_str_len > tmsu_distance_sz(str_first, str_last)) return str_last; /* Not enough room for a match. */
+
+    /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
+    str_last -= find_str_len;
+    const char* cur = str_first;
+    while ((cur = tmsu_find_char_ignore_case_n(cur, str_last, *find_str_first)) != str_last) {
+        if (tmsu_compare_ignore_case_n(cur, cur + find_str_len, find_str_first, find_str_last) == 0) {
+            return cur;
+        }
+        ++cur;
+    }
+    return str_last;
+}
+
+/* Tokenizer */
+
+TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str) {
+    TM_ASSERT(str);
+    tmsu_tokenizer result;
+    result.current = str;
+    return result;
+}
+
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_stringview* out) {
+    TM_ASSERT(tokenizer);
+    TM_ASSERT(tokenizer->current);
+    TM_ASSERT(delimiters);
+
+    /* Skip delimiters at the beginning. */
+    tokenizer->current = tmsu_find_first_not_of(tokenizer->current, delimiters);
+
+    if (!*tokenizer->current) {
+        return TM_FALSE;
+    }
+    /* Skip skip everything until we find other delimiters. */
+    const char* next = tmsu_find_first_of(tokenizer->current, delimiters);
+    if (out) {
+        *out = TMSU_STRINGVIEW_MAKE(tokenizer->current, tmsu_distance(tokenizer->current, next));
+    }
+    tokenizer->current = next;
+    return TM_TRUE;
+}
+
+TMSU_DEF tmsu_tokenizer_n tmsu_make_tokenizer_n(const char* first, const char* last) {
+    TM_ASSERT(first && first <= last);
+
+    tmsu_tokenizer_n result;
+    result.first = first;
+    result.last = last;
+    return result;
+}
+
+TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
+                                   const char* delimiters_last, tmsu_stringview* out) {
+    TM_ASSERT(tokenizer);
+    TM_ASSERT(tokenizer->first && tokenizer->first <= tokenizer->last);
+    TM_ASSERT(delimiters_first && delimiters_first <= delimiters_last);
+
+    /* Skip delimiters at the beginning. */
+    tokenizer->first = tmsu_find_first_not_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
+
+    if (tokenizer->first == tokenizer->last) {
+        return TM_FALSE;
+    }
+    /* Skip skip everything until we find other delimiters. */
+    const char* next = tmsu_find_first_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
+    if (out) {
+        *out = TMSU_STRINGVIEW_MAKE(tokenizer->first, tmsu_distance(tokenizer->first, next));
+    }
+    tokenizer->first = next;
+    return TM_TRUE;
+}
+
+/* Whitespace trimming */
+
+TMSU_DEF const char* tmsu_trim_left(const char* str) {
+    TM_ASSERT(str);
+    while (*str && TM_ISSPACE(TMSU_C2I(*str))) {
+        ++str;
+    }
+    return str;
+}
+TMSU_DEF tmsu_stringview tmsu_trim(const char* str) {
+    TM_ASSERT(str);
+    return tmsu_trim_n(str, str + TM_STRLEN(str));
+}
+
+TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last) {
+    TM_ASSERT(first <= last);
+
+    while (first != last && TM_ISSPACE(TMSU_C2I(*first))) {
+        ++first;
+    }
+    return first;
+}
+TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last) {
+    TM_ASSERT(first <= last);
+    if (first == last) return last;
+    --last;
+    while (first != last && TM_ISSPACE(TMSU_C2I(*last))) {
+        --last;
+    }
+    return last;
+}
+TMSU_DEF tmsu_stringview tmsu_trim_n(const char* first, const char* last) {
+    first = tmsu_trim_left_n(first, last);
+    last = tmsu_trim_right_n(first, last);
+    return TMSU_STRINGVIEW_MAKE(first, tmsu_distance(first, last));
+}
+
+/* Comparisons */
+
+TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last) {
+    TM_ASSERT(a_first <= a_last);
+    TM_ASSERT(b_first <= b_last);
+
+    size_t a_len = tmsu_distance_sz(a_first, a_last);
+    size_t b_len = tmsu_distance_sz(b_first, b_last);
+    if (!a_len || !b_len) return !a_len - !b_len;
+    if (a_len > b_len) return 1;
+    if (a_len < b_len) return -1;
+    if (a_first == b_first) return 0;
+
+    return TM_MEMCMP(a_first, b_first, a_len);
+}
+TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
+                                        const char* b_last) {
+    TM_ASSERT(a_first <= a_last);
+    TM_ASSERT(b_first <= b_last);
+
+    size_t a_len = tmsu_distance_sz(a_first, a_last);
+    size_t b_len = tmsu_distance_sz(b_first, b_last);
+    if (!a_len || !b_len) return !a_len - !b_len;
+    if (a_len > b_len) return 1;
+    if (a_len < b_len) return -1;
+    if (a_first == b_first) return 0;
+
+    for (size_t i = 0; i < a_len; ++i) {
+        int a = TM_TOUPPER(TMSU_C2I(a_first[i]));
+        int b = TM_TOUPPER(TMSU_C2I(b_first[i]));
+        int diff = a - b;
+        if (diff != 0) return diff;
+    }
+    return 0;
+}
+
+/*
+tmsu_human_compare_n implementation is based on this gist: https://gist.github.com/pervognsen/733034 by Per Vognsen.
+*/
+static int tmsu_human_parse_and_advance(const char** str, const char* last) {
+    const char* p = *str;
+    TM_ASSERT(p != last);
+    if (!tmsu_isdigit(TMSU_C2I(*p))) {
+        ++*str;
+        return TM_TOUPPER(TMSU_C2I(*p));
+    }
+
+    int result = 0;
+    while (p != last && tmsu_isdigit(*p)) {
+        result = (result * 10) + (*p - '0');
+        ++p;
+    }
+    *str = p;
+    return result + 256;
+}
+
+TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last) {
+    TM_ASSERT(a_first <= a_last);
+    TM_ASSERT(b_first <= b_last);
+
+    size_t a_len = tmsu_distance_sz(a_first, a_last);
+    size_t b_len = tmsu_distance_sz(b_first, b_last);
+    if (!a_len || !b_len) return !a_len - !b_len;
+    if (a_first == b_first) {
+        /*return (int)(a_len - b_len);*/ /* Might overflow/underflow. */
+        if (a_len > b_len) return 1;
+        if (a_len < b_len) return -1;
+        return 0;
+    }
+
+    while (a_first != a_last && b_first != b_last) {
+        int a = tmsu_human_parse_and_advance(&a_first, a_last);
+        int b = tmsu_human_parse_and_advance(&b_first, b_last);
+        int diff = a - b;
+        if (diff != 0) return diff;
+    }
+    return (a_first != a_last) - (b_first != b_last);
+}
+
+TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+
+    size_t find_str_len = TM_STRLEN(find_str);
+    return TM_STRNCMP(str, find_str, find_str_len) == 0;
+}
+TMSU_DEF tm_bool tmsu_ends_with(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+
+    return tmsu_ends_with_n(str, str + TM_STRLEN(str), find_str, find_str + TM_STRLEN(find_str));
+}
+
+TMSU_DEF tm_bool tmsu_starts_with_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                    const char* find_str_last) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+
+    size_t str_len = tmsu_distance_sz(str_first, str_last);
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (str_len < find_str_len) return TM_FALSE;
+
+    return TM_MEMCMP(str_first, find_str_first, find_str_len) == 0;
+}
+TMSU_DEF tm_bool tmsu_ends_with_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                  const char* find_str_last) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+
+    size_t str_len = tmsu_distance_sz(str_first, str_last);
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (str_len < find_str_len) return TM_FALSE;
+
+    const char* start = str_last - find_str_len;
+    return TM_MEMCMP(start, find_str_first, find_str_len) == 0;
+}
+
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+
+    size_t find_str_len = TM_STRLEN(find_str);
+    return tmsu_strnicmp(str, find_str, find_str_len) == 0;
+}
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case(const char* str, const char* find_str) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+
+    return tmsu_ends_with_ignore_case_n(str, str + TM_STRLEN(str), find_str, find_str + TM_STRLEN(find_str));
+}
+
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                                const char* find_str_last) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+
+    size_t str_len = tmsu_distance_sz(str_first, str_last);
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (str_len < find_str_len) return TM_FALSE;
+
+    return tmsu_compare_ignore_case_n(str_first, str_first + find_str_len, find_str_first, find_str_last) == 0;
+}
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                              const char* find_str_last) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+
+    size_t str_len = tmsu_distance_sz(str_first, str_last);
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (str_len < find_str_len) return TM_FALSE;
+
+    const char* start = str_last - find_str_len;
+    return tmsu_compare_ignore_case_n(start, str_last, find_str_first, find_str_last) == 0;
+}
+
+/* Crt extensions */
+
+TMSU_DEF tm_bool tmsu_isdigit(unsigned c) { return c >= '0' && c <= '9'; }
+
+TMSU_DEF const char* tmsu_stristr(const char* str, const char* find_str) {
+    return tmsu_find_ignore_case(str, find_str);
+}
+TMSU_DEF int tmsu_stricmp(const char* a, const char* b) {
+    while (*a && *b) {
+        int aUpper = TM_TOUPPER(TMSU_C2I(*a));
+        int bUpper = TM_TOUPPER(TMSU_C2I(*b));
+        if (aUpper != bUpper) {
+            break;
+        }
+        ++a;
+        ++b;
+    }
+    int aUpper = TM_TOUPPER(TMSU_C2I(*a));
+    int bUpper = TM_TOUPPER(TMSU_C2I(*b));
+    return aUpper - bUpper;
+}
+TMSU_DEF int tmsu_strnicmp(const char* a, const char* b, size_t count) {
+    while (*a && *b && count--) {
+        int aUpper = TM_TOUPPER(TMSU_C2I(*a));
+        int bUpper = TM_TOUPPER(TMSU_C2I(*b));
+        if (aUpper != bUpper) {
+            break;
+        }
+        ++a;
+        ++b;
+    }
+    if (!count) {
+        return 0;
+    }
+    int aUpper = TM_TOUPPER(TMSU_C2I(*a));
+    int bUpper = TM_TOUPPER(TMSU_C2I(*b));
+    return aUpper - bUpper;
+}
+TMSU_DEF char* tmsu_strrev(char* str) { return tmsu_strnrev(str, TM_STRLEN(str)); }
+TMSU_DEF char* tmsu_strnrev(char* str, size_t count) {
+    for (size_t i = 0, j = count - 1; i < j; ++i, --j) {
+        char tmp = str[i];
+        str[i] = str[j];
+        str[j] = tmp;
+    }
+    return str;
+}
+TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len) {
+    const char* p = (const char*)ptr + len;
+    while (len) {
+        --len;
+        --p;
+        if ((unsigned char)*p == value) {
+            return (const void*)p;
+        }
+    }
+    return TM_NULL;
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
+
+/*
+There are two licenses you can freely choose from - MIT or Public Domain
+---------------------------------------------------------------------------
+
+MIT License:
+Copyright (c) 2016 Tolga Mizrak
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---------------------------------------------------------------------------
+
+Public Domain (www.unlicense.org):
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
+
+---------------------------------------------------------------------------
+*/

@@ -1,4 +1,4 @@
-/* compilers */
+/* Compilers. */
 
 #ifdef __BORLANDC__
 	#define TM_COMPILER_BORLAND __BORLANDC__
@@ -28,7 +28,7 @@
 	#define TM_COMPILER_WATCOM
 #endif
 
-/* operating systems */
+/* Operating systems. */
 
 #ifdef __ANDROID__
 	#define TM_OS_ANDROID
@@ -60,7 +60,7 @@
 	#define TM_OS_WINDOWS
 #endif
 
-/* architectures */
+/* Architectures. */
 
 #if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64) || defined(_M_X64) \
     || defined(_M_AMD64)
@@ -100,16 +100,16 @@
     #endif
 #endif
 
-/* environment */
+/* Environment. */
 
 #if !defined(TM_ENV_64_BIT) && !defined(TM_ENV_32_BIT)
 	#if defined(TM_ARCH_AMD64) || defined(TM_ARCH_ARM64) || defined(TM_ARCH_IA64) || defined(TM_ARCH_POWERPC64)
 	    #define TM_ENV_64_BIT
 	#elif
-	    /* assume 32 bit otherwise, don't support 16 bit */
+	    /* Assume 32 bit otherwise, don't support 16 bit. */
 	    #define TM_ENV_32_BIT
 
-	    /* error for some known 16 bit architectures */
+	    /* Error for some known 16 bit architectures. */
 	    #if defined(_M_I86) || defined(_WIN16)
 	    	#error not implemented for 16bit
 	    #endif

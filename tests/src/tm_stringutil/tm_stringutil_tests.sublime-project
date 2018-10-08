@@ -24,7 +24,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_print-tests",
+			"cmd": "make tm_stringutil-tests",
 
 			"windows": {
 				"shell": false,
@@ -42,12 +42,12 @@
 
 			"variants": [
 				{
-					"name": "run tests",
-					"cmd": "make tm_print-run-tests"
+					"name": "make C build",
+					"cmd": "make tm_stringutil-c"
 				},
 				{
-					"name": "run tests (default config only)",
-					"cmd": "make tm_print-run-tests-default"
+					"name": "run tests",
+					"cmd": "make tm_stringutil-run-tests"
 				}
 			]
 		}

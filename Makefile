@@ -251,12 +251,14 @@ tools/merge/tests/out.cpp: ${MERGE_OUT} tools/merge/tests/test.cpp
 merge-test-merge: tools/merge/tests/out.cpp
 
 # tm_conversion
-tm_conversion-c: ${TM_CONVERSION_DEPS_C}
+${TM_CONVERSION_OUT_C}: ${TM_CONVERSION_DEPS_C}
 	@${CC} ${CFLAGS} \
 		$(call INCLUDECOMMAND.cl, ${TESTS_INCLUDE_DIRS}) \
 		${TM_CONVERSION_SRC_C} \
 		${OUT_FILE.${COMPILER}}${TM_CONVERSION_OUT_C} \
 		${LDFLAGS} ${LDLIBS}
+
+tm_conversion-c: ${TM_CONVERSION_OUT_C}
 
 ${TM_CONVERSION_OUT}: ${TM_CONVERSION_DEPS}
 	@${CXX} ${CXXFLAGS} \
@@ -265,9 +267,9 @@ ${TM_CONVERSION_OUT}: ${TM_CONVERSION_DEPS}
 		${OUT_FILE.${COMPILER}}$@ \
 		${LDFLAGS} ${LDLIBS}
 
-tm_conversion-tests: ${TM_CONVERSION_OUT}
+tm_conversion-tests: ${TM_CONVERSION_OUT} ${TM_CONVERSION_OUT_C}
 
-tm_conversion-run-tests: ${TM_CONVERSION_OUT}
+tm_conversion-run-tests: ${TM_CONVERSION_OUT} ${TM_CONVERSION_OUT_C}
 	@echo TESTING: all tests
 	@${TM_CONVERSION_OUT}
 
@@ -276,11 +278,11 @@ ifeq (${OS}, Windows_NT)
 	# cmd doesn't seem to like forward slashes on commands with arguments
 	TM_CONVERSION_OUT_FAST := $(subst /,\,${TM_CONVERSION_OUT_FAST})
 endif
-tm_conversion-run-tests-fast: ${TM_CONVERSION_OUT}
+tm_conversion-run-tests-fast: ${TM_CONVERSION_OUT} ${TM_CONVERSION_OUT_C}
 	@echo TESTING: fast tests
 	@${TM_CONVERSION_OUT_FAST}
 
-tm_conversion-check: tm_conversion
+tm_conversion-check: tm_conversion.h
 	clang-tidy-8 tm_conversion.h ${clang-tidy-flags} \
 		-checks=$(subst ${space},${empty},${clang-tidy-checks}),-llvm-header-guard \
 		-- ${CXXFLAGS.clang} ${CXXINCLUDEFLAGS} ${TM_CONVERSION_SRC} \
@@ -459,25 +461,6 @@ tm_bezier-c-build: ${TM_BEZIER_TESTS_OUT_C}
 
 TM_CLI_UNMERGED := ${build_dir}/tm_cli-unmerged${ext}
 
-TM_CLI_SRC  := tests/src/tm_cli/main.cpp
-TM_CLI_DEPS := ${build_dir} ${TM_CLI_SRC} ./tm_cli.h tm_conversion.h ${TESTS_DOCTEST_DEP}
-TM_CLI_DEPS += tests/src/assert_throws.h tests/src/assert_throws.cpp
-TM_CLI_OUT  := ${build_dir}/tm_cli_tests${ext}
-
-TM_CLI_TESTS_DEFAULT := ${build_dir}/tm_cli_default${ext}
-TM_CLI_TESTS_CRT := ${build_dir}/tm_cli_crt${ext}
-TM_CLI_TESTS_CRT_SIGNED_SIZE_T := ${build_dir}/tm_cli_crt_signed_size_t${ext}
-TM_CLI_TESTS_TM_CONVERSION := ${build_dir}/tm_cli_tm_conversion${ext}
-TM_CLI_TESTS_TM_CONVERSION_SIGNED_SIZE_T := ${build_dir}/tm_cli_tm_conversion_signed_size_t${ext}
-TM_CLI_TESTS_CHARCONV := ${build_dir}/tm_cli_charconv${ext}
-TM_CLI_TESTS_CHARCONV_SIGNED_SIZE_T := ${build_dir}/tm_cli_charconv_signed_size_t${ext}
-
-TM_CLI_ALL_CONFIGS_DEPS := ${TM_CLI_TESTS_DEFAULT}
-TM_CLI_ALL_CONFIGS_DEPS += ${TM_CLI_TESTS_CRT} ${TM_CLI_TESTS_CRT_SIGNED_SIZE_T}
-TM_CLI_ALL_CONFIGS_DEPS += ${TM_CLI_TESTS_TM_CONVERSION}
-TM_CLI_ALL_CONFIGS_DEPS += ${TM_CLI_TESTS_TM_CONVERSION_SIGNED_SIZE_T}
-TM_CLI_ALL_CONFIGS_DEPS += ${TM_CLI_TESTS_CHARCONV} ${TM_CLI_TESTS_CHARCONV_SIGNED_SIZE_T}
-
 tm_cli.h: ${TM_CLI_UNMERGED} ${MERGE_OUT} src/tm_cli/*.cpp
 	@echo merging tm_cli.h
 	@${MERGE_OUT} src/tm_cli/main.cpp $@ src/tm_cli -r
@@ -488,3 +471,33 @@ ${TM_CLI_UNMERGED}: src/tm_cli/*.cpp
 	@$(call c_compile,src/tm_cli/test.cpp,$@,src/tm_cli ./,)
 
 tm_cli-unmerged: ${TM_CLI_UNMERGED}
+
+# tm_cli
+
+TM_STRINGUTIL_UNMERGED := ${build_dir}/tm_stringutil-unmerged${ext}
+TM_STRINGUTIL_C_OUT := ${build_dir}/tm_stringutil-c${ext}
+TM_STRINGUTIL_TESTS_OUT := ${build_dir}/tm_stringutil-tests${ext}
+
+tm_stringutil.h: ${TM_STRINGUTIL_UNMERGED} ${MERGE_OUT} src/tm_stringutil/*.cpp
+	@echo merging tm_stringutil.h
+	@${MERGE_OUT} src/tm_stringutil/main.cpp $@ src/tm_stringutil -r
+
+tm_stringutil-merge: tm_stringutil.h
+
+${TM_STRINGUTIL_UNMERGED}: ${build_dir} src/tm_stringutil/*.cpp
+	@$(call cxx_compile,src/tm_stringutil/test.cpp,$@,src/tm_stringutil ./,)
+
+tm_stringutil-unmerged: ${TM_STRINGUTIL_UNMERGED}
+
+${TM_STRINGUTIL_C_OUT}: ${build_dir} tests/src/tm_stringutil/main.c tm_stringutil.h
+	@$(call c_compile,tests/src/tm_stringutil/main.c,$@,./,)
+
+tm_stringutil-c: ${TM_STRINGUTIL_C_OUT}
+
+${TM_STRINGUTIL_TESTS_OUT}: ${build_dir} tests/src/tm_stringutil/main.cpp tm_stringutil.h ${TESTS_DOCTEST_DEP}
+	@$(call cxx_compile,tests/src/tm_stringutil/main.cpp,$@,${TESTS_INCLUDE_DIRS},)
+
+tm_stringutil-tests: ${TM_STRINGUTIL_TESTS_OUT} ${TM_STRINGUTIL_C_OUT}
+
+tm_stringutil-run-tests: ${TM_STRINGUTIL_TESTS_OUT} ${TM_STRINGUTIL_C_OUT}
+	@${TM_STRINGUTIL_TESTS_OUT}
