@@ -87,22 +87,24 @@ HISTORY
 extern "C" {
 #endif
 
-#if defined(TM_STRINGVIEW) && defined(__cplusplus)
-    typedef TM_STRINGVIEW tmsu_stringview;
-    #define TMSU_STRINGVIEW_DATA(x) TM_STRINGVIEW_DATA(x)
-    #define TMSU_STRINGVIEW_SIZE(x) TM_STRINGVIEW_SIZE(x)
-    #define TMSU_STRINGVIEW_MAKE(str, size) TM_STRINGVIEW{(str), (size)}
-#else
-    typedef struct {
-        const char* data;
-        tm_size_t size;
-    } tmsu_stringview;
-    #define TMSU_STRINGVIEW_DATA(x) (x).data
-    #define TMSU_STRINGVIEW_SIZE(x) (x).size
-    #define TMSU_STRINGVIEW_MAKE(str, size) tmsu_make_stringview(str, size)
-#endif
-
 /* clang-format on */
+
+/*
+String view type for C. For C++ string views, there are special overloads for them if TM_STRINGVIEW is defined with
+the string view type.
+*/
+typedef struct {
+    const char* data;
+    tm_size_t size;
+} tmsu_stringview;
+inline static tmsu_stringview tmsu_make_stringview(const char* data, tm_size_t size) {
+    tmsu_stringview result;
+    result.data = data;
+    result.size = size;
+    return result;
+}
+inline static const char* tmsu_stringview_begin(tmsu_stringview v) { return v.data; }
+inline static const char* tmsu_stringview_end(tmsu_stringview v) { return v.data + v.size; }
 
 /*
 Find functions for nullterminated strings.
@@ -229,6 +231,12 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
 
 #ifdef __cplusplus
 }
+#endif
+
+#if defined(__cplusplus) && defined(TM_STRING_VIEW)
+
+#include "string_view_overloads.cpp"
+
 #endif
 
 #endif /* !defined(_TM_STRINGUTIL_INCLUDED_49458961_DD38_441D_B888_A589548CA6F5_) */

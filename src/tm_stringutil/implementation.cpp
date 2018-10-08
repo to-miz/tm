@@ -4,17 +4,7 @@ extern "C" {
 
 #include "../common/tm_null.inc"
 
-#define TMSU_STRINGVIEW_BEGIN(x) TMSU_STRINGVIEW_DATA(x)
-#define TMSU_STRINGVIEW_END(x) (TMSU_STRINGVIEW_DATA(x) + TMSU_STRINGVIEW_SIZE(x))
-
 #define TMSU_C2I(x) ((unsigned char)(x))
-
-inline static tmsu_stringview tmsu_make_stringview(const char* data, tm_size_t size) {
-    tmsu_stringview result;
-    result.data = data;
-    result.size = size;
-    return result;
-}
 
 inline static tm_size_t tmsu_distance(const char* first, const char* last) {
     TM_ASSERT(first <= last);
@@ -324,7 +314,7 @@ TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimite
     /* Skip skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of(tokenizer->current, delimiters);
     if (out) {
-        *out = TMSU_STRINGVIEW_MAKE(tokenizer->current, tmsu_distance(tokenizer->current, next));
+        *out = tmsu_make_stringview(tokenizer->current, tmsu_distance(tokenizer->current, next));
     }
     tokenizer->current = next;
     return TM_TRUE;
@@ -354,7 +344,7 @@ TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* deli
     /* Skip skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
     if (out) {
-        *out = TMSU_STRINGVIEW_MAKE(tokenizer->first, tmsu_distance(tokenizer->first, next));
+        *out = tmsu_make_stringview(tokenizer->first, tmsu_distance(tokenizer->first, next));
     }
     tokenizer->first = next;
     return TM_TRUE;
@@ -394,7 +384,7 @@ TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last) {
 TMSU_DEF tmsu_stringview tmsu_trim_n(const char* first, const char* last) {
     first = tmsu_trim_left_n(first, last);
     last = tmsu_trim_right_n(first, last);
-    return TMSU_STRINGVIEW_MAKE(first, tmsu_distance(first, last));
+    return tmsu_make_stringview(first, tmsu_distance(first, last));
 }
 
 /* Comparisons */
