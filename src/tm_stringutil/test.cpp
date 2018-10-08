@@ -1,9 +1,16 @@
+#include <string_view>
+using std::string_view;
+
+#if 1
+#define TM_STRING_VIEW string_view
+#define TM_STRING_VIEW_DATA(str) (str).data()
+#define TM_STRING_VIEW_SIZE(str) ((tm_size_t)(str).size())
+#endif
+
 #define TM_STRINGUTIL_IMPLEMENTATION
 #include "main.cpp"
 
 #include <cstdio>
-#include <string_view>
-using std::string_view;
 
 auto my_begin(string_view v) { return v.data(); }
 auto my_end(string_view v) { return v.data() + v.size(); }

@@ -307,10 +307,7 @@ TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimite
 
     /* Skip delimiters at the beginning. */
     tokenizer->current = tmsu_find_first_not_of(tokenizer->current, delimiters);
-
-    if (!*tokenizer->current) {
-        return TM_FALSE;
-    }
+    if (!*tokenizer->current) return TM_FALSE;
     /* Skip skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of(tokenizer->current, delimiters);
     if (out) {
@@ -337,15 +334,10 @@ TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* deli
 
     /* Skip delimiters at the beginning. */
     tokenizer->first = tmsu_find_first_not_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
-
-    if (tokenizer->first == tokenizer->last) {
-        return TM_FALSE;
-    }
+    if (tokenizer->first == tokenizer->last) return TM_FALSE;
     /* Skip skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
-    if (out) {
-        *out = tmsu_make_stringview(tokenizer->first, tmsu_distance(tokenizer->first, next));
-    }
+    if (out) *out = tmsu_make_stringview(tokenizer->first, tmsu_distance(tokenizer->first, next));
     tokenizer->first = next;
     return TM_TRUE;
 }

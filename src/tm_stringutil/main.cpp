@@ -235,7 +235,7 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
 
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
 
-#include "string_view_overloads.cpp"
+#include "string_view_overloads.h"
 
 #endif
 
@@ -244,6 +244,12 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
 #ifdef TM_STRINGUTIL_IMPLEMENTATION
 
 #include "implementation.cpp"
+
+#if defined(__cplusplus) && defined(TM_STRING_VIEW)
+
+#include "string_view_overloads.cpp"
+
+#endif
 
 #endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
 
