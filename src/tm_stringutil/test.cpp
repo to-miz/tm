@@ -22,9 +22,9 @@ int main() {
     // nullterminated version
     {
         auto tokenizer = tmsu_make_tokenizer(str);
-        tmsu_stringview view = {};
+        tmsu_string_view view = {};
         while (tmsu_next_token(&tokenizer, delimeters, &view)) {
-            printf("%.*s\n", (int)view.size, view.data);
+            printf("%.*s\n", (int)TMSU_STRING_VIEW_SIZE(view), TMSU_STRING_VIEW_DATA(view));
         }
     }
 
@@ -35,9 +35,9 @@ int main() {
         auto delimeters_first = delimeters;
         auto delimeters_last = delimeters_first + strlen(delimeters_first);
         auto tokenizer = tmsu_make_tokenizer_n(str_first, str_last);
-        tmsu_stringview view = {};
+        tmsu_string_view view = {};
         while (tmsu_next_token_n(&tokenizer, delimeters_first, delimeters_last, &view)) {
-            printf("%.*s\n", (int)view.size, view.data);
+            printf("%.*s\n", (int)TMSU_STRING_VIEW_SIZE(view), TMSU_STRING_VIEW_DATA(view));
         }
     }
 

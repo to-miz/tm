@@ -2,6 +2,15 @@
 extern "C" {
 #endif
 
+#if !defined(__cplusplus) || !defined(TM_STRING_VIEW)
+inline static tmsu_string_view tmsu_make_string_view(const char* str, tm_size_t size) {
+    tmsu_string_view result;
+    result.data = str;
+    result.size = size;
+    return result;
+}
+#endif /* !defined(__cplusplus) || !defined(TM_STRING_VIEW) */
+
 #include "../common/tm_null.inc"
 
 #define TMSU_C2I(x) ((unsigned char)(x))
@@ -300,7 +309,7 @@ TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str) {
     return result;
 }
 
-TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_stringview* out) {
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_string_view* out) {
     TM_ASSERT(tokenizer);
     TM_ASSERT(tokenizer->current);
     TM_ASSERT(delimiters);
@@ -311,7 +320,7 @@ TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimite
     /* Skip skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of(tokenizer->current, delimiters);
     if (out) {
-        *out = tmsu_make_stringview(tokenizer->current, tmsu_distance(tokenizer->current, next));
+        *out = TMSU_STRING_VIEW_MAKE(tokenizer->current, tmsu_distance(tokenizer->current, next));
     }
     tokenizer->current = next;
     return TM_TRUE;
@@ -327,7 +336,7 @@ TMSU_DEF tmsu_tokenizer_n tmsu_make_tokenizer_n(const char* first, const char* l
 }
 
 TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
-                                   const char* delimiters_last, tmsu_stringview* out) {
+                                   const char* delimiters_last, tmsu_string_view* out) {
     TM_ASSERT(tokenizer);
     TM_ASSERT(tokenizer->first && tokenizer->first <= tokenizer->last);
     TM_ASSERT(delimiters_first && delimiters_first <= delimiters_last);
@@ -337,7 +346,7 @@ TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* deli
     if (tokenizer->first == tokenizer->last) return TM_FALSE;
     /* Skip skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
-    if (out) *out = tmsu_make_stringview(tokenizer->first, tmsu_distance(tokenizer->first, next));
+    if (out) *out = TMSU_STRING_VIEW_MAKE(tokenizer->first, tmsu_distance(tokenizer->first, next));
     tokenizer->first = next;
     return TM_TRUE;
 }
@@ -350,10 +359,6 @@ TMSU_DEF const char* tmsu_trim_left(const char* str) {
         ++str;
     }
     return str;
-}
-TMSU_DEF tmsu_stringview tmsu_trim(const char* str) {
-    TM_ASSERT(str);
-    return tmsu_trim_n(str, str + TM_STRLEN(str));
 }
 
 TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last) {
@@ -372,11 +377,6 @@ TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last) {
         --last;
     }
     return last;
-}
-TMSU_DEF tmsu_stringview tmsu_trim_n(const char* first, const char* last) {
-    first = tmsu_trim_left_n(first, last);
-    last = tmsu_trim_right_n(first, last);
-    return tmsu_make_stringview(first, tmsu_distance(first, last));
 }
 
 /* Comparisons */

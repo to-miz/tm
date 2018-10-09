@@ -1,6 +1,3 @@
-tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, TM_STRING_VIEW* out);
-tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first, const char* delimiters_last,
-                          TM_STRING_VIEW* out);
 TM_STRING_VIEW tmsu_trim_left(TM_STRING_VIEW str);
 TM_STRING_VIEW tmsu_trim_right(TM_STRING_VIEW str);
 TM_STRING_VIEW tmsu_trim(TM_STRING_VIEW str);

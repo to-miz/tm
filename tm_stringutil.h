@@ -110,24 +110,27 @@ HISTORY
 extern "C" {
 #endif
 
-/* clang-format on */
-
 /*
-String view type for C. For C++ string views, there are special overloads for them if TM_STRINGVIEW is defined with
-the string view type.
+Use the C++ string_view type if it is available. This will pull out any string_view returning function out of C-linkage,
+since they cannot be defined in C. If C interop is needed, #undef TM_STRING_VIEW before including this file, so both
+C and C++ use the same data types.
 */
-typedef struct {
-    const char* data;
-    tm_size_t size;
-} tmsu_stringview;
-inline static tmsu_stringview tmsu_make_stringview(const char* data, tm_size_t size) {
-    tmsu_stringview result;
-    result.data = data;
-    result.size = size;
-    return result;
-}
-inline static const char* tmsu_stringview_begin(tmsu_stringview v) { return v.data; }
-inline static const char* tmsu_stringview_end(tmsu_stringview v) { return v.data + v.size; }
+#if defined(TM_STRING_VIEW) && defined(__cplusplus)
+    typedef TM_STRING_VIEW tmsu_string_view;
+    #define TMSU_STRING_VIEW_DATA(x) TM_STRING_VIEW_DATA(x)
+    #define TMSU_STRING_VIEW_SIZE(x) TM_STRING_VIEW_SIZE(x)
+    #define TMSU_STRING_VIEW_MAKE(str, size) TM_STRING_VIEW{(str), (size)}
+#else
+    typedef struct {
+        const char* data;
+        tm_size_t size;
+    } tmsu_string_view;
+    #define TMSU_STRING_VIEW_DATA(x) (x).data
+    #define TMSU_STRING_VIEW_SIZE(x) (x).size
+    #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, size)
+#endif
+
+/* clang-format on */
 
 /*
 Find functions for nullterminated strings.
@@ -188,7 +191,7 @@ TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str);
 Returns true if a token could be extracted. Delimeters can be different between calls.
 The start and length of the token is then stored into the output parameter out.
 */
-TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_stringview* out);
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_string_view* out);
 
 typedef struct {
     const char* first;
@@ -202,20 +205,16 @@ Returns true if a token could be extracted. Delimeters can be different between 
 The start and length of the token is then stored into the output parameter out.
 */
 TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
-                                   const char* delimiters_last, tmsu_stringview* out);
+                                   const char* delimiters_last, tmsu_string_view* out);
 
 /* Whitespace trimming */
 
 TMSU_DEF const char* tmsu_trim_left(const char* str);
-/* Trims whitespace from both sides. */
-TMSU_DEF tmsu_stringview tmsu_trim(const char* str);
 
 /* Trims whitespace from the left. Returns new left/first boundary. */
 TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last);
 /* Trims whitespace from the right. Returns new right/last boundary. */
 TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
-/* Trims whitespace from both sides. */
-TMSU_DEF tmsu_stringview tmsu_trim_n(const char* first, const char* last);
 
 /* Comparisons */
 
@@ -256,11 +255,23 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
 }
 #endif
 
+/* string_view returning types are only extern C if the string_view isn't a C++ type. */
+#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+extern "C" {
+#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
+
+/* Trims whitespace from both sides. */
+TMSU_DEF tmsu_string_view tmsu_trim(const char* str);
+/* Trims whitespace from both sides. */
+TMSU_DEF tmsu_string_view tmsu_trim_n(const char* first, const char* last);
+
+#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+}
+#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
+
+
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
 
-tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, TM_STRING_VIEW* out);
-tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first, const char* delimiters_last,
-                          TM_STRING_VIEW* out);
 TM_STRING_VIEW tmsu_trim_left(TM_STRING_VIEW str);
 TM_STRING_VIEW tmsu_trim_right(TM_STRING_VIEW str);
 TM_STRING_VIEW tmsu_trim(TM_STRING_VIEW str);
@@ -283,6 +294,15 @@ tm_bool tmsu_ends_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if !defined(__cplusplus) || !defined(TM_STRING_VIEW)
+inline static tmsu_string_view tmsu_make_string_view(const char* str, tm_size_t size) {
+    tmsu_string_view result;
+    result.data = str;
+    result.size = size;
+    return result;
+}
+#endif /* !defined(__cplusplus) || !defined(TM_STRING_VIEW) */
 
 /* Use null of the underlying language. */
 #ifndef TM_NULL
@@ -589,7 +609,7 @@ TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str) {
     return result;
 }
 
-TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_stringview* out) {
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_string_view* out) {
     TM_ASSERT(tokenizer);
     TM_ASSERT(tokenizer->current);
     TM_ASSERT(delimiters);
@@ -600,7 +620,7 @@ TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimite
     /* Skip skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of(tokenizer->current, delimiters);
     if (out) {
-        *out = tmsu_make_stringview(tokenizer->current, tmsu_distance(tokenizer->current, next));
+        *out = TMSU_STRING_VIEW_MAKE(tokenizer->current, tmsu_distance(tokenizer->current, next));
     }
     tokenizer->current = next;
     return TM_TRUE;
@@ -616,7 +636,7 @@ TMSU_DEF tmsu_tokenizer_n tmsu_make_tokenizer_n(const char* first, const char* l
 }
 
 TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
-                                   const char* delimiters_last, tmsu_stringview* out) {
+                                   const char* delimiters_last, tmsu_string_view* out) {
     TM_ASSERT(tokenizer);
     TM_ASSERT(tokenizer->first && tokenizer->first <= tokenizer->last);
     TM_ASSERT(delimiters_first && delimiters_first <= delimiters_last);
@@ -626,7 +646,7 @@ TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* deli
     if (tokenizer->first == tokenizer->last) return TM_FALSE;
     /* Skip skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
-    if (out) *out = tmsu_make_stringview(tokenizer->first, tmsu_distance(tokenizer->first, next));
+    if (out) *out = TMSU_STRING_VIEW_MAKE(tokenizer->first, tmsu_distance(tokenizer->first, next));
     tokenizer->first = next;
     return TM_TRUE;
 }
@@ -639,10 +659,6 @@ TMSU_DEF const char* tmsu_trim_left(const char* str) {
         ++str;
     }
     return str;
-}
-TMSU_DEF tmsu_stringview tmsu_trim(const char* str) {
-    TM_ASSERT(str);
-    return tmsu_trim_n(str, str + TM_STRLEN(str));
 }
 
 TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last) {
@@ -661,11 +677,6 @@ TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last) {
         --last;
     }
     return last;
-}
-TMSU_DEF tmsu_stringview tmsu_trim_n(const char* first, const char* last) {
-    first = tmsu_trim_left_n(first, last);
-    last = tmsu_trim_right_n(first, last);
-    return tmsu_make_stringview(first, tmsu_distance(first, last));
 }
 
 /* Comparisons */
@@ -891,35 +902,6 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len) {
 #define TMSU_SV_BEGIN(str) TM_STRING_VIEW_DATA(str)
 #define TMSU_SV_END(str) (TM_STRING_VIEW_DATA(str) + TM_STRING_VIEW_SIZE(str))
 
-tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, TM_STRING_VIEW* out) {
-    TM_ASSERT(tokenizer);
-    TM_ASSERT(tokenizer->current);
-    TM_ASSERT(delimiters);
-
-    /* Skip delimiters at the beginning. */
-    tokenizer->current = tmsu_find_first_not_of(tokenizer->current, delimiters);
-    if (!*tokenizer->current) return TM_FALSE;
-    /* Skip skip everything until we find other delimiters. */
-    const char* next = tmsu_find_first_of(tokenizer->current, delimiters);
-    if (out) *out = TM_STRING_VIEW{tokenizer->current, tmsu_distance(tokenizer->current, next)};
-    tokenizer->current = next;
-    return TM_TRUE;
-}
-tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first, const char* delimiters_last,
-                          TM_STRING_VIEW* out) {
-    TM_ASSERT(tokenizer);
-    TM_ASSERT(tokenizer->first && tokenizer->first <= tokenizer->last);
-    TM_ASSERT(delimiters_first && delimiters_first <= delimiters_last);
-
-    /* Skip delimiters at the beginning. */
-    tokenizer->first = tmsu_find_first_not_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
-    if (tokenizer->first == tokenizer->last) return TM_FALSE;
-    /* Skip skip everything until we find other delimiters. */
-    const char* next = tmsu_find_first_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
-    if (out) *out = TM_STRING_VIEW{tokenizer->first, tmsu_distance(tokenizer->first, next)};
-    tokenizer->first = next;
-    return TM_TRUE;
-}
 TM_STRING_VIEW tmsu_trim_left(TM_STRING_VIEW str) {
     const char* first = TMSU_SV_BEGIN(str);
     const char* last = TMSU_SV_END(str);
@@ -969,6 +951,25 @@ tm_bool tmsu_ends_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str) 
 #undef TMSU_SV_END
 
 #endif
+
+/* string_view returning types are only extern C if the string_view isn't a C++ type. */
+#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+extern "C" {
+#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
+
+TMSU_DEF tmsu_string_view tmsu_trim(const char* str) {
+    TM_ASSERT(str);
+    return tmsu_trim_n(str, str + TM_STRLEN(str));
+}
+TMSU_DEF tmsu_string_view tmsu_trim_n(const char* first, const char* last) {
+    first = tmsu_trim_left_n(first, last);
+    last = tmsu_trim_right_n(first, last);
+    return TMSU_STRING_VIEW_MAKE(first, tmsu_distance(first, last));
+}
+
+#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+}
+#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
 
 #endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
 

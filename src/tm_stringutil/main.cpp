@@ -87,24 +87,27 @@ HISTORY
 extern "C" {
 #endif
 
-/* clang-format on */
-
 /*
-String view type for C. For C++ string views, there are special overloads for them if TM_STRINGVIEW is defined with
-the string view type.
+Use the C++ string_view type if it is available. This will pull out any string_view returning function out of C-linkage,
+since they cannot be defined in C. If C interop is needed, #undef TM_STRING_VIEW before including this file, so both
+C and C++ use the same data types.
 */
-typedef struct {
-    const char* data;
-    tm_size_t size;
-} tmsu_stringview;
-inline static tmsu_stringview tmsu_make_stringview(const char* data, tm_size_t size) {
-    tmsu_stringview result;
-    result.data = data;
-    result.size = size;
-    return result;
-}
-inline static const char* tmsu_stringview_begin(tmsu_stringview v) { return v.data; }
-inline static const char* tmsu_stringview_end(tmsu_stringview v) { return v.data + v.size; }
+#if defined(TM_STRING_VIEW) && defined(__cplusplus)
+    typedef TM_STRING_VIEW tmsu_string_view;
+    #define TMSU_STRING_VIEW_DATA(x) TM_STRING_VIEW_DATA(x)
+    #define TMSU_STRING_VIEW_SIZE(x) TM_STRING_VIEW_SIZE(x)
+    #define TMSU_STRING_VIEW_MAKE(str, size) TM_STRING_VIEW{(str), (size)}
+#else
+    typedef struct {
+        const char* data;
+        tm_size_t size;
+    } tmsu_string_view;
+    #define TMSU_STRING_VIEW_DATA(x) (x).data
+    #define TMSU_STRING_VIEW_SIZE(x) (x).size
+    #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, size)
+#endif
+
+/* clang-format on */
 
 /*
 Find functions for nullterminated strings.
@@ -165,7 +168,7 @@ TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str);
 Returns true if a token could be extracted. Delimeters can be different between calls.
 The start and length of the token is then stored into the output parameter out.
 */
-TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_stringview* out);
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_string_view* out);
 
 typedef struct {
     const char* first;
@@ -179,20 +182,16 @@ Returns true if a token could be extracted. Delimeters can be different between 
 The start and length of the token is then stored into the output parameter out.
 */
 TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
-                                   const char* delimiters_last, tmsu_stringview* out);
+                                   const char* delimiters_last, tmsu_string_view* out);
 
 /* Whitespace trimming */
 
 TMSU_DEF const char* tmsu_trim_left(const char* str);
-/* Trims whitespace from both sides. */
-TMSU_DEF tmsu_stringview tmsu_trim(const char* str);
 
 /* Trims whitespace from the left. Returns new left/first boundary. */
 TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last);
 /* Trims whitespace from the right. Returns new right/last boundary. */
 TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
-/* Trims whitespace from both sides. */
-TMSU_DEF tmsu_stringview tmsu_trim_n(const char* first, const char* last);
 
 /* Comparisons */
 
@@ -233,6 +232,18 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
 }
 #endif
 
+/* string_view returning types are only extern C if the string_view isn't a C++ type. */
+#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+extern "C" {
+#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
+
+#include "string_view_c_linkage.h"
+
+#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+}
+#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
+
+
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
 
 #include "string_view_overloads.h"
@@ -250,6 +261,17 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
 #include "string_view_overloads.cpp"
 
 #endif
+
+/* string_view returning types are only extern C if the string_view isn't a C++ type. */
+#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+extern "C" {
+#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
+
+#include "string_view_c_linkage.c"
+
+#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+}
+#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
 
 #endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
 
