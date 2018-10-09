@@ -59,7 +59,7 @@ HISTORY
 #include <stdint.h>
 
 /* For error logging. */
-#include <cstdio>
+#include <stdio.h>
 
 /* Linkage defaults to extern, to override define TMCLI_DEF before including this file.
    Examples of possible override values are static or __declspec(dllexport). */
@@ -100,10 +100,10 @@ enum tmcli_output_type {
     CLI_COUNTER_OUTPUT, /* Output will be set like this: *output += output_value; */
 };
 
-struct tmcli_multiple {
+typedef struct {
     int max_amount; /* Set to a negative number if there is no maximum. */
     unsigned* counter;
-};
+} tmcli_multiple;
 
 typedef tm_bool (*tmcli_validator_type)(const char*);
 
@@ -167,7 +167,7 @@ See implementation of tmcli_make_parser for how to call this function from argc/
 */
 TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const char* program_name, int argc, char const** argv,
                                             const tmcli_option* options, tm_size_t options_count,
-                                            tmcli_parser_settings_struct settings);
+                                            tmcli_parser_settings settings);
 
 typedef struct tmcli_parsed_option_struct {
     const tmcli_option* option; /* Can be NULL if free arguments are allowed. */

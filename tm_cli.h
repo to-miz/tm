@@ -89,7 +89,7 @@ HISTORY
 #include <stdint.h>
 
 /* For error logging. */
-#include <cstdio>
+#include <stdio.h>
 
 /* Linkage defaults to extern, to override define TMCLI_DEF before including this file.
    Examples of possible override values are static or __declspec(dllexport). */
@@ -130,10 +130,10 @@ enum tmcli_output_type {
     CLI_COUNTER_OUTPUT, /* Output will be set like this: *output += output_value; */
 };
 
-struct tmcli_multiple {
+typedef struct {
     int max_amount; /* Set to a negative number if there is no maximum. */
     unsigned* counter;
-};
+} tmcli_multiple;
 
 typedef tm_bool (*tmcli_validator_type)(const char*);
 
@@ -197,7 +197,7 @@ See implementation of tmcli_make_parser for how to call this function from argc/
 */
 TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const char* program_name, int argc, char const** argv,
                                             const tmcli_option* options, tm_size_t options_count,
-                                            tmcli_parser_settings_struct settings);
+                                            tmcli_parser_settings settings);
 
 typedef struct tmcli_parsed_option_struct {
     const tmcli_option* option; /* Can be NULL if free arguments are allowed. */
@@ -315,6 +315,12 @@ TMCLI_DEF tm_bool CLI_ARGUMENT_FLOAT(const char* str) {
     return !*str;
 }
 
+/* Ignore missing-field-initializers warning on gcc/clang, because we use {0} to zero initialize. */
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 TMCLI_DEF tmcli_parser_settings tmcli_default_parser_settings() {
     tmcli_parser_settings result = {0};
     result.error_log = stderr;
@@ -324,9 +330,9 @@ TMCLI_DEF tmcli_parser_settings tmcli_default_parser_settings() {
 
 TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const char* program_name, int argc, char const** argv,
                                             const tmcli_option* options, tm_size_t options_count,
-                                            tmcli_parser_settings_struct settings) {
+                                            tmcli_parser_settings settings) {
     TM_ASSERT(options_count <= 128);
-    tmcli_parser result = {};
+    tmcli_parser result = {0};
     result.argc = argc;
     result.argv = argv;
     result.options = options;
@@ -338,6 +344,10 @@ TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const char* program_name, int argc, 
     result.program_name = program_name;
     return result;
 }
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, char const** argv, const tmcli_option* options,
                                          tm_size_t options_count) {

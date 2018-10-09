@@ -79,7 +79,6 @@ DEFINES.release := NDEBUG
 # warnings for gcc and clang
 
 GCC_WARNINGS := -Wall -Wextra -Werror -pedantic -pedantic-errors
-GCC_WARNINGS += -Wno-unused-parameter
 
 # gcc flags
 
@@ -88,6 +87,8 @@ GCC_WARNINGS += -Wno-unused-parameter
 FLAGS.gcc.debug   := -fstack-protector-all -g -ggdb -fsanitize=address -fno-omit-frame-pointer
 FLAGS.gcc.release := -O3 -march=native -DNDEBUG
 FLAGS.gcc         := ${GCC_WARNINGS} ${FLAGS.gcc.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}})
+
+RELAXED_WARNINGS.gcc := -Wno-newline-eof
 
 CXXFLAGS.gcc.debug   :=
 CXXFLAGS.gcc.release :=
@@ -117,6 +118,8 @@ CINCLUDEFLAGS.gcc   := ${INCLUDEFLAGS.gcc}
 FLAGS.clang.debug   := -O0 -fstack-protector-all -g -ggdb -fsanitize=address -fno-omit-frame-pointer
 FLAGS.clang.release := -O3 -march=native -DNDEBUG
 FLAGS.clang         := ${GCC_WARNINGS} ${FLAGS.clang.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}})
+
+RELAXED_WARNINGS.clang := -Wno-newline-eof
 
 CXXFLAGS.clang.debug   :=
 CXXFLAGS.clang.release :=
@@ -149,6 +152,8 @@ FLAGS.cl         := /EHsc /W4 /Oi /DNOMINMAX /DUNICODE  \
 					/D_CRT_SECURE_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS \
 					${FLAGS.cl.${BUILD}} $(addprefix /D, ${DEFINES.${BUILD}}) \
 					/Fo${build_dir}/ /FC
+
+RELAXED_WARNINGS.cl :=
 
 CXXFLAGS.cl.debug   :=
 CXXFLAGS.cl.release :=
@@ -207,8 +212,8 @@ OUT_FILE.cl = /link /OUT:
 # ${2} is output filename
 # ${3} are include directories
 # ${4} are additional definitions
-override cxx_compile = ${CXX} ${CXXFLAGS} ${call INCLUDECOMMAND.${COMPILER},${3}} $(call DEFINECOMMAND.${COMPILER},${4}) ${1} ${OUT_FILE.${COMPILER}}${2} ${LDFLAGS} ${LDLIBS}
-override c_compile = ${CC} ${CFLAGS} ${call INCLUDECOMMAND.${COMPILER},${3}} $(call DEFINECOMMAND.${COMPILER},${4}) ${1} ${OUT_FILE.${COMPILER}}${2} ${LDFLAGS} ${LDLIBS}
+override cxx_compile = ${CXX} ${CXXFLAGS} ${call INCLUDECOMMAND.${COMPILER},${3}} $(call DEFINECOMMAND.${COMPILER},${4}) $(if ${5},${RELAXED_WARNINGS.${COMPILER}}) ${1} ${OUT_FILE.${COMPILER}}${2} ${LDFLAGS} ${LDLIBS}
+override c_compile = ${CC} ${CFLAGS} ${call INCLUDECOMMAND.${COMPILER},${3}} $(call DEFINECOMMAND.${COMPILER},${4}) $(if ${5},${RELAXED_WARNINGS.${COMPILER}}) ${1} ${OUT_FILE.${COMPILER}}${2} ${LDFLAGS} ${LDLIBS}
 
 # targets
 all: directories
@@ -460,19 +465,28 @@ tm_bezier-c-build: ${TM_BEZIER_TESTS_OUT_C}
 # tm_cli
 
 TM_CLI_UNMERGED := ${build_dir}/tm_cli-unmerged${ext}
+TM_CLI_UNMERGED_C := ${build_dir}/tm_cli-unmerged-c${ext}
+TM_CLI_C := ${build_dir}/tm_cli-c${ext}
 
-tm_cli.h: ${TM_CLI_UNMERGED} ${MERGE_OUT} src/tm_cli/*.cpp
+tm_cli.h: ${TM_CLI_UNMERGED} ${TM_CLI_UNMERGED_C} ${MERGE_OUT}
 	@echo merging tm_cli.h
 	@${MERGE_OUT} src/tm_cli/main.cpp $@ src/tm_cli -r
 
 tm_cli-merge: tm_cli.h
 
-${TM_CLI_UNMERGED}: src/tm_cli/*.cpp
-	@$(call c_compile,src/tm_cli/test.cpp,$@,src/tm_cli ./,)
+${TM_CLI_UNMERGED}: ${build_dir} src/tm_cli/*.cpp
+	@$(call cxx_compile,src/tm_cli/test.cpp,$@,src/tm_cli ./,)
+${TM_CLI_UNMERGED_C}: ${build_dir} src/tm_cli/*.cpp src/tm_cli/*.c
+	@$(call c_compile,src/tm_cli/test.c,$@,src/tm_cli ./,,relaxed_warnings)
 
 tm_cli-unmerged: ${TM_CLI_UNMERGED}
 
-# tm_cli
+${TM_CLI_C}: tm_cli.h
+	@$(call c_compile,tests/src/tm_cli/main.c,$@,./,,relaxed_warnings)
+
+tm_cli-c: ${TM_CLI_C}
+
+# tm_stringutil
 
 TM_STRINGUTIL_UNMERGED := ${build_dir}/tm_stringutil-unmerged${ext}
 TM_STRINGUTIL_C_OUT := ${build_dir}/tm_stringutil-c${ext}

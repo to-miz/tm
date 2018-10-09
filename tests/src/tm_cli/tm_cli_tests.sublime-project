@@ -1,0 +1,55 @@
+{
+	"folders": [
+		{
+			"path": "../../../",
+			"folder_exclude_patterns": ["builds", "build", "data", "src", "tests"]
+		},
+		{
+			"path": "../../",
+			"folder_exclude_patterns": ["builds", "build", "data", "src", "tests"]
+		},
+		{
+			"path": "./"
+		}
+	],
+	"settings": {
+		"read_only_files": [
+			"tm_print.h",
+			"tm_cli.h",
+			"tm_stringutil.h"
+		],
+		"read_only_folders": [
+		]
+	},
+	"build_systems": [
+		{
+			"name": "make",
+			"cmd": "make tm_cli-tests",
+
+			"windows": {
+				"shell": false,
+				"file_regex": "(.*)\\(([0-9]+)\\): (error|note|warning)",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../../",
+			},
+
+			"linux": {
+				"shell": true,
+				"file_regex": "^(..[^:\n]*):([0-9]+):?([0-9]+)?:? (.*)$",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../../",
+			},
+
+			"variants": [
+				{
+					"name": "make C build",
+					"cmd": "make tm_cli-c"
+				},
+				{
+					"name": "run tests",
+					"cmd": "make tm_cli-run-tests"
+				}
+			]
+		}
+	]
+}

@@ -292,7 +292,7 @@ indentation_result get_indent(std::vector<char>::iterator first, std::vector<cha
 }
 void indent_range(std::vector<char>& data, std::vector<char>::iterator first, std::vector<char>::iterator last,
                   indentation_result indentation) {
-    if(indentation.amount == 0) {
+    if (indentation.amount == 0) {
         return;
     }
     // indent parsed lines based on indentation level of the directive
@@ -448,6 +448,7 @@ merge_result merge(const std::vector<char>& in, const char* dir, const std::vect
                         break;
                 }
             }
+            default: { break; }
         }
         result.data.insert(result.data.end(), prev, stream.p);
     }

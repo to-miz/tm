@@ -7,6 +7,10 @@ enum flag_values {
     MY_FLAG2 = (1u << 2),
 };
 
+#ifdef __GNUC__
+    #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 int main(int argc, char const* argv[]) {
     unsigned verbose = 0;
     unsigned warning_level = 0;
