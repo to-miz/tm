@@ -67,11 +67,12 @@ TMSU_DEF const char* tmsu_find_char2_n(const char* str_first, const char* str_la
 #endif
 }
 
-TMSU_DEF const char* tmsu_find_last_char_n(const char* str_first, const char* str_last, char c) {
+TMSU_DEF const char* tmsu_find_last_char_n_ex(const char* str_first, const char* str_last, char c,
+                                              const char* not_found) {
     TM_ASSERT(str_first <= str_last);
 #ifdef TM_MEMRCHR
     void* result = TM_MEMRCHR(str_first, TMSU_C2I(c), tmsu_distance_sz(str_first, str_last));
-    return (result) ? (const char*)result : str_last;
+    return (result) ? (const char*)result : not_found;
 #else
     const char* cur = str_last;
     while (str_first != cur) {
@@ -80,14 +81,17 @@ TMSU_DEF const char* tmsu_find_last_char_n(const char* str_first, const char* st
             return cur;
         }
     };
-    return str_last;
+    return not_found;
 #endif
+}
+TMSU_DEF const char* tmsu_find_last_char_n(const char* str_first, const char* str_last, char c) {
+    return tmsu_find_last_char_n_ex(str_first, str_last, c, str_last);
 }
 
 TMSU_DEF const char* tmsu_find_n(const char* str_first, const char* str_last, const char* find_str_first,
                                  const char* find_str_last) {
-    TM_ASSERT(str_first && str_first <= str_last);
-    TM_ASSERT(find_str_first && find_str_first <= find_str_last);
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
 
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
     if (!find_str_len) return str_first;                                       /* Empty string always matches */
@@ -105,14 +109,14 @@ TMSU_DEF const char* tmsu_find_n(const char* str_first, const char* str_last, co
     return str_last;
 }
 
-TMSU_DEF const char* tmsu_find_last_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                      const char* find_str_last) {
-    TM_ASSERT(str_first && str_first <= str_last);
-    TM_ASSERT(find_str_first && find_str_first <= find_str_last);
+TMSU_DEF const char* tmsu_find_last_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
+                                         const char* find_str_last, const char* not_found) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
 
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
-    if (!find_str_len) return str_first;                                       /* Empty string always matches */
-    if (find_str_len > tmsu_distance_sz(str_first, str_last)) return str_last; /* Not enough room for a match. */
+    if (!find_str_len) return str_first;                                        /* Empty string always matches */
+    if (find_str_len > tmsu_distance_sz(str_first, str_last)) return not_found; /* Not enough room for a match. */
 
     /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
     str_last -= find_str_len;
@@ -124,7 +128,12 @@ TMSU_DEF const char* tmsu_find_last_n(const char* str_first, const char* str_las
         }
         prev = cur;
     }
-    return str_last;
+    return not_found;
+}
+
+TMSU_DEF const char* tmsu_find_last_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                      const char* find_str_last) {
+    return tmsu_find_last_n_ex(str_first, str_last, find_str_first, find_str_last, str_last);
 }
 
 TMSU_DEF const char* tmsu_find(const char* str, const char* find_str) {
@@ -204,6 +213,7 @@ TMSU_DEF const char* tmsu_find_first_of_n(const char* str_first, const char* str
                                           const char* find_str_last) {
     TM_ASSERT(str_first <= str_last);
     TM_ASSERT(find_str_first <= find_str_last);
+    if (find_str_first == find_str_last) return str_first;
 
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
     while (str_first != str_last && TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len) == TM_NULL) {
@@ -224,30 +234,40 @@ TMSU_DEF const char* tmsu_find_first_not_of_n(const char* str_first, const char*
     return str_first;
 }
 
-TMSU_DEF const char* tmsu_find_last_of_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                         const char* find_str_last) {
+TMSU_DEF const char* tmsu_find_last_of_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
+                                            const char* find_str_last, const char* not_found) {
     if (str_first == str_last) {
-        return str_last;
+        return not_found;
     }
     --str_last;
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
     while (str_last != str_first && TM_MEMCHR(find_str_first, TMSU_C2I(*str_last), find_str_len) == TM_NULL) {
         --str_last;
     }
-    return str_last;
+    return not_found;
 }
 
-TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                             const char* find_str_last) {
+TMSU_DEF const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
+                                                const char* find_str_last, const char* not_found) {
     if (str_first == str_last) {
-        return str_last;
+        return not_found;
     }
     --str_last;
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
     while (str_last != str_first && TM_MEMCHR(find_str_first, TMSU_C2I(*str_last), find_str_len)) {
         --str_last;
     }
-    return str_last;
+    return not_found;
+}
+
+TMSU_DEF const char* tmsu_find_last_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                         const char* find_str_last) {
+    return tmsu_find_last_of_n_ex(str_first, str_last, find_str_first, find_str_last, str_last);
+}
+
+TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* str_last, const char* find_str_first,
+                                             const char* find_str_last) {
+    return tmsu_find_last_not_of_n_ex(str_first, str_last, find_str_first, find_str_last, str_last);
 }
 
 /* Case insensitive */
@@ -298,6 +318,89 @@ TMSU_DEF const char* tmsu_find_ignore_case_n(const char* str_first, const char* 
         ++cur;
     }
     return str_last;
+}
+
+/* Find functions that allow escaping of the character to look for. Useful for parsing. */
+
+TMSU_DEF const char* tmsu_find_char_escaped(const char* str, char c, char escape_char) {
+    TM_ASSERT(str);
+    if (*str == c) return str;
+    do {
+        str = tmsu_find_char(str + 1, c);
+    } while (*str && *(str - 1) == escape_char);
+    return str;
+}
+TMSU_DEF const char* tmsu_find_first_of_escaped(const char* str, const char* find_str, char escape_char) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+    if (TM_STRCHR(find_str, TMSU_C2I(*str)) != TM_NULL) return str;
+    do {
+        str = tmsu_find_first_of(str + 1, find_str);
+    } while (*str && *(str - 1) == escape_char);
+    return str;
+}
+TMSU_DEF const char* tmsu_find_first_of_escape_chars(const char* str, const char* find_str, const char* escape_chars) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+    TM_ASSERT(TM_STRLEN(find_str) <= TM_STRLEN(escape_chars));
+    if (TM_STRCHR(find_str, TMSU_C2I(*str)) != TM_NULL) return str;
+    char escape_char = 0;
+    do {
+        ++str;
+        const char* found = TM_NULL;
+        while (*str && (found = TM_STRCHR(find_str, TMSU_C2I(*str))) == TM_NULL) {
+            ++str;
+        }
+        escape_char = (found) ? *(escape_chars + (found - find_str)) : 0;
+    } while (*str && *(str - 1) == escape_char);
+    return str;
+}
+TMSU_DEF const char* tmsu_find_char_escaped_n(const char* str_first, const char* str_last, char c, char escape_char) {
+    TM_ASSERT(str_first <= str_last);
+    if (str_first == str_last) return str_last;
+    if (*str_first == c) return str_first;
+    do {
+        str_first = tmsu_find_char_n(str_first + 1, str_last, c);
+    } while (str_first != str_last && *(str_first - 1) == escape_char);
+    return str_first;
+}
+TMSU_DEF const char* tmsu_find_first_of_escaped_n(const char* str_first, const char* str_last,
+                                                  const char* find_str_first, const char* find_str_last,
+                                                  char escape_char) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+    if (str_first == str_last) return str_last;
+    if (find_str_first == find_str_last) return str_first; /* Empty string always matches. */
+
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len) != TM_NULL) return str_first;
+    do {
+        str_first = tmsu_find_first_of_n(str_first + 1, str_last, find_str_first, find_str_last);
+    } while (str_first != str_last && *(str_first - 1) == escape_char);
+    return str_first;
+}
+TMSU_DEF const char* tmsu_find_first_of_escape_chars_n(const char* str_first, const char* str_last,
+                                                       const char* find_str_first, const char* find_str_last,
+                                                       const char* escape_chars_first, const char* escape_chars_last) {
+    TM_ASSERT(str_first <= str_last);
+    TM_ASSERT(find_str_first <= find_str_last);
+    TM_ASSERT(escape_chars_first <= escape_chars_last);
+    TM_ASSERT(tmsu_distance_sz(find_str_first, find_str_last) <=
+              tmsu_distance_sz(escape_chars_first, escape_chars_last));
+
+    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len) != TM_NULL) return str_first;
+    char escape_char = 0;
+    do {
+        ++str_first;
+        const char* found = TM_NULL;
+        while (str_first != str_last &&
+               (found = (const char*)TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len)) == TM_NULL) {
+            ++str_first;
+        }
+        escape_char = (found) ? *(escape_chars_first + (found - find_str_first)) : 0;
+    } while (str_first != str_last && *(str_first - 1) == escape_char);
+    return str_first;
 }
 
 /* Tokenizer */
@@ -353,30 +456,16 @@ TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* deli
 
 /* Whitespace trimming */
 
-TMSU_DEF const char* tmsu_trim_left(const char* str) {
-    TM_ASSERT(str);
-    while (*str && TM_ISSPACE(TMSU_C2I(*str))) {
-        ++str;
-    }
-    return str;
-}
+static const int TMSU_WHITESPACE_COUNT = 6;
+static char const* const TMSU_WHITESPACE = " \t\n\v\f\r";
+
+TMSU_DEF const char* tmsu_trim_left(const char* str) { return tmsu_find_first_not_of(str, TMSU_WHITESPACE); }
 
 TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last) {
-    TM_ASSERT(first <= last);
-
-    while (first != last && TM_ISSPACE(TMSU_C2I(*first))) {
-        ++first;
-    }
-    return first;
+    return tmsu_find_first_not_of_n(first, last, TMSU_WHITESPACE, TMSU_WHITESPACE + TMSU_WHITESPACE_COUNT);
 }
 TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last) {
-    TM_ASSERT(first <= last);
-    if (first == last) return last;
-    --last;
-    while (first != last && TM_ISSPACE(TMSU_C2I(*last))) {
-        --last;
-    }
-    return last;
+    return tmsu_find_last_not_of_n_ex(first, last, TMSU_WHITESPACE, TMSU_WHITESPACE + TMSU_WHITESPACE_COUNT, first);
 }
 
 /* Comparisons */
