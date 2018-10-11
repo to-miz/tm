@@ -126,16 +126,6 @@ TMSU_DEF const char* tmsu_find_first_of(const char* str, const char* find_str);
 TMSU_DEF const char* tmsu_find_last_not_of(const char* str, const char* find_str);
 TMSU_DEF const char* tmsu_find_last_of(const char* str, const char* find_str);
 
-/* Find functions that allow escaping of the character to look for. Useful for parsing. */
-TMSU_DEF const char* tmsu_find_char_escaped(const char* str, char c, char escape_char);
-TMSU_DEF const char* tmsu_find_first_of_escaped(const char* str, const char* find_str, char escape_char);
-/* Individual escape chars for each of find_str, therefore escape_chars must have same length as find_str. */
-TMSU_DEF const char* tmsu_find_first_of_escape_chars(const char* str, const char* find_str, const char* escape_chars);
-
-/* Ignores case for ascii characters. */
-TMSU_DEF const char* tmsu_find_char_ignore_case(const char* str, char c);
-TMSU_DEF const char* tmsu_find_ignore_case(const char* str, const char* find_str);
-
 /*
 Find functions for length based strings/iterators. They return str_last if no match is found (even the *_last versions).
 Params:
@@ -174,15 +164,21 @@ TMSU_DEF const char* tmsu_find_char_ignore_case_n(const char* str_first, const c
 TMSU_DEF const char* tmsu_find_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
                                              const char* find_str_last);
 
-/* Find functions that allow escaping of the character to look for. Useful for parsing. */
-TMSU_DEF const char* tmsu_find_char_escaped_n(const char* str_first, const char* str_last, char c, char escape_char);
-TMSU_DEF const char* tmsu_find_first_of_escaped_n(const char* str_first, const char* str_last,
-                                                  const char* find_str_first, const char* find_str_last,
-                                                  char escape_char);
-/* Individual escape chars for each of find_str, therefore escape_chars must have same length as find_str. */
-TMSU_DEF const char* tmsu_find_first_of_escape_chars_n(const char* str_first, const char* str_last,
-                                                       const char* find_str_first, const char* find_str_last,
-                                                       const char* escape_chars_first, const char* escape_chars_last);
+/*
+Find functions that allow escaping of the character to look for. Useful for parsing.
+Note that an escape character escapes the character immediatelly following it. These functions assume that the
+escape character also escapes itself.
+*/
+TMSU_DEF const char* tmsu_find_char_unescaped(const char* str, char c, char escape_char);
+TMSU_DEF const char* tmsu_find_first_of_unescaped(const char* str, const char* find_str, char escape_char);
+TMSU_DEF const char* tmsu_find_char_unescaped_n(const char* str_first, const char* str_last, char c, char escape_char);
+TMSU_DEF const char* tmsu_find_first_of_unescaped_n(const char* str_first, const char* str_last,
+                                                    const char* find_str_first, const char* find_str_last,
+                                                    char escape_char);
+
+/* Ignores case for ascii characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case(const char* str, char c);
+TMSU_DEF const char* tmsu_find_ignore_case(const char* str, const char* find_str);
 
 typedef struct {
     const char* current;

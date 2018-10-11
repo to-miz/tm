@@ -228,6 +228,7 @@ TMSU_DEF const char* tmsu_find_first_not_of_n(const char* str_first, const char*
     TM_ASSERT(find_str_first <= find_str_last);
 
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
+    if (!find_str_len) return str_first; /* Empty always matches. */
     while (str_first != str_last && TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len)) {
         ++str_first;
     }
@@ -322,85 +323,111 @@ TMSU_DEF const char* tmsu_find_ignore_case_n(const char* str_first, const char* 
 
 /* Find functions that allow escaping of the character to look for. Useful for parsing. */
 
-TMSU_DEF const char* tmsu_find_char_escaped(const char* str, char c, char escape_char) {
-    TM_ASSERT(str);
-    if (*str == c) return str;
-    do {
-        str = tmsu_find_char(str + 1, c);
-    } while (*str && *(str - 1) == escape_char);
-    return str;
+static tm_bool tmsu_is_char_unescaped(const char* first, const char* last, char escape_char) {
+    /* Count how many escape chars precede last. */
+    const char* pos = last;
+    while (pos > first && *(pos - 1) == escape_char) --pos;
+    TM_ASSERT(last >= pos);
+    size_t preceding_escape_chars_count = (size_t)(last - pos);
+    /* If there are even number of escape chars before last, they all escaped each other. */
+    return (preceding_escape_chars_count & 1) == 0;
 }
-TMSU_DEF const char* tmsu_find_first_of_escaped(const char* str, const char* find_str, char escape_char) {
+
+TMSU_DEF const char* tmsu_find_char_unescaped(const char* str, char c, char escape_char) {
     TM_ASSERT(str);
-    TM_ASSERT(find_str);
-    if (TM_STRCHR(find_str, TMSU_C2I(*str)) != TM_NULL) return str;
-    do {
-        str = tmsu_find_first_of(str + 1, find_str);
-    } while (*str && *(str - 1) == escape_char);
-    return str;
-}
-TMSU_DEF const char* tmsu_find_first_of_escape_chars(const char* str, const char* find_str, const char* escape_chars) {
-    TM_ASSERT(str);
-    TM_ASSERT(find_str);
-    TM_ASSERT(TM_STRLEN(find_str) <= TM_STRLEN(escape_chars));
-    if (TM_STRCHR(find_str, TMSU_C2I(*str)) != TM_NULL) return str;
-    char escape_char = 0;
-    do {
-        ++str;
-        const char* found = TM_NULL;
-        while (*str && (found = TM_STRCHR(find_str, TMSU_C2I(*str))) == TM_NULL) {
-            ++str;
+    if (c != escape_char) {
+        if (*str == c) return str;
+        const char* start = str;
+        for (;;) {
+            str = tmsu_find_char(str + 1, c);
+            if (!*str) return str;
+            if (tmsu_is_char_unescaped(start, str, escape_char)) return str;
         }
-        escape_char = (found) ? *(escape_chars + (found - find_str)) : 0;
-    } while (*str && *(str - 1) == escape_char);
+    } else {
+        /* We are looking for an unescaped escape char.
+         * Since we are doing lookahead, we don't need to backtrack like in the other case. */
+        for (;;) {
+            str = tmsu_find_char(str, c);
+            if (!*str) return str;
+            if (*(str + 1) == c) {
+                str += 2;
+                continue;
+            }
+            return str;
+        }
+    }
+}
+TMSU_DEF const char* tmsu_find_first_of_unescaped(const char* str, const char* find_str, char escape_char) {
+    TM_ASSERT(str);
+    TM_ASSERT(find_str);
+    if (!*find_str) return str; /* Empty always matches. */
+    const char* first = str;
+    for (;;) {
+        str = tmsu_find_first_of(str, find_str);
+        if (!*str) return str;
+        if (*str == escape_char) {
+            if (*(str + 1) == escape_char) {
+                str += 2;
+                first = str;
+                continue;
+            }
+            return str;
+        }
+        if (tmsu_is_char_unescaped(first, str, escape_char)) return str;
+        ++str;
+    }
     return str;
 }
-TMSU_DEF const char* tmsu_find_char_escaped_n(const char* str_first, const char* str_last, char c, char escape_char) {
+TMSU_DEF const char* tmsu_find_char_unescaped_n(const char* str_first, const char* str_last, char c, char escape_char) {
     TM_ASSERT(str_first <= str_last);
     if (str_first == str_last) return str_last;
-    if (*str_first == c) return str_first;
-    do {
-        str_first = tmsu_find_char_n(str_first + 1, str_last, c);
-    } while (str_first != str_last && *(str_first - 1) == escape_char);
-    return str_first;
+
+    const char* str = str_first;
+    if (c != escape_char) {
+        if (*str == c) return str;
+        for (;;) {
+            str = tmsu_find_char_n(str + 1, str_last, c);
+            if (str == str_last) return str;
+            if (tmsu_is_char_unescaped(str_first, str, escape_char)) return str;
+        }
+    } else {
+        /* We are looking for an unescaped escape char.
+         * Since we are doing lookahead, we don't need to backtrack like in the other case. */
+        for (;;) {
+            str = tmsu_find_char_n(str, str_last, c);
+            if (str == str_last) return str;
+            if (str + 1 != str_last && *(str + 1) == c) {
+                str += 2;
+                continue;
+            }
+            return str;
+        }
+    }
 }
-TMSU_DEF const char* tmsu_find_first_of_escaped_n(const char* str_first, const char* str_last,
-                                                  const char* find_str_first, const char* find_str_last,
-                                                  char escape_char) {
+TMSU_DEF const char* tmsu_find_first_of_unescaped_n(const char* str_first, const char* str_last,
+                                                    const char* find_str_first, const char* find_str_last,
+                                                    char escape_char) {
     TM_ASSERT(str_first <= str_last);
     TM_ASSERT(find_str_first <= find_str_last);
     if (str_first == str_last) return str_last;
     if (find_str_first == find_str_last) return str_first; /* Empty string always matches. */
 
-    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
-    if (TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len) != TM_NULL) return str_first;
-    do {
-        str_first = tmsu_find_first_of_n(str_first + 1, str_last, find_str_first, find_str_last);
-    } while (str_first != str_last && *(str_first - 1) == escape_char);
-    return str_first;
-}
-TMSU_DEF const char* tmsu_find_first_of_escape_chars_n(const char* str_first, const char* str_last,
-                                                       const char* find_str_first, const char* find_str_last,
-                                                       const char* escape_chars_first, const char* escape_chars_last) {
-    TM_ASSERT(str_first <= str_last);
-    TM_ASSERT(find_str_first <= find_str_last);
-    TM_ASSERT(escape_chars_first <= escape_chars_last);
-    TM_ASSERT(tmsu_distance_sz(find_str_first, find_str_last) <=
-              tmsu_distance_sz(escape_chars_first, escape_chars_last));
-
-    size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
-    if (TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len) != TM_NULL) return str_first;
-    char escape_char = 0;
-    do {
-        ++str_first;
-        const char* found = TM_NULL;
-        while (str_first != str_last &&
-               (found = (const char*)TM_MEMCHR(find_str_first, TMSU_C2I(*str_first), find_str_len)) == TM_NULL) {
-            ++str_first;
+    const char* str = str_first;
+    for (;;) {
+        str = tmsu_find_first_of_n(str, str_last, find_str_first, find_str_last);
+        if (str == str_last) return str;
+        if (*str == escape_char) {
+            if (str + 1 != str_last && *(str + 1) == escape_char) {
+                str += 2;
+                str_first = str;
+                continue;
+            }
+            return str;
         }
-        escape_char = (found) ? *(escape_chars_first + (found - find_str_first)) : 0;
-    } while (str_first != str_last && *(str_first - 1) == escape_char);
-    return str_first;
+        if (tmsu_is_char_unescaped(str_first, str, escape_char)) return str;
+        ++str;
+    }
+    return str;
 }
 
 /* Tokenizer */
