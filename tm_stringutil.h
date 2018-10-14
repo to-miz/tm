@@ -716,7 +716,7 @@ TMSU_DEF const char* tmsu_find_first_of_unescaped(const char* str, const char* f
             }
             return str;
         }
-        if (tmsu_is_char_unescaped(first, str, escape_char)) return str;
+        if (tmsu_is_char_unescaped(first, str, escape_char)) break;
         ++str;
     }
     return str;
@@ -767,7 +767,7 @@ TMSU_DEF const char* tmsu_find_first_of_unescaped_n(const char* str_first, const
             }
             return str;
         }
-        if (tmsu_is_char_unescaped(str_first, str, escape_char)) return str;
+        if (tmsu_is_char_unescaped(str_first, str, escape_char)) break;
         ++str;
     }
     return str;
