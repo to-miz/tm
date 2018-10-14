@@ -22,6 +22,7 @@ PURPOSE
 HISTORY
     v0.2   14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
                     Added tmsu_equals.
+                    Fixed MSVC warning about unreachable code.
     v0.1   07.10.18 Initial commit.
 */
 
