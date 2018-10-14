@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.1 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.2 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -20,7 +20,9 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
-    v0.1   07.10.18 initial commit
+    v0.2   14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
+                    Added tmsu_equals.
+    v0.1   07.10.18 Initial commit.
 */
 
 /* This is a generated file, do not modify directly. You can find the generator files in the src directory. */
@@ -46,14 +48,24 @@ HISTORY
         #ifndef TM_STRLEN
             #define TM_STRLEN strlen
         #endif
-        #ifndef TM_STRSTR
-            #define TM_STRSTR strstr
-        #endif
         #ifndef TM_STRNCMP
             #define TM_STRNCMP strncmp
         #endif
         #ifndef TM_MEMCMP
             #define TM_MEMCMP memcmp
+        #endif
+
+        /* Optional defines. */
+        #ifndef TM_STRSTR
+            #define TM_STRSTR strstr
+        #endif
+        #ifndef TM_STRCMP
+            #define TM_STRCMP strcmp
+        #endif
+        #ifndef TM_STRICMP
+            #ifdef WIN32
+                #define TM_STRICMP _stricmp
+            #endif
         #endif
     #endif
 
@@ -240,11 +252,21 @@ TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
 
 /* Comparisons */
 
+/* Lexicographical comparisons. */
+TMSU_DEF int tmsu_compare(const char* a, const char* b);
+TMSU_DEF int tmsu_compare_ignore_case(const char* a, const char* b);
+
 TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
 TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
                                         const char* b_last);
+
 /* String comparison for humans. See http://stereopsis.com/strcmp4humans.html. */
 TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+
+/* Equality check, faster than lexicographical compare, since we can check lengths first. */
+TMSU_DEF tm_bool tmsu_equals_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+TMSU_DEF tm_bool tmsu_equals_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
+                                           const char* b_last);
 
 TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str);
 TMSU_DEF tm_bool tmsu_ends_with(const char* str, const char* find_str);
@@ -459,6 +481,7 @@ TMSU_DEF const char* tmsu_find_last_n(const char* str_first, const char* str_las
 
 TMSU_DEF const char* tmsu_find(const char* str, const char* find_str) {
     TM_ASSERT(str);
+    TM_ASSERT(find_str);
 
 #ifdef TM_STRSTR
     return TM_STRSTR(str, find_str);
@@ -467,8 +490,7 @@ TMSU_DEF const char* tmsu_find(const char* str, const char* find_str) {
 #if 0
     return tmsu_find_n(str, str + TM_STRLEN(str), find_str, TM_STRLEN(find_str));
 #else
-    size_t find_str_len = TM_STRLEN(find_str);
-    if (!find_str || !*find_str) return str;
+    if (!*find_str) return str;
     for (;;) {
         while (*str && *str != *find_str) {
             ++str;
@@ -818,18 +840,55 @@ TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last) {
 
 /* Comparisons */
 
+TMSU_DEF int tmsu_compare(const char* a, const char* b) {
+    TM_ASSERT(a);
+    TM_ASSERT(b);
+#ifdef TM_STRCMP
+    return TM_STRCMP(a, b);
+#else
+    while (*a && *b && *a == *b) {
+        ++a;
+        ++b;
+    }
+    return *b - *a;
+#endif
+}
+TMSU_DEF int tmsu_compare_ignore_case(const char* a, const char* b) {
+    TM_ASSERT(a);
+    TM_ASSERT(b);
+#ifdef TM_STRICMP
+    return TM_STRICMP(a, b);
+#else
+    while (*a && *b && TM_TOUPPER(TMSU_C2I(*a)) == TM_TOUPPER(TMSU_C2I(*b))) {
+        ++a;
+        ++b;
+    }
+    return TM_TOUPPER(TMSU_C2I(*b)) - TM_TOUPPER(TMSU_C2I(*a));
+#endif
+}
+
 TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last) {
     TM_ASSERT(a_first <= a_last);
     TM_ASSERT(b_first <= b_last);
 
     size_t a_len = tmsu_distance_sz(a_first, a_last);
     size_t b_len = tmsu_distance_sz(b_first, b_last);
-    if (!a_len || !b_len) return !a_len - !b_len;
+    if (!a_len || !b_len) return !b_len - !a_len;
+    if (a_first == b_first) {
+        if (a_len > b_len) return 1;
+        if (a_len < b_len) return -1;
+        return 0;
+    }
+
+    size_t len = (a_len < b_len) ? a_len : b_len;
+    if(len) {
+        int common_cmp = TM_MEMCMP(a_first, b_first, len);
+        if (common_cmp != 0) return common_cmp;
+    }
+
     if (a_len > b_len) return 1;
     if (a_len < b_len) return -1;
-    if (a_first == b_first) return 0;
-
-    return TM_MEMCMP(a_first, b_first, a_len);
+    return 0;
 }
 TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
                                         const char* b_last) {
@@ -838,17 +897,23 @@ TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last,
 
     size_t a_len = tmsu_distance_sz(a_first, a_last);
     size_t b_len = tmsu_distance_sz(b_first, b_last);
-    if (!a_len || !b_len) return !a_len - !b_len;
-    if (a_len > b_len) return 1;
-    if (a_len < b_len) return -1;
-    if (a_first == b_first) return 0;
+    if (!a_len || !b_len) return !b_len - !a_len;
+    if (a_first == b_first) {
+        if (a_len > b_len) return 1;
+        if (a_len < b_len) return -1;
+        return 0;
+    }
 
-    for (size_t i = 0; i < a_len; ++i) {
+    size_t len = (a_len < b_len) ? a_len : b_len;
+    for (size_t i = 0; i < len; ++i) {
         int a = TM_TOUPPER(TMSU_C2I(a_first[i]));
         int b = TM_TOUPPER(TMSU_C2I(b_first[i]));
         int diff = a - b;
         if (diff != 0) return diff;
     }
+
+    if (a_len > b_len) return 1;
+    if (a_len < b_len) return -1;
     return 0;
 }
 
@@ -878,9 +943,8 @@ TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const
 
     size_t a_len = tmsu_distance_sz(a_first, a_last);
     size_t b_len = tmsu_distance_sz(b_first, b_last);
-    if (!a_len || !b_len) return !a_len - !b_len;
+    if (!a_len || !b_len) return !b_len - !a_len;
     if (a_first == b_first) {
-        /*return (int)(a_len - b_len);*/ /* Might overflow/underflow. */
         if (a_len > b_len) return 1;
         if (a_len < b_len) return -1;
         return 0;
@@ -892,7 +956,29 @@ TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const
         int diff = a - b;
         if (diff != 0) return diff;
     }
-    return (a_first != a_last) - (b_first != b_last);
+
+    if (a_len > b_len) return 1;
+    if (a_len < b_len) return -1;
+    return 0;
+}
+
+TMSU_DEF tm_bool tmsu_equals_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last) {
+    size_t a_len = tmsu_distance_sz(a_first, a_last);
+    size_t b_len = tmsu_distance_sz(b_first, b_last);
+    if (a_len != b_len) return TM_FALSE;
+    return TM_MEMCMP(a_first, b_first, a_len) == 0;
+}
+TMSU_DEF tm_bool tmsu_equals_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
+                                           const char* b_last) {
+    size_t a_len = tmsu_distance_sz(a_first, a_last);
+    size_t b_len = tmsu_distance_sz(b_first, b_last);
+    if (a_len != b_len) return TM_FALSE;
+    for (size_t i = 0; i < a_len; ++i) {
+        int a = TM_TOUPPER(TMSU_C2I(a_first[i]));
+        int b = TM_TOUPPER(TMSU_C2I(b_first[i]));
+        if (a != b) return TM_FALSE;
+    }
+    return TM_TRUE;
 }
 
 TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str) {

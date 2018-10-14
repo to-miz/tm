@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.1 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.2 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -20,7 +20,9 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
-    v0.1   07.10.18 initial commit
+    v0.2   14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
+                    Added tmsu_equals.
+    v0.1   07.10.18 Initial commit.
 */
 
 #include "../common/GENERATED_WARNING.inc"
@@ -42,14 +44,24 @@ HISTORY
         #ifndef TM_STRLEN
             #define TM_STRLEN strlen
         #endif
-        #ifndef TM_STRSTR
-            #define TM_STRSTR strstr
-        #endif
         #ifndef TM_STRNCMP
             #define TM_STRNCMP strncmp
         #endif
         #ifndef TM_MEMCMP
             #define TM_MEMCMP memcmp
+        #endif
+
+        /* Optional defines. */
+        #ifndef TM_STRSTR
+            #define TM_STRSTR strstr
+        #endif
+        #ifndef TM_STRCMP
+            #define TM_STRCMP strcmp
+        #endif
+        #ifndef TM_STRICMP
+            #ifdef WIN32
+                #define TM_STRICMP _stricmp
+            #endif
         #endif
     #endif
 
@@ -217,11 +229,21 @@ TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
 
 /* Comparisons */
 
+/* Lexicographical comparisons. */
+TMSU_DEF int tmsu_compare(const char* a, const char* b);
+TMSU_DEF int tmsu_compare_ignore_case(const char* a, const char* b);
+
 TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
 TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
                                         const char* b_last);
+
 /* String comparison for humans. See http://stereopsis.com/strcmp4humans.html. */
 TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+
+/* Equality check, faster than lexicographical compare, since we can check lengths first. */
+TMSU_DEF tm_bool tmsu_equals_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+TMSU_DEF tm_bool tmsu_equals_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
+                                           const char* b_last);
 
 TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str);
 TMSU_DEF tm_bool tmsu_ends_with(const char* str, const char* find_str);
