@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.2 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.3 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -20,6 +20,7 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
+    v0.3   15.10.18 Added more string_view overloads.
     v0.2   14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
                     Added tmsu_equals.
                     Fixed MSVC warning about unreachable code.

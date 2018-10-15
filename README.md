@@ -13,7 +13,7 @@ tm_conversion.h | From and to string conversion library with minimal dependencie
 tm_json.h | C++ and C99 json parsing library that can do both json reading and parsing into a json document for queries. Accepts a wide variety of flags, can be used to parse json in strict mode, or in json5 mode with the right combination of flags. | C99/C++ | v0.1.5
 tm_polygon.h | Triangulation and clipping of polygons. Clipping supports union, difference and substraction. | C99/C++ | v1.1
 tm_print.h | Lightweight typesafe variadic print and snprint using C++11 and variadic templates. | C++11 | v0.0.8
-tm_stringutil.h | String utility functions, from matching, comparison to tokenizing. | C99/C++ | v0.2
+tm_stringutil.h | String utility functions, from matching, comparison to tokenizing. | C99/C++ | v0.3
 tm_unicode.h | Extracting codepoints from utf8/utf16 strings and conversion between them. | C99/C++ | v1.0.1a
 tm_utility.h | Utility and convenience functions, mainly for my personal use. | C++11 | v1.1.4
 
