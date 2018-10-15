@@ -349,6 +349,8 @@ tm_bool tmsu_ends_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
 tm_bool tmsu_starts_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
 tm_bool tmsu_ends_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
 
+tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, TM_STRING_VIEW find_str, tmsu_string_view* out);
+
 #endif
 
 #endif /* !defined(_TM_STRINGUTIL_INCLUDED_49458961_DD38_441D_B888_A589548CA6F5_) */
@@ -1232,9 +1234,14 @@ tm_bool tmsu_starts_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str
     return tmsu_starts_with_ignore_case_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str),
                                           TMSU_SV_END(find_str));
 }
+
 tm_bool tmsu_ends_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
     return tmsu_ends_with_ignore_case_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str),
                                         TMSU_SV_END(find_str));
+}
+
+tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, TM_STRING_VIEW find_str, tmsu_string_view* out) {
+    return tmsu_next_token_n(tokenizer, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str), out);
 }
 
 #undef TMSU_SV_BEGIN

@@ -29,3 +29,5 @@ tm_bool tmsu_starts_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
 tm_bool tmsu_ends_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
 tm_bool tmsu_starts_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
 tm_bool tmsu_ends_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
+
+tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, TM_STRING_VIEW find_str, tmsu_string_view* out);
