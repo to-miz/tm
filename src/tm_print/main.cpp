@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.8 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.9 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,6 +19,8 @@ ISSUES
     current locale.
 
 HISTORY
+    v0.0.9  02.11.18 moved the fixed size array inside PrintArgList into the variadic template functions
+                     so its size can be deduced from the number of arguments
     v0.0.8  06.10.18 refactored some common macro blocks into include files
                      fixed compilation error when TM_STRING_VIEW is defined
                      added TMP_DEFAULT_FLAGS
@@ -57,7 +59,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#define TMP_VERSION 0x00000008u
+#define TMP_VERSION 0x00000009u
 
 #include "dependencies_header.h"
 
@@ -160,7 +162,7 @@ union PrintValue {
 };
 
 struct PrintArgList {
-    PrintValue args[PrintType::Count];
+    PrintValue* args;
     uint64_t flags;
     unsigned int size;
 };
@@ -188,6 +190,6 @@ TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, 
 
 #ifdef TM_PRINT_IMPLEMENTATION
 #include "implementation.cpp"
-#endif // TM_PRINT_IMPLEMENTATION
+#endif  // TM_PRINT_IMPLEMENTATION
 
 #include "../common/LICENSE.inc"
