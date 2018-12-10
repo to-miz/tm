@@ -515,3 +515,20 @@ tm_stringutil-tests: ${TM_STRINGUTIL_TESTS_OUT} ${TM_STRINGUTIL_C_OUT}
 
 tm_stringutil-run-tests: ${TM_STRINGUTIL_TESTS_OUT} ${TM_STRINGUTIL_C_OUT}
 	@${TM_STRINGUTIL_TESTS_OUT}
+
+# tm_file
+
+TM_FILE_UNMERGED := ${build_dir}/tm_file-unmerged${ext}
+TM_FILE_C_OUT := ${build_dir}/tm_file-c${ext}
+TM_FILE_TESTS_OUT := ${build_dir}/tm_file-tests${ext}
+
+tm_file.h: ${TM_FILE_UNMERGED} ${MERGE_OUT} src/tm_file/*.cpp
+	@echo merging tm_file.h
+	@${MERGE_OUT} src/tm_file/main.cpp $@ src/tm_file -r
+
+tm_file-merge: tm_file.h
+
+${TM_FILE_UNMERGED}: ${build_dir} src/tm_file/*.cpp
+	@$(call cxx_compile,src/tm_file/test.cpp,$@,src/tm_file ./,)
+
+tm_file-unmerged: ${TM_FILE_UNMERGED}
