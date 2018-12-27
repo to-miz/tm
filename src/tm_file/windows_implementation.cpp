@@ -1,16 +1,25 @@
 /* Use malloc if provided, otherwise fall back to process heap. */
-#ifdef TM_MALLOC
-	#define TMF_MALLOC TM_MALLOC
-	#define TMF_FREE TM_FREE
+#ifdef TM_REALLOC
+    #define TMF_MALLOC TM_MALLOC
+    #define TMF_REALLOC TM_REALLOC
+    #define TMF_FREE TM_FREE
 #else
-	#define TMF_MALLOC(type, size, alignment) (type*)HeapAlloc(GetProcessHeap(), 0, (size) * sizeof(type))
-	#define TMF_FREE(ptr, size, alignment) HeapFree(GetProcessHeap(), 0, (ptr))
+    #define TMF_MALLOC(type, size, alignment) (type*)HeapAlloc(GetProcessHeap(), 0, (size) * sizeof(type))
+    #define TMF_REALLOC(type, ptr, old_size, old_alignment, new_size, new_alignment) \
+        (type*)HeapReAlloc(GetProcessHeap(), 0, (ptr), (new_size) * sizeof(type))
+    #define TMF_FREE(ptr, size, alignment) HeapFree(GetProcessHeap(), 0, (ptr))
 #endif
 
 #ifdef TM_MEMMOVE
-	#define TMF_MEMMOVE TM_MEMMOVE
+    #define TMF_MEMMOVE TM_MEMMOVE
 #else
-	#define TMF_MEMMOVE(dest, src, size) MoveMemory((dest), (src), (size))
+    #define TMF_MEMMOVE MoveMemory
+#endif
+
+#ifdef TM_MEMCPY
+    #define TMF_MEMCPY TM_MEMCPY
+#else
+    #define TMF_MEMCPY CopyMemory
 #endif
 
 typedef WCHAR tmf_tchar;
@@ -29,6 +38,8 @@ static WCHAR* tmf_strchrw(WCHAR* str, WCHAR c) {
 }
 #define TMF_STRCHRW tmf_strchrw
 #endif
+
+#define TMF_WCSLEN(str) lstrlenW((str))
 
 typedef struct {
     tmf_tchar* path;
@@ -63,6 +74,10 @@ tm_errc tmf_winerror_to_errc(DWORD error, tm_errc def) {
         case ERROR_INVALID_HANDLE:
         case ERROR_INVALID_NAME:
         case ERROR_NEGATIVE_SEEK:
+        case ERROR_NO_UNICODE_TRANSLATION:
+        case ERROR_INVALID_PARAMETER:
+        case ERROR_INVALID_FLAGS:
+        case ERROR_INSUFFICIENT_BUFFER:
             return TM_EINVAL;
 
         case ERROR_FILE_NOT_FOUND:
@@ -161,26 +176,9 @@ tmf_platform_path tmf_to_platform_path(const char* path) {
     return tmf_to_platform_path_n(path, (tm_size_t)lstrlenA(path));
 }
 
-void tmf_to_tmf_path(char* path) {
-    TM_ASSERT(path);
-
-    for (;; ++path) {
-        switch (*path) {
-            case 0:
-                return;
-            case '\\': {
-                *path = '/';
-                break;
-            }
-        }
-    }
-}
-
 void tmf_destroy_platform_path(tmf_platform_path* platform_path) {
     if (platform_path) {
-        if (platform_path->path) {
-            TMF_FREE(platform_path->path, platform_path->size, sizeof(tmf_tchar));
-        }
+        if (platform_path->path) TMF_FREE(platform_path->path, platform_path->size, sizeof(tmf_tchar));
         *platform_path = {TM_NULL, 0};
     }
 }
@@ -217,12 +215,12 @@ tmf_file_timestamp_result tmf_file_timestamp_t(const WCHAR* filename) {
     }
 
     TM_STATIC_ASSERT(sizeof(result.file_time) == sizeof(fileAttr.ftLastWriteTime), invalid_file_time_size);
-    CopyMemory(&result.file_time, &fileAttr.ftLastWriteTime, sizeof(fileAttr.ftLastWriteTime));
+    TMF_MEMCPY(&result.file_time, &fileAttr.ftLastWriteTime, sizeof(fileAttr.ftLastWriteTime));
     return result;
 }
 
 tmf_contents_result tmf_read_file_t(const WCHAR* filename) {
-    tmf_contents_result result = {{TM_NULL, 0}, TM_OK};
+    tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
 
     HANDLE file =
         CreateFileW(filename, GENERIC_READ, FILE_SHARE_READ, TM_NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, TM_NULL);
@@ -243,7 +241,8 @@ tmf_contents_result tmf_read_file_t(const WCHAR* filename) {
         return result;
     }
 
-    char* data = TMF_MALLOC(char, (tm_size_t)size.QuadPart, sizeof(char));
+    tm_size_t data_size = (tm_size_t)size.QuadPart;
+    char* data = TMF_MALLOC(char, data_size, sizeof(char));
     if (!data) {
         result.ec = TM_ENOMEM;
         return result;
@@ -260,46 +259,18 @@ tmf_contents_result tmf_read_file_t(const WCHAR* filename) {
     CloseHandle(file);
 
     result.contents.data = data;
-    result.contents.size = (tm_size_t)size.QuadPart;
+    result.contents.capacity = result.contents.size = data_size;
     return result;
 }
 
-static tm_errc tmf_create_directory_internal(const WCHAR* dir, tm_size_t dir_len) {
-    if (dir_len <= 0) return TM_OK;
-    if (dir_len == 1 && dir[0] == L'\\') return TM_OK;
-    if (dir_len == 2 && (dir[0] == L'.' || dir[0] == L'~') && dir[1] == L'\\') return TM_OK;
-
-    tm_size_t dir_str_len = dir_len + 1;
-    WCHAR* dir_str = TMF_MALLOC(WCHAR, dir_str_len, sizeof(WCHAR));
-    if (!dir_str) return TM_ENOMEM;
-    CopyMemory(dir_str, dir, dir_len);
-    dir_str[dir_str_len] = 0;
-
-    if (tmf_directory_exists_t(dir_str).exists) {
-        TMF_FREE(dir_str, dir_str_len, sizeof(WCHAR));
-        return TM_OK;
-    }
-
-    /* Create directory tree recursively. */
+static tm_errc tmf_create_single_directory_t(const WCHAR* dir) {
     tm_errc result = TM_OK;
-    WCHAR* end = TMF_STRCHRW(dir_str, L'\\');
-    for (;;) {
-        tm_bool was_null = (end == TM_NULL);
-        if (!was_null) *end = 0;
-
-        if (!CreateDirectoryW(dir_str, TM_NULL)) {
-            DWORD error = GetLastError();
-            if (error != ERROR_ALREADY_EXISTS) {
-                result = tmf_winerror_to_errc(error, TM_EIO);
-                break;
-            }
+    if (!CreateDirectoryW(dir, TM_NULL)) {
+        DWORD error = GetLastError();
+        if (error != ERROR_ALREADY_EXISTS) {
+            result = tmf_winerror_to_errc(error, TM_EIO);
         }
-
-        if (was_null || *(end + 1) == 0) break;
-        *end = L'\\';
-        end = TMF_STRCHRW(end + 1, L'\\');
     }
-    TMF_FREE(dir_str, dir_str_len, sizeof(WCHAR));
     return result;
 }
 
@@ -390,7 +361,7 @@ tmf_write_file_result tmf_write_file_ex_t(const WCHAR* filename, const void* dat
     /* Limitation of GetTempFileNameW, dir_len cannot be bigger than MAX_PATH - 14. */
     if (dir_len < MAX_PATH - 14) {
         WCHAR temp_dir[MAX_PATH];
-        CopyMemory(temp_dir, filename, dir_len);
+        TMF_MEMCPY(temp_dir, filename, dir_len);
         temp_dir[dir_len] = 0;
         if (GetTempFileNameW(temp_dir, L"tmf", 0, temp_file_buffer) == 0) {
             result.ec = TM_EIO;
@@ -405,9 +376,9 @@ tmf_write_file_result tmf_write_file_ex_t(const WCHAR* filename, const void* dat
             result.ec = TM_ENOMEM;
             return result;
         }
-        CopyMemory(temp_file, filename, filename_len * sizeof(WCHAR));
+        TMF_MEMCPY(temp_file, filename, filename_len * sizeof(WCHAR));
         /* Copy filename ending + null terminator. */
-        CopyMemory(temp_file + filename_len, ".tmf_tmp", sizeof(WCHAR) * 9);
+        TMF_MEMCPY(temp_file + filename_len, ".tmf_tmp", sizeof(WCHAR) * 9);
     }
 
     TM_ASSERT(temp_file);
@@ -448,31 +419,28 @@ tm_errc tmf_delete_file_t(const WCHAR* filename) {
     return TM_OK;
 }
 
-tm_errc tmf_create_directory_t(const WCHAR* dir) {
-    int dirlen = lstrlenW(dir);
-    return tmf_create_directory_internal(dir, dirlen);
-}
-
 tm_errc tmf_delete_directory_t(const WCHAR* dir) {
     if (!RemoveDirectoryW(dir)) return tmf_winerror_to_errc(GetLastError(), TM_EIO);
     return TM_OK;
 }
 
-static tmf_contents_result tmf_to_utf8(const WCHAR* str, tm_size_t extra_size, int* written) {
-    tmf_contents_result result = {{TM_NULL, 0}, TM_OK};
+static tmf_contents_result tmf_to_utf8(const WCHAR* str, tm_size_t extra_size) {
+    tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
     if (str && *str) {
         int size = WideCharToMultiByte(CP_UTF8, 0, str, -1, TM_NULL, 0, TM_NULL, TM_NULL);
-        if (size) {
-        	TM_ASSERT(extra_size < INT32_MAX - size);
-            size += (int)extra_size;
+        if (!size) {
+            result.ec = tmf_winerror_to_errc(GetLastError(), TM_EINVAL);
+        } else {
+            TM_ASSERT(extra_size < INT32_MAX - size);
+            size += (int)extra_size + 1;
             result.contents.data = TMF_MALLOC(char, size, sizeof(char));
             if (!result.contents.data) {
                 result.ec = TM_ENOMEM;
             } else {
-                int real_size = WideCharToMultiByte(CP_UTF8, 0, str, -1, result.contents.data, size, TM_NULL, TM_NULL);
-                result.contents.size = (tm_size_t)size;
+                result.contents.capacity = size;
 
-                *written = real_size;
+                int real_size = WideCharToMultiByte(CP_UTF8, 0, str, -1, result.contents.data, size, TM_NULL, TM_NULL);
+                result.contents.size = (tm_size_t)real_size;
 
                 /* Always nullterminate. */
                 if (!real_size) {
@@ -493,7 +461,7 @@ static tmf_contents_result tmf_to_utf8(const WCHAR* str, tm_size_t extra_size, i
 tmf_contents_result tmf_current_working_directory(tm_size_t extra_size) {
     TM_ASSERT_VALID_SIZE(extra_size);
 
-	tmf_contents_result result = {{TM_NULL, 0}, TM_OK};
+    tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
 
     DWORD len = GetCurrentDirectoryW(0, TM_NULL);
     if (!len) {
@@ -507,19 +475,11 @@ tmf_contents_result tmf_current_working_directory(tm_size_t extra_size) {
     }
 
     DWORD written = GetCurrentDirectoryW(len, dir);
+    TM_UNREFERENCED(written);
     TM_ASSERT(written == len);
 
-    int result_len = 0;
-    result = tmf_to_utf8(dir, extra_size + 1, &result_len);
-    if (result.ec == TM_OK) {
-        tmf_to_tmf_path(result.contents.data);
-        /* Append '/' at the end of the current directory if it doesn't exist. */
-        if (result_len && result.contents.data[result_len - 1] != '/') {
-            result.contents.data[result_len] = '/';
-            TM_ASSERT(result_len + 1 < result.contents.size);
-            result.contents.data[result_len + 1] = 0;
-        }
-    }
+    result = tmf_to_utf8(dir, extra_size + 1);
+    if (result.ec == TM_OK) tmf_to_tmf_path(&result.contents, /*is_dir=*/TM_TRUE);
     TMF_FREE(dir, len, sizeof(WCHAR));
     return result;
 }

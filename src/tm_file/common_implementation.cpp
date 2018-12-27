@@ -1,3 +1,41 @@
+static tm_errc tmf_create_directory_internal(const WCHAR* dir, tm_size_t dir_len) {
+    if (dir_len <= 0) return TM_OK;
+    if (dir_len == 1 && dir[0] == L'\\') return TM_OK;
+    if (dir_len == 2 && (dir[0] == L'.' || dir[0] == L'~') && dir[1] == L'\\') return TM_OK;
+
+    tm_size_t dir_str_len = dir_len + 1;
+    WCHAR* dir_str = TMF_MALLOC(WCHAR, dir_str_len, sizeof(WCHAR));
+    if (!dir_str) return TM_ENOMEM;
+    TMF_MEMCPY(dir_str, dir, dir_len);
+    dir_str[dir_str_len] = 0;
+
+    if (tmf_directory_exists_t(dir_str).exists) {
+        TMF_FREE(dir_str, dir_str_len, sizeof(WCHAR));
+        return TM_OK;
+    }
+
+    /* Create directory tree recursively. */
+    tm_errc result = TM_OK;
+    WCHAR* end = TMF_STRCHRW(dir_str, L'\\');
+    for (;;) {
+        tm_bool was_null = (end == TM_NULL);
+        if (!was_null) *end = 0;
+
+        result = tmf_create_single_directory_t(dir_str);
+        if (result != TM_OK) break;
+
+        if (was_null || *(end + 1) == 0) break;
+        *end = L'\\';
+        end = TMF_STRCHRW(end + 1, L'\\');
+    }
+    TMF_FREE(dir_str, dir_str_len, sizeof(WCHAR));
+    return result;
+}
+
+tm_errc tmf_create_directory_t(const WCHAR* dir) {
+    return tmf_create_directory_internal(dir, (tm_size_t)TMF_WCSLEN(dir));
+}
+
 int tmf_compare_file_time(tmf_file_time a, tmf_file_time b) {
     int64_t cmp = (int64_t)(a - b);
     if (cmp < 0) return -1;
@@ -8,11 +46,12 @@ int tmf_compare_file_time(tmf_file_time a, tmf_file_time b) {
 void tmf_destroy_contents(tmf_contents* contents) {
     if (contents) {
         if (contents->data) {
-            TM_ASSERT(contents->size > 0);
-            TMF_FREE(contents->data, contents->size, sizeof(char));
+            TM_ASSERT(contents->capacity > 0);
+            TMF_FREE(contents->data, contents->capacity, sizeof(char));
         }
         contents->data = TM_NULL;
         contents->size = 0;
+        contents->capacity = 0;
     }
 }
 
@@ -41,11 +80,11 @@ tmf_write_file_result tmf_write_file_ex(const char* filename, const void* data, 
     return result;
 }
 
-tmf_contents_result tmf_read_file_as_utf8(const char* filename) {
-    tmf_contents_result result = {{TM_NULL, 0}, TM_OK};
+tmf_contents_result tmf_read_file_as_utf8(const char* filename, tm_bool validate) {
+    tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
     tmf_contents_result file = tmf_read_file(filename);
     if (file.ec == TM_OK) {
-        result = tmf_convert_to_utf8(file.contents);
+        result = tmf_convert_to_utf8(file.contents, validate);
         if (result.contents.data != file.contents.data) tmf_destroy_contents(&file.contents);
     }
     return result;
@@ -120,11 +159,14 @@ tmf_write_file_result tmf_write_file_ex(TM_STRING_VIEW filename, const void* dat
     return result;
 }
 
-tmf_contents_result tmf_read_file_as_utf8(TM_STRING_VIEW filename) {
+tmf_contents_result tmf_read_file_as_utf8(TM_STRING_VIEW filename, tm_bool validate) {
+    tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
     tmf_contents_result file = tmf_read_file(filename);
-    /* TODO: Convert file to utf8. */
-    TM_ASSERT(0 && "Not implemented.");
-    return file;
+    if (file.ec == TM_OK) {
+        result = tmf_convert_to_utf8(file.contents, validate);
+        if (result.contents.data != file.contents.data) tmf_destroy_contents(&file.contents);
+    }
+    return result;
 }
 tmf_write_file_result tmf_write_file_as_utf8(TM_STRING_VIEW filename, const char* data, tm_size_t size) {
     return tmf_write_file_as_utf8_ex(filename, data, size, tmf_overwrite | tmf_write_byte_order_marker);
@@ -161,8 +203,8 @@ tmf_read_file_managed_result tmf_read_file_managed(TM_STRING_VIEW filename) {
     result.ec = read_file_result.ec;
     return result;
 }
-tmf_read_file_managed_result tmf_read_file_as_utf8_managed(TM_STRING_VIEW filename) {
-    tmf_contents_result read_file_result = tmf_read_file_as_utf8(filename);
+tmf_read_file_managed_result tmf_read_file_as_utf8_managed(TM_STRING_VIEW filename, tm_bool validate) {
+    tmf_contents_result read_file_result = tmf_read_file_as_utf8(filename, validate);
 
     tmf_read_file_managed_result result;
     result.contents.data = read_file_result.contents.data;
@@ -227,8 +269,8 @@ tmf_read_file_managed_result tmf_read_file_managed(const char* filename) {
     return result;
 }
 
-tmf_read_file_managed_result tmf_read_file_as_utf8_managed(const char* filename) {
-    tmf_contents_result read_file_result = tmf_read_file_as_utf8(filename);
+tmf_read_file_managed_result tmf_read_file_as_utf8_managed(const char* filename, tm_bool validate) {
+    tmf_contents_result read_file_result = tmf_read_file_as_utf8(filename, validate);
 
     tmf_read_file_managed_result result;
     result.contents.data = read_file_result.contents.data;

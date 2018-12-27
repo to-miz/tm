@@ -1,3 +1,20 @@
+/*
+References:
+ERRNO:
+    http://www.virtsync.com/c-error-codes-include-errno
+    https://en.cppreference.com/w/cpp/error/errc
+
+GNU: https://www.gnu.org/software/libc/manual/html_node/File-System-Interface.html#File-System-Interface
+
+WINAPI:
+    FILE: https://docs.microsoft.com/en-us/windows/desktop/fileio/file-management-functions
+    DIRECTORY: https://docs.microsoft.com/en-us/windows/desktop/FileIO/directory-management-functions
+
+WINDOWS CRT:
+    FILE: https://docs.microsoft.com/en-us/cpp/c-runtime-library/file-handling?view=vs-2017
+    DIRECTORY: https://docs.microsoft.com/en-us/cpp/c-runtime-library/directory-control?view=vs-2017
+*/
+
 #include "../common/GENERATED_WARNING.inc"
 
 #ifdef TM_FILE_IMPLEMENTATION
@@ -19,6 +36,7 @@
 typedef struct {
     char* data;
     tm_size_t size;
+    tm_size_t capacity;
 
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
     operator TM_STRING_VIEW() const;
@@ -47,7 +65,7 @@ tmf_file_timestamp_result tmf_file_timestamp(const char* filename);
 int tmf_compare_file_time(tmf_file_time a, tmf_file_time b);
 
 tmf_contents_result tmf_read_file(const char* filename);
-tmf_contents_result tmf_read_file_as_utf8(const char* filename);
+tmf_contents_result tmf_read_file_as_utf8(const char* filename, tm_bool validate);
 void tmf_destroy_contents(tmf_contents* contents);
 
 typedef struct {
@@ -93,7 +111,7 @@ struct tmf_read_file_managed_result {
     tm_errc ec;
 };
 tmf_read_file_managed_result tmf_read_file_managed(const char* filename);
-tmf_read_file_managed_result tmf_read_file_as_utf8_managed(const char* filename);
+tmf_read_file_managed_result tmf_read_file_as_utf8_managed(const char* filename, tm_bool validate);
 
 #if defined(TMF_USE_STL)
 std::vector<char> tmf_read_file_to_vector(const char* filename);
@@ -108,7 +126,7 @@ tmf_contents_result tmf_read_file(TM_STRING_VIEW filename);
 tmf_write_file_result tmf_write_file(TM_STRING_VIEW filename, const void* data, tm_size_t size);
 tmf_write_file_result tmf_write_file_ex(TM_STRING_VIEW filename, const void* data, tm_size_t size, uint32_t flags);
 
-tmf_contents_result tmf_read_file_as_utf8(TM_STRING_VIEW filename);
+tmf_contents_result tmf_read_file_as_utf8(TM_STRING_VIEW filename, tm_bool validate);
 tmf_write_file_result tmf_write_file_as_utf8(TM_STRING_VIEW filename, const char* data, tm_size_t size);
 tmf_write_file_result tmf_write_file_as_utf8_ex(TM_STRING_VIEW filename, const char* data, tm_size_t size,
                                                 uint32_t flags);
@@ -116,7 +134,7 @@ tmf_write_file_result tmf_write_file_as_utf8_ex(TM_STRING_VIEW filename, const c
 tm_errc tmf_rename_file(TM_STRING_VIEW from, TM_STRING_VIEW to);
 tm_errc tmf_rename_file_ex(TM_STRING_VIEW from, TM_STRING_VIEW to, uint32_t flags);
 tmf_read_file_managed_result tmf_read_file_managed(TM_STRING_VIEW filename);
-tmf_read_file_managed_result tmf_read_file_as_utf8_managed(TM_STRING_VIEW filename);
+tmf_read_file_managed_result tmf_read_file_as_utf8_managed(TM_STRING_VIEW filename, tm_bool validate);
 
 tm_errc tmf_create_directory(TM_STRING_VIEW dir);
 tm_errc tmf_delete_directory(TM_STRING_VIEW dir);
@@ -148,8 +166,31 @@ static const unsigned char tmf_utf16_le_bom[2] = {0xFF, 0xFE};
 static const unsigned char tmf_utf32_be_bom[4] = {0x00, 0x00, 0xFE, 0xFF};
 static const unsigned char tmf_utf32_le_bom[4] = {0xFF, 0xFE, 0x00, 0x00};
 
+void tmf_to_tmf_path(tmf_contents* path, tm_bool is_dir) {
+    TM_ASSERT(path);
+    TM_ASSERT((path->data && path->capacity > 0) || (!path->data && path->capacity == 0));
+
+    for (char* str = path->data; *str; ++str) {
+        if (*str == '\\') *str = '/';
+    }
+
+    if (is_dir && path->size > 0) {
+        /* Append '/' at the end of the directory path if it doesn't exist. */
+        if (path->data[path->size - 1] != '/') {
+            path->data[path->size++] = '/';
+            TM_ASSERT(path->size <= path->capacity);
+        }
+    }
+}
+static tm_errc tmf_create_directory_internal(const WCHAR* dir, tm_size_t dir_len);
+
 #ifdef TMF_USE_WINDOWS_H
 #include "windows_implementation.cpp"
+#endif
+
+#ifdef TMF_USE_CRT
+/* Needs wchar.h on MSVC. */
+#include "msvc_crt.cpp"
 #endif
 
 #include "utf_conversion.cpp"
