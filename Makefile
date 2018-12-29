@@ -423,11 +423,23 @@ tm_print-run-tests: tm_print-tests
 TM_JSON_DEPS := ${build_dir} ${TESTS_DOCTEST_DEP} tm_json.h tests/src/tm_json/main.cpp
 TM_JSON_SRC := tests/src/tm_json/main.cpp
 TM_JSON_TESTS_OUT := ${build_dir}/tm_json_tests${ext}
+TM_JSON_UNMERGED := ${build_dir}/tm_json-unmerged${ext}
+TM_JSON_UNMERGED_C := ${build_dir}/tm_json-unmerged-c${ext}
 
 ${TM_JSON_TESTS_OUT}: ${TM_JSON_DEPS}
 	@$(call cxx_compile,${TM_JSON_SRC},$@,${TESTS_INCLUDE_DIRS},)
 
+${TM_JSON_UNMERGED}: ${build_dir} src/tm_json/*.cpp
+	@$(call cxx_compile,src/tm_json/test.cpp,$@,src/tm_json ./,)
+
+${TM_JSON_UNMERGED_C}: ${build_dir} src/tm_json/*.c
+	@$(call cxx_compile,src/tm_json/test.c,$@,src/tm_json ./,)
+
 tm_json-tests: ${TM_JSON_TESTS_OUT}
+
+tm_json-unmerged: ${TM_JSON_UNMERGED}
+
+tm_json-unmerged-c: ${TM_JSON_UNMERGED_C}
 
 # tm_bin_packing.h
 
