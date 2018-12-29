@@ -1,22 +1,22 @@
-static tm_errc tmf_create_directory_internal(const WCHAR* dir, tm_size_t dir_len) {
+static tm_errc tmf_create_directory_internal(const tmf_tchar* dir, tm_size_t dir_len) {
     if (dir_len <= 0) return TM_OK;
-    if (dir_len == 1 && dir[0] == L'\\') return TM_OK;
-    if (dir_len == 2 && (dir[0] == L'.' || dir[0] == L'~') && dir[1] == L'\\') return TM_OK;
+    if (dir_len == 1 && dir[0] == TMF_TEXT('\\')) return TM_OK;
+    if (dir_len == 2 && (dir[0] == TMF_TEXT('.') || dir[0] == TMF_TEXT('~')) && dir[1] == TMF_TEXT('\\')) return TM_OK;
 
     tm_size_t dir_str_len = dir_len + 1;
-    WCHAR* dir_str = TMF_MALLOC(WCHAR, dir_str_len, sizeof(WCHAR));
+    tmf_tchar* dir_str = TMF_MALLOC(tmf_tchar, dir_str_len, sizeof(tmf_tchar));
     if (!dir_str) return TM_ENOMEM;
-    TMF_MEMCPY(dir_str, dir, dir_len);
+    TMF_MEMCPY(dir_str, dir, dir_len * sizeof(tmf_tchar));
     dir_str[dir_str_len] = 0;
 
     if (tmf_directory_exists_t(dir_str).exists) {
-        TMF_FREE(dir_str, dir_str_len, sizeof(WCHAR));
+        TMF_FREE(dir_str, dir_str_len, sizeof(tmf_tchar));
         return TM_OK;
     }
 
     /* Create directory tree recursively. */
     tm_errc result = TM_OK;
-    WCHAR* end = TMF_STRCHRW(dir_str, L'\\');
+    tmf_tchar* end = TMF_TEXTCHR(dir_str, TMF_TEXT('\\'));
     for (;;) {
         tm_bool was_null = (end == TM_NULL);
         if (!was_null) *end = 0;
@@ -25,15 +25,15 @@ static tm_errc tmf_create_directory_internal(const WCHAR* dir, tm_size_t dir_len
         if (result != TM_OK) break;
 
         if (was_null || *(end + 1) == 0) break;
-        *end = L'\\';
-        end = TMF_STRCHRW(end + 1, L'\\');
+        *end = TMF_TEXT('\\';)
+        end = TMF_TEXTCHR(end + 1, TMF_TEXT('\\'));
     }
-    TMF_FREE(dir_str, dir_str_len, sizeof(WCHAR));
+    TMF_FREE(dir_str, dir_str_len, sizeof(tmf_tchar));
     return result;
 }
 
-tm_errc tmf_create_directory_t(const WCHAR* dir) {
-    return tmf_create_directory_internal(dir, (tm_size_t)TMF_WCSLEN(dir));
+tm_errc tmf_create_directory_t(const tmf_tchar* dir) {
+    return tmf_create_directory_internal(dir, (tm_size_t)TMF_TEXTLEN(dir));
 }
 
 int tmf_compare_file_time(tmf_file_time a, tmf_file_time b) {

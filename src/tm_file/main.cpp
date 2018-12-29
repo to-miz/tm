@@ -182,16 +182,56 @@ void tmf_to_tmf_path(tmf_contents* path, tm_bool is_dir) {
         }
     }
 }
-static tm_errc tmf_create_directory_internal(const WCHAR* dir, tm_size_t dir_len);
+static tm_errc tmf_create_directory_internal(const wchar_t* dir, tm_size_t dir_len);
 
 #ifdef TMF_USE_WINDOWS_H
 #include "windows_implementation.cpp"
 #endif
 
 #ifdef TMF_USE_CRT
+
+/* Use malloc if provided, otherwise fall back to heap. */
+#ifdef TM_REALLOC
+    #define TMF_MALLOC TM_MALLOC
+    #define TMF_REALLOC TM_REALLOC
+    #define TMF_FREE TM_FREE
+#else
+    #define TMF_MALLOC(type, size, alignment) (type*)malloc((size) * sizeof(type))
+    #define TMF_REALLOC(type, ptr, old_size, old_alignment, new_size, new_alignment) \
+        (type*)realloc((ptr), (new_size) * sizeof(type))
+    #define TMF_FREE(ptr, size, alignment) free((ptr))
+#endif
+
+#ifdef TM_MEMMOVE
+    #define TMF_MEMMOVE TM_MEMMOVE
+#else
+    #define TMF_MEMMOVE memmove
+#endif
+
+#ifdef TM_MEMCPY
+    #define TMF_MEMCPY TM_MEMCPY
+#else
+    #define TMF_MEMCPY memcpy
+#endif
+
+#ifdef TM_WCSCHR
+    #define TMF_STRCHRW TM_WCSCHR
+#else
+    #define TMF_STRCHRW wcschr
+#endif
+
+#define TMF_STRLEN strlen
+#define TMF_WCSLEN wcslen
+
+#if defined(_MSC_VER)
 /* Needs wchar.h on MSVC. */
 #include "msvc_crt.cpp"
+#elif defined(__GNUC__) || defined(__clang__)
+#include "gnu_crt.cpp"
 #endif
+
+#include "common_crt.cpp"
+#endif /* defined(TMF_USE_CRT) */
 
 #include "utf_conversion.cpp"
 
