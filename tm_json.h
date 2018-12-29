@@ -113,6 +113,7 @@ HISTORY
                       fixed an error in compareString
                       renamed compareString functions to stringEquals, since they only check equality
                       removed tmj_bool and TMJ_NULL, using tm_bool and TM_NULL instead
+                      reformatted and switched to indentation using spaces
     v0.1.5  06.10.18  refactored preprocessor
                       changed tmj_size_t to tm_size_t
                       changed TMJ_STRING_VIEW to TM_STRING_VIEW
