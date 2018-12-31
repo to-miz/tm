@@ -116,6 +116,7 @@ HISTORY
                       fixed GCC unused-function warning when building in release builds
                       improved default implementation of string conversion functions
                       fixed clang compilation errors for C99 compilation
+                      fixed cl compilation errors for C99 compilation
                       switched from using toupper to tolower for case insensitive comparisons
                       fixed jsonToFloat to also use TM_INFINITY and TM_NAN
     v0.1.6  29.12.18  fixed GCC warnings for multi-line comment, missing-field-initializers and implicit-fallthrough
@@ -2280,7 +2281,9 @@ tm_size_t jsonCopyConcatenatedString(JsonStringView str, char* buffer, tm_size_t
                 ++next;
                 skip = TM_TRUE;
             }
-            JsonStringView current = {p, (tm_size_t)(next - p)};
+            JsonStringView current;
+            current.data = p;
+            current.size = (tm_size_t)(next - p);
             tm_size_t len = jsonCopyUnescapedString(current, buffer, size);
             buffer += len;
             size -= len;
@@ -2576,7 +2579,10 @@ static JsonErrorType jsonReadArray(JsonReader* reader, JsonStackAllocator* alloc
 TMJ_DEF JsonAllocatedDocument jsonAllocateDocument(const char* data, tm_size_t size, unsigned int flags) {
     size_t poolSize = size * sizeof(JsonValue);
     char* pool = (char*)TMJ_ALLOCATE(poolSize, JSON_ALIGNMENT_VALUE);
-    JsonStackAllocator allocator = {pool, 0, size * sizeof(JsonValue)};
+    JsonStackAllocator allocator;
+    allocator.ptr = pool;
+    allocator.size = 0;
+    allocator.capacity = size * sizeof(JsonValue);
     JsonAllocatedDocument result;
     result.document = jsonMakeDocument(&allocator, data, size, flags);
     result.pool = pool;
@@ -2847,7 +2853,10 @@ static JsonErrorType jsonReadArrayEx(JsonReader* reader, JsonStackAllocator* all
 TMJ_DEF JsonAllocatedDocument jsonAllocateDocumentEx(const char* data, tm_size_t size, unsigned int flags) {
     size_t poolSize = size * sizeof(JsonValue);
     char* pool = (char*)TMJ_ALLOCATE(poolSize, JSON_ALIGNMENT_VALUE);
-    JsonStackAllocator allocator = {pool, 0, size * sizeof(JsonValue)};
+    JsonStackAllocator allocator;
+    allocator.ptr = pool;
+    allocator.size = 0;
+    allocator.capacity = size * sizeof(JsonValue);
     JsonAllocatedDocument result;
     result.document = jsonMakeDocumentEx(&allocator, data, size, flags);
     result.pool = pool;

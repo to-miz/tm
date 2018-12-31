@@ -429,10 +429,10 @@ TM_JSON_UNMERGED_C := ${build_dir}/tm_json-unmerged-c${ext}
 ${TM_JSON_TESTS_OUT}: ${TM_JSON_DEPS}
 	@$(call cxx_compile,${TM_JSON_SRC},$@,${TESTS_INCLUDE_DIRS},)
 
-${TM_JSON_UNMERGED}: ${build_dir} src/tm_json/*.cpp
+${TM_JSON_UNMERGED}: ${build_dir} src/tm_json/*.cpp tm_json.h
 	@$(call cxx_compile,src/tm_json/test.cpp,$@,src/tm_json ./,)
 
-${TM_JSON_UNMERGED_C}: ${build_dir} src/tm_json/*.c
+${TM_JSON_UNMERGED_C}: ${build_dir} src/tm_json/*.c tm_json.h
 	@$(call c_compile,src/tm_json/test.c,$@,src/tm_json ./,)
 
 tm_json-tests: ${TM_JSON_TESTS_OUT}
