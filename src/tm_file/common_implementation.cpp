@@ -1,7 +1,7 @@
 static tm_errc tmf_create_directory_internal(const tmf_tchar* dir, tm_size_t dir_len) {
     if (dir_len <= 0) return TM_OK;
-    if (dir_len == 1 && dir[0] == TMF_TEXT('\\')) return TM_OK;
-    if (dir_len == 2 && (dir[0] == TMF_TEXT('.') || dir[0] == TMF_TEXT('~')) && dir[1] == TMF_TEXT('\\')) return TM_OK;
+    if (dir_len == 1 && dir[0] == TMF_DIR_DELIM) return TM_OK;
+    if (dir_len == 2 && (dir[0] == TMF_TEXT('.') || dir[0] == TMF_TEXT('~')) && dir[1] == TMF_DIR_DELIM) return TM_OK;
 
     tm_size_t dir_str_len = dir_len + 1;
     tmf_tchar* dir_str = TMF_MALLOC(tmf_tchar, dir_str_len, sizeof(tmf_tchar));
@@ -16,7 +16,7 @@ static tm_errc tmf_create_directory_internal(const tmf_tchar* dir, tm_size_t dir
 
     /* Create directory tree recursively. */
     tm_errc result = TM_OK;
-    tmf_tchar* end = TMF_TEXTCHR(dir_str, TMF_TEXT('\\'));
+    tmf_tchar* end = TMF_TEXTCHR(dir_str, TMF_DIR_DELIM);
     for (;;) {
         tm_bool was_null = (end == TM_NULL);
         if (!was_null) *end = 0;
@@ -25,8 +25,8 @@ static tm_errc tmf_create_directory_internal(const tmf_tchar* dir, tm_size_t dir
         if (result != TM_OK) break;
 
         if (was_null || *(end + 1) == 0) break;
-        *end = TMF_TEXT('\\';)
-        end = TMF_TEXTCHR(end + 1, TMF_TEXT('\\'));
+        *end = TMF_DIR_DELIM;
+        end = TMF_TEXTCHR(end + 1, TMF_DIR_DELIM);
     }
     TMF_FREE(dir_str, dir_str_len, sizeof(tmf_tchar));
     return result;
@@ -84,7 +84,7 @@ tmf_contents_result tmf_read_file_as_utf8(const char* filename, tm_bool validate
     tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
     tmf_contents_result file = tmf_read_file(filename);
     if (file.ec == TM_OK) {
-        result = tmf_convert_to_utf8(file.contents, validate);
+        result = tmf_convert_file_to_utf8(file.contents, validate);
         if (result.contents.data != file.contents.data) tmf_destroy_contents(&file.contents);
     }
     return result;
@@ -163,7 +163,7 @@ tmf_contents_result tmf_read_file_as_utf8(TM_STRING_VIEW filename, tm_bool valid
     tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
     tmf_contents_result file = tmf_read_file(filename);
     if (file.ec == TM_OK) {
-        result = tmf_convert_to_utf8(file.contents, validate);
+        result = tmf_convert_file_to_utf8(file.contents, validate);
         if (result.contents.data != file.contents.data) tmf_destroy_contents(&file.contents);
     }
     return result;

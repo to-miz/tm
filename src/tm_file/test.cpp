@@ -3,7 +3,7 @@
 #define TM_STRING_VIEW_DATA(x) (x).data()
 #define TM_STRING_VIEW_SIZE(x) (x).size()
 
-#if defined(_WIN32)
+#if defined(_WIN32) && 0
 #define TMF_USE_WINDOWS_H
 #else
 #define TMF_USE_CRT

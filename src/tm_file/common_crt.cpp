@@ -1,3 +1,30 @@
+tmf_contents_result tmf_read_file_t(const tmf_tchar* filename) {
+    tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
+
+    FILE* f = TMF_FOPEN_READ(filename);
+    if (!f) {
+        result.ec = errno;
+    } else {
+        if (fseek(f, 0, SEEK_END) != 0)  {
+            result.ec = TM_EIO;
+        } else {
+            long fsize = ftell(f);
+            if(fsize < 0) {
+                result.ec = errno;
+            } else {
+                if (fseek(f, 0, SEEK_SET) != 0)  {
+                    result.ec = TM_EIO;
+                }
+
+                char* data = TMF_MALLOC(char, fsize + 1, sizeof(char));
+                fread(data, fsize, 1, f);
+                fclose(f);
+            }
+        }
+    }
+
+    return result;
+}
 
 tmf_exists_result tmf_file_exists_t(const tmf_tchar* filename) {
     TM_ASSERT(filename);

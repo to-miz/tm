@@ -1,3 +1,9 @@
+typedef WCHAR tmf_tchar;
+#define TMF_TEXT(x) L##x
+#define TMF_TEXTLEN TMF_WCSLEN
+#define TMF_TEXTCHR TMF_STRCHRW
+#define TMF_DIR_DELIM L'\\'
+
 /* Use malloc if provided, otherwise fall back to process heap. */
 #ifdef TM_REALLOC
     #define TMF_MALLOC TM_MALLOC

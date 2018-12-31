@@ -49,6 +49,8 @@ uint32_t tmf_extract_u32_le(tmf_contents* contents) {
 #undef TMF_WIDEN
 
 tm_bool tmf_grow_by(tmf_contents* contents, tm_size_t amount) {
+    TM_ASSERT(contents);
+    TM_ASSERT_VALID_SIZE(contents->size);
     TM_ASSERT(contents->capacity >= contents->size);
 
     if ((contents->capacity - contents->size) >= amount) return TM_TRUE;
@@ -59,13 +61,13 @@ tm_bool tmf_grow_by(tmf_contents* contents, tm_size_t amount) {
 
     contents->data = new_data;
     contents->capacity = new_capacity;
-
     return TM_TRUE;
 }
 
 #define TMF_MAX_UTF32 0x10FFFFu
 
-tm_bool tmf_append_codepoint(tmf_contents* contents, uint32_t codepoint) {
+tm_bool tmf_utf8_append_codepoint(tmf_contents* contents, uint32_t codepoint) {
+    TM_ASSERT(contents);
     TM_ASSERT(codepoint <= TMF_MAX_UTF32);
     if (codepoint < 0x80) {
         /* 1 byte sequence */
@@ -99,6 +101,59 @@ tm_bool tmf_append_codepoint(tmf_contents* contents, uint32_t codepoint) {
         contents->size += 4;
     }
 
+    return TM_TRUE;
+}
+
+typedef struct {
+    uint16_t* data;
+    tm_size_t size;
+    tm_size_t capacity;
+} tmf_utf16_contents;
+
+typedef struct {
+    tmf_utf16_contents contents;
+    tm_errc ec;
+} tmf_utf16_contents_result;
+
+tm_bool tmf_utf16_grow_by(tmf_utf16_contents* contents, tm_size_t amount) {
+    TM_ASSERT(contents);
+    TM_ASSERT_VALID_SIZE(contents->size);
+    TM_ASSERT(contents->capacity >= contents->size);
+
+    if ((contents->capacity - contents->size) >= amount) return TM_TRUE;
+
+    tm_size_t new_capacity = contents->capacity + (contents->capacity / 2);
+    uint16_t* new_data =
+        TMF_REALLOC(uint16_t, contents->data, contents->capacity, sizeof(uint16_t), new_capacity, sizeof(uint16_t));
+    if (!new_data) return TM_FALSE;
+
+    contents->data = new_data;
+    contents->capacity = new_capacity;
+    return TM_TRUE;
+}
+
+tm_bool tmf_utf16_append_codepoint(tmf_utf16_contents* contents, uint32_t codepoint) {
+    TM_ASSERT(codepoint <= TMF_MAX_UTF32);
+    if (codepoint < 0xD7FF) {
+        if (!tmf_utf16_grow_by(contents, 1)) return TM_FALSE;
+        uint16_t* cur = contents->data + contents->size;
+        cur[0] = (uint16_t)codepoint;
+        contents->size += 1;
+    } else if (codepoint >= 0xE000 && codepoint <= 0xFFFF) {
+        if (!tmf_utf16_grow_by(contents, 1)) return TM_FALSE;
+        uint16_t* cur = contents->data + contents->size;
+        cur[0] = (uint16_t)codepoint;
+        contents->size += 1;
+    } else if (codepoint >= 0x10000 && codepoint <= 0x10FFFF) {
+        if (!tmf_utf16_grow_by(contents, 2)) return TM_FALSE;
+        uint16_t* cur = contents->data + contents->size;
+        codepoint -= 0x10000;
+        cur[0] = 0xD800 + (uint16_t)(codepoint >> 10);
+        cur[1] = 0xDC00 + (uint16_t)(codepoint & 0x3FF);
+        contents->size += 2;
+    } else {
+        return TM_FALSE;
+    }
     return TM_TRUE;
 }
 
@@ -159,15 +214,97 @@ tm_size_t tmf_skip_invalid_utf8(char* str, tm_size_t len) {
         tm_size_t i = len - remaining;
         tm_size_t range = tmf_valid_utf8_range(str + i, remaining);
 
-        if (cur != str + i) {
-            TMF_MEMMOVE(cur, str + i, range);
-        }
+        if (cur != str + i) TMF_MEMMOVE(cur, str + i, range);
         cur += range;
         if (range == remaining) break;
         TM_ASSERT(remaining >= range + 1);
         remaining -= range + 1;
     }
     return (tm_size_t)(cur - str);
+}
+
+typedef struct {
+    const uint16_t* cur;
+    const uint16_t* end;
+} tmf_utf16_stream;
+
+typedef struct {
+    uint32_t codepoint;
+    tm_errc ec;
+} tmf_codepoint_result;
+
+tmf_codepoint_result tmf_extract_from_utf16_stream(tmf_utf16_stream* stream) {
+    tmf_codepoint_result result = {0xFFFFFFFFu, TM_EINVAL};
+    const uint16_t* cur = stream->cur;
+    uint16_t const* const end = stream->end;
+    if (cur != end) {
+        uint32_t lead = *cur;
+        ++cur;
+
+        /* Check for surrogate pair. */
+        if (lead >= TMF_LEAD_SURROGATE_MIN && lead <= TMF_LEAD_SURROGATE_MAX) {
+            if (cur != end) {
+                uint32_t trail = *cur;
+                ++cur;
+                if (trail >= TMF_TRAILING_SURROGATE_MIN && trail <= TMF_TRAILING_SURROGATE_MAX) {
+                    result.codepoint = (lead << 10) + trail + TMF_SURROGATE_OFFSET;
+                }
+            }
+        } else {
+            result.codepoint = lead;
+        }
+
+        result.ec = (result.codepoint > TMF_MAX_UTF32) ? TM_EINVAL : TM_OK;
+        stream->cur = cur;
+    }
+    return result;
+}
+
+typedef struct {
+    const char* cur;
+    const char* end;
+} tmf_utf8_stream;
+
+tmf_codepoint_result tmf_extract_from_utf8_stream(tmf_utf8_stream* stream) {
+    tmf_codepoint_result result = {0xFFFFFFFFu, TM_EINVAL};
+    const char* cur = stream->cur;
+    tm_size_t remaining = (tm_size_t)(stream->end - cur);
+    if (remaining > 0) {
+        uint32_t first = (uint8_t)cur[0];
+        if (first < 0x80) {
+            result.codepoint = first;
+            cur += 1;
+        } else if ((first >> 5) == 0x6) {  // 110xxxxx 10xxxxxx
+            // 2 byte sequence
+            if (remaining >= 2) {
+                uint32_t second = (uint8_t)cur[1];
+                result.codepoint = ((first & 0x1F) << 6) | (second & 0x3F);
+                cur += 2;
+            }
+        } else if ((first >> 4) == 0xE) {  // 1110xxxx 10xxxxxx 10xxxxxx
+            // 3 byte sequence
+            if (remaining >= 3) {
+                uint32_t second = (uint8_t)cur[1];
+                uint32_t third = (uint8_t)cur[2];
+                result.codepoint = ((first & 0xF) << 12) | ((second & 0x3F) << 6) | (third & 0x3F);
+                cur += 3;
+            }
+        } else if ((first >> 3) == 0x1E) {  // 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+            // 4 byte sequence
+            if (remaining >= 4) {
+                uint32_t second = (uint8_t)cur[1];
+                uint32_t third = (uint8_t)cur[2];
+                uint32_t fourth = (uint8_t)cur[3];
+                result.codepoint =
+                    ((first & 0x7) << 18) | ((second & 0x3F) << 12) | ((third & 0x3F) << 6) | (fourth & 0x3f);
+                cur += 4;
+            }
+        }
+
+        result.ec = (result.codepoint > TMF_MAX_UTF32) ? TM_EINVAL : TM_OK;
+        stream->cur = cur;
+    }
+    return result;
 }
 
 tmf_contents_result tmf_convert_file_from_utf16(tmf_contents contents, uint16_t (*extract)(tmf_contents*),
@@ -214,7 +351,7 @@ tmf_contents_result tmf_convert_file_from_utf16(tmf_contents contents, uint16_t 
                     continue;
                 }
             }
-            if (!tmf_append_codepoint(&result.contents, codepoint)) {
+            if (!tmf_utf8_append_codepoint(&result.contents, codepoint)) {
                 result.ec = TM_ENOMEM;
                 tmf_destroy_contents(&result.contents);
                 break;
@@ -248,7 +385,7 @@ tmf_contents_result tmf_convert_file_from_utf32(tmf_contents contents, uint32_t 
                     continue;
                 }
             }
-            if (!tmf_append_codepoint(&result.contents, codepoint)) {
+            if (!tmf_utf8_append_codepoint(&result.contents, codepoint)) {
                 result.ec = TM_ENOMEM;
                 tmf_destroy_contents(&result.contents);
                 break;
@@ -263,7 +400,7 @@ tmf_contents_result tmf_convert_file_from_utf32(tmf_contents contents, uint32_t 
 
 #undef TMF_MAX_UTF32
 
-tmf_contents_result tmf_convert_to_utf8(tmf_contents contents, tm_bool validate) {
+tmf_contents_result tmf_convert_file_to_utf8(tmf_contents contents, tm_bool validate) {
     tmf_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
 
     if (contents.data) {
@@ -323,4 +460,31 @@ tmf_contents_result tmf_convert_to_utf8(tmf_contents contents, tm_bool validate)
     }
 
     return result;
+}
+
+tmf_utf16_contents_result tmf_utf8_stream_to_utf16(tmf_utf8_stream stream) {
+    TM_UNREFERENCED_PARAM(stream);
+    tmf_utf16_contents_result result = {};
+    return result;
+}
+
+tmf_utf16_contents_result tmf_utf8_to_utf16(const char* str) {
+    TM_ASSERT(str);
+
+    tmf_utf8_stream stream;
+    stream.cur = str;
+    stream.end = str + TMF_STRLEN(str);
+
+    return tmf_utf8_stream_to_utf16(stream);
+}
+
+tmf_utf16_contents_result tmf_utf8_n_to_utf16(const char* str, tm_size_t len) {
+    TM_ASSERT_VALID_SIZE(len);
+    TM_ASSERT(str || !len);
+
+    tmf_utf8_stream stream;
+    stream.cur = str;
+    stream.end = str + len;
+
+    return tmf_utf8_stream_to_utf16(stream);
 }

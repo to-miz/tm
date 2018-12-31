@@ -2,6 +2,7 @@ typedef char tmf_tchar;
 #define TMF_TEXT(x) x
 #define TMF_TEXTLEN strlen
 #define TMF_TEXTCHR strchr
+#define TMF_DIR_DELIM '/'
 
 #define TMF_STAT stat
 #define TMF_STRUCT_STAT struct stat
