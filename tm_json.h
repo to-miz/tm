@@ -212,7 +212,7 @@ HISTORY
         #define TMJ_TO_UINT(str, len, base, def) tmj_to_uint((str), (len), (base), (def))
         #define TMJ_TO_INT64(str, len, base, def) tmj_to_int64((str), (len), (base), (def))
         #define TMJ_TO_UINT64(str, len, base, def) tmj_to_uint64((str), (len), (base), (def))
-        #define TMJ_TO_FLOAT(str, len, def) tmj_to_float((str), (len), (def))
+        #define TMJ_TO_FLOAT(str, len, def) (float)tmj_to_double((str), (len), (double)(def))
         #define TMJ_TO_DOUBLE(str, len, def) tmj_to_double((str), (len), (def))
     #endif
 #endif
