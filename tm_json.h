@@ -110,12 +110,16 @@ ISSUES
       json objects should be turned into hashmaps manually when applicable
 
 HISTORY
-    v0.1.7  31.12.18  added more error info to jsonDocument
+    v0.1.7  31.12.18  added stringStartsWith to be used when appropriate instead of stringEquals
+                      fixed a bug with null values not being parsed properly
+                      added more error info to jsonDocument
                       fixed GCC unused-function warning when building in release builds
                       improved default implementation of string conversion functions
                       fixed clang compilation errors for C99 compilation
+                      switched from using toupper to tolower for case insensitive comparisons
+                      fixed jsonToFloat to also use TM_INFINITY and TM_NAN
     v0.1.6  29.12.18  fixed GCC warnings for multi-line comment, missing-field-initializers and implicit-fallthrough
-                      fixed an error in compareString
+                      fixed a bug with compareString acting like stringStartsWith
                       renamed compareString functions to stringEquals, since they only check equality
                       removed tmj_bool and TMJ_NULL, using tm_bool and TM_NULL instead
                       reformatted and switched to indentation using spaces
@@ -153,7 +157,7 @@ HISTORY
         #define TM_ISALPHA isalpha
         #define TM_ISXDIGIT isxdigit
         #define TM_ISSPACE isspace
-        #define TM_TOUPPER toupper
+        #define TM_TOLOWER tolower
     #endif
     #ifndef TM_MEMCMP
         #include <string.h>
@@ -827,25 +831,25 @@ static tm_bool stringEqualsIgnoreCase(const char* a, size_t aSize, const char* b
     if (aSize != bSize) return TM_FALSE;
     do {
         // We know that b is already uppercased.
-        if (TM_TOUPPER((unsigned char)*a) != (unsigned char)*b) return TM_FALSE;
+        if (TM_TOLOWER((unsigned char)*a) != (unsigned char)*b) return TM_FALSE;
         ++a;
         ++b;
         --bSize;
     } while (bSize);
     return TM_TRUE;
 }
-// TODO: maybe use strncmp instead if second string is nullterminated?
-static tm_bool stringEqualsNull(const char* a, size_t aSize, const char* b) {
-    return stringEquals(a, aSize, b, TM_STRLEN(b));
+
+static tm_bool stringStartsWith(const char* a, size_t aSize, const char* b, size_t bSize) {
+    TM_ASSERT(bSize > 0);
+    if (aSize < bSize) return TM_FALSE;
+    return TM_MEMCMP(a, b, bSize) == 0;
 }
 
-// This function is only used in debug builds currently.
-#ifdef _DEBUG
-// TODO: maybe use strnicmp instead if second string is nullterminated?
-static tm_bool stringEqualsIgnoreCaseNull(const char* a, size_t aSize, const char* b) {
-    return stringEqualsIgnoreCase(a, aSize, b, TM_STRLEN(b));
+static tm_bool stringStartsWithIgnoreCase(const char* a, size_t aSize, const char* b, size_t bSize) {
+    TM_ASSERT(bSize > 0);
+    if (aSize < bSize) return TM_FALSE;
+    return stringEqualsIgnoreCase(a, bSize, b, bSize);
 }
-#endif
 
 #ifdef TMJ_DEFINE_OWN_STRING_CONVERSIONS
 
@@ -920,7 +924,33 @@ TMJ_DEF unsigned int jsonToUInt(JsonStringView str, unsigned int def) {
     return TMJ_TO_UINT(str.data, str.size, 10, def);
 }
 TMJ_DEF float jsonToFloat(JsonStringView str, float def) {
-    return (float)jsonToDouble(str, (double)def);
+    if (str.size <= 0) return def;
+#if defined(TM_INFINITY) || defined(TM_NAN)
+    {
+        // check for inf, nan etc
+        tm_bool neg = TM_FALSE;
+        JsonStringView str_ = str;
+        if (str_.data[0] == '+') {
+            ++str_.data;
+            --str_.size;
+        } else if (str_.data[0] == '-') {
+            neg = TM_TRUE;
+            ++str_.data;
+            --str_.size;
+        }
+#if defined(TM_INFINITY)
+        if (stringEqualsIgnoreCase(str_.data, str_.size, "infinity", 8)) {
+            return (float)((neg) ? (-TM_INFINITY) : (TM_INFINITY));
+        }
+#endif
+#if defined(TM_NAN)
+        if (stringEqualsIgnoreCase(str_.data, str_.size, "nan", 3)) {
+            return (float)((neg) ? (-TM_NAN) : (TM_NAN));
+        }
+#endif
+    }
+#endif
+    return TMJ_TO_FLOAT(str.data, str.size, def);
 }
 TMJ_DEF double jsonToDouble(JsonStringView str, double def) {
     if (str.size <= 0) return def;
@@ -938,12 +968,12 @@ TMJ_DEF double jsonToDouble(JsonStringView str, double def) {
             --str_.size;
         }
 #if defined(TM_INFINITY)
-        if (stringEqualsIgnoreCase(str_.data, str_.size, "INFINITY", 8)) {
+        if (stringEqualsIgnoreCase(str_.data, str_.size, "infinity", 8)) {
             return (neg) ? (-TM_INFINITY) : (TM_INFINITY);
         }
 #endif
 #if defined(TM_NAN)
-        if (stringEqualsIgnoreCase(str_.data, str_.size, "NAN", 3)) {
+        if (stringEqualsIgnoreCase(str_.data, str_.size, "nan", 3)) {
             return (neg) ? (-TM_NAN) : (TM_NAN);
         }
 #endif
@@ -963,9 +993,9 @@ TMJ_DEF tm_bool jsonToBool(JsonStringView str, tm_bool def) {
                 return def;
         }
     }
-    if (stringEqualsIgnoreCase(str.data, str.size, "TRUE", 4)) {
+    if (stringEqualsIgnoreCase(str.data, str.size, "true", 4)) {
         return TM_TRUE;
-    } else if (stringEqualsIgnoreCase(str.data, str.size, "FALSE", 5)) {
+    } else if (stringEqualsIgnoreCase(str.data, str.size, "false", 5)) {
         return TM_FALSE;
     }
     return def;
@@ -1206,21 +1236,21 @@ static tm_bool readNumberEx(JsonReader* reader) {
                 offset = 1;
             }
             if (reader->flags & JSON_READER_IGNORE_CASE_KEYWORDS) {
-                if (stringEqualsIgnoreCase(start, size, "INFINITY", 8)) {
+                if (stringStartsWithIgnoreCase(start, size, "infinity", 8)) {
                     reader->valueType = JVAL_FLOAT;
                     advanceValue(reader, 8 + offset);
                     return TM_TRUE;
-                } else if (stringEqualsIgnoreCase(start, size, "NAN", 3)) {
+                } else if (stringStartsWithIgnoreCase(start, size, "nan", 3)) {
                     reader->valueType = JVAL_FLOAT;
                     advanceValue(reader, 3 + offset);
                     return TM_TRUE;
                 }
             } else {
-                if (stringEquals(start, size, "infinity", 8)) {
+                if (stringStartsWith(start, size, "infinity", 8)) {
                     reader->valueType = JVAL_FLOAT;
                     advanceValue(reader, 8 + offset);
                     return TM_TRUE;
-                } else if (stringEquals(start, size, "nan", 3)) {
+                } else if (stringStartsWith(start, size, "nan", 3)) {
                     reader->valueType = JVAL_FLOAT;
                     advanceValue(reader, 3 + offset);
                     return TM_TRUE;
@@ -1231,13 +1261,13 @@ static tm_bool readNumberEx(JsonReader* reader) {
     return readNumber(reader);
 }
 static JsonTokenType readValue(JsonReader* reader) {
-    if (stringEquals(reader->data, reader->size, "true", 4)) {
+    if (stringStartsWith(reader->data, reader->size, "true", 4)) {
         reader->valueType = JVAL_BOOL;
         return advanceValue(reader, 4);
-    } else if (stringEquals(reader->data, reader->size, "false", 5)) {
+    } else if (stringStartsWith(reader->data, reader->size, "false", 5)) {
         reader->valueType = JVAL_BOOL;
         return advanceValue(reader, 5);
-    } else if (stringEquals(reader->data, reader->size, "null", 4)) {
+    } else if (stringStartsWith(reader->data, reader->size, "null", 4)) {
         reader->valueType = JVAL_NULL;
         return advanceValue(reader, 4);
     } else if (readNumber(reader)) {
@@ -1249,24 +1279,24 @@ static JsonTokenType readValue(JsonReader* reader) {
 }
 static JsonTokenType readValueEx(JsonReader* reader) {
     if (reader->flags & JSON_READER_IGNORE_CASE_KEYWORDS) {
-        if (stringEqualsIgnoreCase(reader->data, reader->size, "TRUE", 4)) {
+        if (stringStartsWithIgnoreCase(reader->data, reader->size, "true", 4)) {
             reader->valueType = JVAL_BOOL;
             return advanceValue(reader, 4);
-        } else if (stringEqualsIgnoreCase(reader->data, reader->size, "FALSE", 5)) {
+        } else if (stringStartsWithIgnoreCase(reader->data, reader->size, "false", 5)) {
             reader->valueType = JVAL_BOOL;
             return advanceValue(reader, 5);
-        } else if (stringEqualsIgnoreCase(reader->data, reader->size, "NULL", 4)) {
+        } else if (stringStartsWithIgnoreCase(reader->data, reader->size, "null", 4)) {
             reader->valueType = JVAL_NULL;
             return advanceValue(reader, 4);
         }
     } else {
-        if (stringEquals(reader->data, reader->size, "true", 4)) {
+        if (stringStartsWith(reader->data, reader->size, "true", 4)) {
             reader->valueType = JVAL_BOOL;
             return advanceValue(reader, 4);
-        } else if (stringEquals(reader->data, reader->size, "false", 5)) {
+        } else if (stringStartsWith(reader->data, reader->size, "false", 5)) {
             reader->valueType = JVAL_BOOL;
             return advanceValue(reader, 5);
-        } else if (stringEquals(reader->data, reader->size, "null", 4)) {
+        } else if (stringStartsWith(reader->data, reader->size, "null", 4)) {
             reader->valueType = JVAL_NULL;
             return advanceValue(reader, 4);
         }
@@ -2874,8 +2904,8 @@ TMJ_DEF void jsonFreeDocument(JsonAllocatedDocument* doc) {
 TMJ_DEF tm_bool jsonIsNull(JsonValueArg value) {
 #ifdef _DEBUG
     if (TMJ_DEREF(value).type == JVAL_NULL) {
-        TM_ASSERT(stringEqualsIgnoreCaseNull(TMJ_DEREF(value).data.content.data, TMJ_DEREF(value).data.content.size,
-                                              "null"));
+        TM_ASSERT(
+            stringEqualsIgnoreCase(TMJ_DEREF(value).data.content.data, TMJ_DEREF(value).data.content.size, "null", 4));
     }
 #endif  // _DEBUG
     return TMJ_DEREF(value).type == JVAL_NULL && TMJ_DEREF(value).data.content.data != TM_NULL;
@@ -2916,8 +2946,9 @@ TMJ_DEF JsonValue jsonGetMember(JsonObjectArg object, const char* name) {
     JsonValue result = {0};
     JsonNode* it = TMJ_DEREF(object).nodes;
     JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    size_t len = TM_STRLEN(name);
     for (; it < last; ++it) {
-        if (stringEqualsNull(it->name.data, it->name.size, name)) {
+        if (stringEquals(it->name.data, it->name.size, name, len)) {
             result = it->value;
             break;
         }
@@ -2931,8 +2962,9 @@ TMJ_DEF JsonValue* jsonQueryMember(JsonObjectArg object, const char* name) {
 #else
     JsonNode* it = TMJ_DEREF(object).nodes;
     JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    size_t len = TM_STRLEN(name);
     for (; it < last; ++it) {
-        if (stringEqualsNull(it->name.data, it->name.size, name)) {
+        if (stringEquals(it->name.data, it->name.size, name, len)) {
             return &it->value;
         }
     }
@@ -2953,8 +2985,9 @@ TMJ_DEF JsonValue* jsonQueryMemberCached(JsonObjectArg object, const char* name,
     tm_bool found = TM_FALSE;
     JsonNode* it = TMJ_DEREF(object).nodes + *lastAccess;
     JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    size_t len = TM_STRLEN(name);
     for (; it < last; ++it) {
-        if (stringEqualsNull(it->name.data, it->name.size, name)) {
+        if (stringEquals(it->name.data, it->name.size, name, len)) {
             result = &it->value;
             *lastAccess = (tm_size_t)(it - TMJ_DEREF(object).nodes);
             found = TM_TRUE;
@@ -2965,7 +2998,7 @@ TMJ_DEF JsonValue* jsonQueryMemberCached(JsonObjectArg object, const char* name,
         it = TMJ_DEREF(object).nodes;
         last = TMJ_DEREF(object).nodes + *lastAccess;
         for (; it < last; ++it) {
-            if (stringEqualsNull(it->name.data, it->name.size, name)) {
+            if (stringEquals(it->name.data, it->name.size, name, len)) {
                 result = &it->value;
                 *lastAccess = (tm_size_t)(it - TMJ_DEREF(object).nodes);
                 break;
