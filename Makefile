@@ -433,7 +433,7 @@ ${TM_JSON_UNMERGED}: ${build_dir} src/tm_json/*.cpp
 	@$(call cxx_compile,src/tm_json/test.cpp,$@,src/tm_json ./,)
 
 ${TM_JSON_UNMERGED_C}: ${build_dir} src/tm_json/*.c
-	@$(call cxx_compile,src/tm_json/test.c,$@,src/tm_json ./,)
+	@$(call c_compile,src/tm_json/test.c,$@,src/tm_json ./,)
 
 tm_json-tests: ${TM_JSON_TESTS_OUT}
 

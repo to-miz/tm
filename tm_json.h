@@ -113,6 +113,7 @@ HISTORY
     v0.1.7  31.12.18  added more error info to jsonDocument
                       fixed GCC unused-function warning when building in release builds
                       improved default implementation of string conversion functions
+                      fixed clang compilation errors for C99 compilation
     v0.1.6  29.12.18  fixed GCC warnings for multi-line comment, missing-field-initializers and implicit-fallthrough
                       fixed an error in compareString
                       renamed compareString functions to stringEquals, since they only check equality
@@ -1280,7 +1281,7 @@ static JsonTokenType readValueEx(JsonReader* reader) {
 
 static tm_bool jsonPushContext(JsonReader* reader, JsonContext context) {
     JsonContextStack* stack = &reader->contextStack;
-    if (stack->size && stack->data[stack->size - 1].context == context) {
+    if (stack->size && (JsonContext)stack->data[stack->size - 1].context == context) {
         if (stack->data[stack->size - 1].count < TMJ_MAX_NESTING_COUNT) {
             ++stack->data[stack->size - 1].count;
             return TM_TRUE;
@@ -1299,7 +1300,7 @@ static tm_bool jsonPushContext(JsonReader* reader, JsonContext context) {
 }
 static tm_bool jsonPopContext(JsonReader* reader, JsonContext context) {
     JsonContextStack* stack = &reader->contextStack;
-    if (!stack->size || stack->data[stack->size - 1].context != context) {
+    if (!stack->size || (JsonContext)stack->data[stack->size - 1].context != context) {
         setError(reader, JERR_MISMATCHED_BRACKETS);
         return TM_FALSE;
     }
@@ -2939,7 +2940,7 @@ TMJ_DEF JsonValue* jsonQueryMember(JsonObjectArg object, const char* name) {
 #endif
 }
 TMJ_DEF JsonValue jsonGetMemberCached(JsonObjectArg object, const char* name, tm_size_t* lastAccess) {
-    JsonValue result = {JVAL_NULL, {TM_NULL, 0}};
+    JsonValue result = {JVAL_NULL, {{TM_NULL, 0}}};
     JsonValue* value = jsonQueryMemberCached(object, name, lastAccess);
     if (value) {
         result = *value;
