@@ -1,5 +1,5 @@
 /*
-tm_json.h v0.1.6 - public domain - https://github.com/to-miz/tm
+tm_json.h v0.1.7 - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -49,7 +49,7 @@ DOCUMENTATION
 SWITCHES
     You can change how most of the things inside this library are implemented.
     Starting from which dependencies to use, you can make this library not use the crt by defining
-    the functions it depends on (see the block of #defines at TM_ASSERT).
+    the functions it depends on (see the block of #defines at TM_MEMCHR).
     These need to be defined before the header is included.
     You can toggle some extra functionality using these switches:
         TMJ_NO_INT64:
@@ -71,13 +71,13 @@ SWITCHES
             define these macros if you have string conversion functions that accept non
             nullterminated strings.
             These macros represent functions with these signatures:
-                int to_int( const char* data, size_t size, int base, int def )
-                unsigned int to_uint( const char* data, size_t size, int base, unsigned int def )
-                double to_double( const char* data, size_t size, double def )
-                float to_float( const char* data, size_t size, float def )
-                long long to_int64( const char* data, size_t size, int base, long long def )
-                unsigned long long to_uint64( const char* data, size_t size, int base,
-                                              unsigned long long def )
+                int to_int(const char* data, size_t size, int base, int def)
+                unsigned int to_uint(const char* data, size_t size, int base, unsigned int def)
+                double to_double(const char* data, size_t size, double def)
+                float to_float(const char* data, size_t size, float def)
+                long long to_int64(const char* data, size_t size, int base, long long def)
+                unsigned long long to_uint64(const char* data, size_t size, int base,
+                                             unsigned long long def)
             Arguments:
                 str: a non nullterminated string
                 len: the length of str
@@ -103,12 +103,16 @@ SWITCHES
 
 ISSUES
     - \u isn't implemented in strings, it will just be ignored currently
-    - needs -Wno-missing-field-initializers or similar when compiling
+    - mismatched brackets will be reported as JERR_UNEXPECTED_EOF instead of JERR_MISMATCHED_BRACKETS
+      when using jsonMakeDocument, because jsonSkipCurrent skips until eof on mismatched brackets.
     - missing documentation and example usage code
     - json objects aren't implemented as dictionaries/hashmaps, instead they use linear lookup
       json objects should be turned into hashmaps manually when applicable
 
 HISTORY
+    v0.1.7  31.12.18  added more error info to jsonDocument
+                      fixed GCC unused-function warning when building in release builds
+                      improved default implementation of string conversion functions
     v0.1.6  29.12.18  fixed GCC warnings for multi-line comment, missing-field-initializers and implicit-fallthrough
                       fixed an error in compareString
                       renamed compareString functions to stringEquals, since they only check equality
@@ -618,9 +622,15 @@ void* jsonAllocate(JsonStackAllocator* allocator, size_t size, unsigned int alig
 
 typedef struct JsonDocumentStruct {
     JsonValue root;
-    JsonErrorType errorType;
+    struct {
+        JsonErrorType type;
+        tm_size_t line;
+        tm_size_t column; // Byte column/offset from beginning of line.
+        tm_size_t offset; // Offset from beginning of the json file in bytes.
+        tm_size_t length; // Length of the token that caused the error.
+    } error;
 #ifdef __cplusplus
-    inline explicit operator bool() const { return errorType == JSON_OK; }
+    inline explicit operator bool() const { return error.type == JSON_OK; }
 #endif
 } JsonDocument;
 
@@ -791,9 +801,20 @@ inline unsigned long long JsonValueStruct::getUInt64(unsigned long long def) con
 // implementation
 #ifdef TM_JSON_IMPLEMENTATION
 
+// clang-format off
 #ifndef TM_MIN
-#define TM_MIN(a, b) (((a) < (b)) ? (a) : (b))
+    #define TM_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
+
+#ifndef TM_ASSERT_VALID_SIZE
+    #if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
+        #define TM_ASSERT_VALID_SIZE(x) TM_ASSERT((x) >= 0)
+    #else
+        /* always true if size_t is unsigned */
+        #define TM_ASSERT_VALID_SIZE(x) ((void)0)
+    #endif
+#endif /* !defined(TM_ASSERT_VALID_SIZE) */
+// clang-format on
 
 static tm_bool stringEquals(const char* a, size_t aSize, const char* b, size_t bSize) {
     TM_ASSERT(bSize > 0);
@@ -802,8 +823,9 @@ static tm_bool stringEquals(const char* a, size_t aSize, const char* b, size_t b
 }
 static tm_bool stringEqualsIgnoreCase(const char* a, size_t aSize, const char* b, size_t bSize) {
     TM_ASSERT(bSize > 0);
-    if (aSize < bSize) return TM_FALSE;
+    if (aSize != bSize) return TM_FALSE;
     do {
+        // We know that b is already uppercased.
         if (TM_TOUPPER((unsigned char)*a) != (unsigned char)*b) return TM_FALSE;
         ++a;
         ++b;
@@ -815,10 +837,14 @@ static tm_bool stringEqualsIgnoreCase(const char* a, size_t aSize, const char* b
 static tm_bool stringEqualsNull(const char* a, size_t aSize, const char* b) {
     return stringEquals(a, aSize, b, TM_STRLEN(b));
 }
+
+// This function is only used in debug builds currently.
+#ifdef _DEBUG
 // TODO: maybe use strnicmp instead if second string is nullterminated?
 static tm_bool stringEqualsIgnoreCaseNull(const char* a, size_t aSize, const char* b) {
     return stringEqualsIgnoreCase(a, aSize, b, TM_STRLEN(b));
 }
+#endif
 
 #ifdef TMJ_DEFINE_OWN_STRING_CONVERSIONS
 
@@ -828,47 +854,47 @@ static tm_bool stringEqualsIgnoreCaseNull(const char* a, size_t aSize, const cha
 // TODO: inspect strings to return def param if string is illformed?
 
 #include <stdlib.h>
+#include <errno.h>
 static int tmj_to_int(const char* data, tm_size_t size, int base, int def) {
-    TM_UNREFERENCED_PARAM(def);
+    TM_ASSERT_VALID_SIZE(size);
+    if (size > 32) return def;
     char buffer[33];
-    size = TM_MIN(size, 32);
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
-    return (int)strtol(buffer, TM_NULL, base);
+    errno = 0;
+    int result = (int)strtol(buffer, TM_NULL, base);
+    if (errno == ERANGE) return def;
+    return result;
 }
 static unsigned int tmj_to_uint(const char* data, tm_size_t size, int base, unsigned int def) {
-    TM_UNREFERENCED_PARAM(def);
+    TM_ASSERT_VALID_SIZE(size);
+    if (size > 32) return def;
     char buffer[33];
-    size = TM_MIN(size, 32);
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     return (unsigned int)strtoul(buffer, TM_NULL, base);
 }
 static double tmj_to_double(const char* data, tm_size_t size, double def) {
-    TM_UNREFERENCED_PARAM(def);
+    TM_ASSERT_VALID_SIZE(size);
+    if (size > 511) return def;
     char buffer[512];
-    size = TM_MIN(size, 511);
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     return strtod(buffer, TM_NULL);
 }
-static float tmj_to_float(const char* data, tm_size_t size, float def) {
-    TM_UNREFERENCED_PARAM(def);
-    return (float)tmj_to_double(data, size, (double)def);
-}
 #ifndef TMJ_NO_INT64
 static long long tmj_to_int64(const char* data, tm_size_t size, int base, long long def) {
-    TM_UNREFERENCED_PARAM(def);
+    TM_ASSERT_VALID_SIZE(size);
+    if (size > 64) return def;
     char buffer[65];
-    size = TM_MIN(size, 64);
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     return (long long)strtoll(buffer, TM_NULL, base);
 }
 static unsigned long long tmj_to_uint64(const char* data, tm_size_t size, int base, unsigned long long def) {
-    TM_UNREFERENCED_PARAM(def);
+    TM_ASSERT_VALID_SIZE(size);
+    if (size > 64) return def;
     char buffer[65];
-    size = TM_MIN(size, 64);
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     return (unsigned long long)strtoull(buffer, TM_NULL, base);
@@ -877,33 +903,26 @@ static unsigned long long tmj_to_uint64(const char* data, tm_size_t size, int ba
 #endif  // defined(TMJ_DEFINE_OWN_STRING_CONVERSIONS)
 
 TMJ_DEF int jsonToInt(JsonStringView str, int def) {
-    if (str.size <= 0) {
-        return def;
-    }
+    if (str.size <= 0) return def;
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
-        return TMJ_TO_INT(str.data, str.size, 16, def);
+        if (str.size == 2) return def;
+        return TMJ_TO_INT(str.data + 2, str.size - 2, 16, def);
     }
     return TMJ_TO_INT(str.data, str.size, 10, def);
 }
 TMJ_DEF unsigned int jsonToUInt(JsonStringView str, unsigned int def) {
-    if (str.size <= 0) {
-        return def;
-    }
+    if (str.size <= 0) return def;
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
-        return TMJ_TO_UINT(str.data, str.size, 16, def);
+        if (str.size == 2) return def;
+        return TMJ_TO_UINT(str.data + 2, str.size - 2, 16, def);
     }
     return TMJ_TO_UINT(str.data, str.size, 10, def);
 }
 TMJ_DEF float jsonToFloat(JsonStringView str, float def) {
-    if (str.size <= 0) {
-        return def;
-    }
-    return TMJ_TO_FLOAT(str.data, str.size, def);
+    return (float)jsonToDouble(str, (double)def);
 }
 TMJ_DEF double jsonToDouble(JsonStringView str, double def) {
-    if (str.size <= 0) {
-        return def;
-    }
+    if (str.size <= 0) return def;
 #if defined(TM_INFINITY) || defined(TM_NAN)
     {
         // check for inf, nan etc
@@ -932,9 +951,7 @@ TMJ_DEF double jsonToDouble(JsonStringView str, double def) {
     return TMJ_TO_DOUBLE(str.data, str.size, def);
 }
 TMJ_DEF tm_bool jsonToBool(JsonStringView str, tm_bool def) {
-    if (str.size <= 0) {
-        return def;
-    }
+    if (str.size <= 0) return def;
     if (str.size == 1) {
         switch (str.data[0]) {
             case '0':
@@ -954,20 +971,18 @@ TMJ_DEF tm_bool jsonToBool(JsonStringView str, tm_bool def) {
 }
 #ifndef TMJ_NO_INT64
 TMJ_DEF long long jsonToInt64(JsonStringView str, long long def) {
-    if (str.size <= 0) {
-        return def;
-    }
+    if (str.size <= 0) return def;
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
-        return TMJ_TO_INT64(str.data, str.size, 16, def);
+        if (str.size == 2) return def;
+        return TMJ_TO_INT64(str.data + 2, str.size - 2, 16, def);
     }
     return TMJ_TO_INT64(str.data, str.size, 10, def);
 }
 TMJ_DEF unsigned long long jsonToUInt64(JsonStringView str, unsigned long long def) {
-    if (str.size <= 0) {
-        return def;
-    }
+    if (str.size <= 0) return def;
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
-        return TMJ_TO_UINT64(str.data, str.size, 16, def);
+        if (str.size == 2) return def;
+        return TMJ_TO_UINT64(str.data + 2, str.size - 2, 16, def);
     }
     return TMJ_TO_UINT64(str.data, str.size, 10, def);
 }
@@ -2546,29 +2561,33 @@ TMJ_DEF JsonDocument jsonMakeDocument(JsonStackAllocator* allocator, const char*
     JsonContext rootType = jsonReadRootType(&reader);
     switch (rootType) {
         case JSON_CONTEXT_NULL: {
-            result.errorType = JERR_NO_ROOT;
+            result.error.type = JERR_NO_ROOT;
             break;
         }
         case JSON_CONTEXT_OBJECT: {
             result.root.type = JVAL_OBJECT;
-            result.errorType = jsonReadObject(&reader, allocator, &result.root.data.object);
+            result.error.type = jsonReadObject(&reader, allocator, &result.root.data.object);
             break;
         }
         case JSON_CONTEXT_ARRAY: {
             result.root.type = JVAL_ARRAY;
-            result.errorType = jsonReadArray(&reader, allocator, &result.root.data.array);
+            result.error.type = jsonReadArray(&reader, allocator, &result.root.data.array);
             break;
         }
         default: {
             TM_ASSERT(0 && "invalid code path");
-            result.errorType = JERR_INTERNAL_ERROR;
+            result.error.type = JERR_INTERNAL_ERROR;
             break;
         }
     }
-    jsonIsValidUntilEof(&reader);
+    if (reader.errorType == JSON_OK) jsonIsValidUntilEof(&reader);
     if (reader.errorType != JSON_OK) {
         TM_MEMSET(&result, 0, sizeof(JsonDocument));
-        result.errorType = reader.errorType;
+        result.error.type = reader.errorType;
+        result.error.line = reader.line;
+        result.error.column = reader.column;
+        result.error.offset = (tm_size_t)(reader.current.data - data);
+        result.error.length = reader.current.size;
     }
     return result;
 }
@@ -2813,29 +2832,33 @@ TMJ_DEF JsonDocument jsonMakeDocumentEx(JsonStackAllocator* allocator, const cha
     JsonContext rootType = jsonReadRootType(&reader);
     switch (rootType) {
         case JSON_CONTEXT_NULL: {
-            result.errorType = JERR_NO_ROOT;
+            result.error.type = JERR_NO_ROOT;
             break;
         }
         case JSON_CONTEXT_OBJECT: {
             result.root.type = JVAL_OBJECT;
-            result.errorType = jsonReadObjectEx(&reader, allocator, &result.root.data.object);
+            result.error.type = jsonReadObjectEx(&reader, allocator, &result.root.data.object);
             break;
         }
         case JSON_CONTEXT_ARRAY: {
             result.root.type = JVAL_ARRAY;
-            result.errorType = jsonReadArrayEx(&reader, allocator, &result.root.data.array);
+            result.error.type = jsonReadArrayEx(&reader, allocator, &result.root.data.array);
             break;
         }
         default: {
             TM_ASSERT(0 && "invalid code path");
-            result.errorType = JERR_INTERNAL_ERROR;
+            result.error.type = JERR_INTERNAL_ERROR;
             break;
         }
     }
-    jsonIsValidUntilEofEx(&reader);
+    if (reader.errorType == JSON_OK) jsonIsValidUntilEofEx(&reader);
     if (reader.errorType != JSON_OK) {
         TM_MEMSET(&result, 0, sizeof(JsonDocument));
-        result.errorType = reader.errorType;
+        result.error.type = reader.errorType;
+        result.error.line = reader.line;
+        result.error.column = reader.column;
+        result.error.offset = (tm_size_t)(reader.current.data - data);
+        result.error.length = reader.current.size;
     }
     return result;
 }
