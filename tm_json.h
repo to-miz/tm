@@ -1,5 +1,5 @@
 /*
-tm_json.h v0.1.7 - public domain - https://github.com/to-miz/tm
+tm_json.h v0.1.8 - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -110,6 +110,7 @@ ISSUES
       json objects should be turned into hashmaps manually when applicable
 
 HISTORY
+    v0.1.8  01.01.19  removed unnecessary debug assertion from jsonIsNull
     v0.1.7  31.12.18  added stringStartsWith to be used when appropriate instead of stringEquals
                       fixed a bug with null values not being parsed properly
                       added more error info to jsonDocument
@@ -119,6 +120,7 @@ HISTORY
                       fixed cl compilation errors for C99 compilation
                       switched from using toupper to tolower for case insensitive comparisons
                       fixed jsonToFloat to also use TM_INFINITY and TM_NAN
+                      changed remaining assert calls to TM_ASSERT
     v0.1.6  29.12.18  fixed GCC warnings for multi-line comment, missing-field-initializers and implicit-fallthrough
                       fixed a bug with compareString acting like stringStartsWith
                       renamed compareString functions to stringEquals, since they only check equality
@@ -409,6 +411,10 @@ TMJ_DEF const char* jsonGetErrorString(JsonErrorType error);
 typedef struct {
     const char* data;
     tm_size_t size;
+
+#if defined(__cplusplus) && defined(TM_STRING_VIEW)
+    operator TM_STRING_VIEW() const { return {data, size}; };
+#endif
 } JsonStringView;
 typedef struct {
     int8_t context;
@@ -857,7 +863,6 @@ static tm_bool stringStartsWithIgnoreCase(const char* a, size_t aSize, const cha
 #ifndef TM_UNREFERENCED_PARAM
 #define TM_UNREFERENCED_PARAM(x) ((void)(x))
 #endif
-// TODO: inspect strings to return def param if string is illformed?
 
 #include <stdlib.h>
 #include <errno.h>
@@ -878,7 +883,10 @@ static unsigned int tmj_to_uint(const char* data, tm_size_t size, int base, unsi
     char buffer[33];
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
-    return (unsigned int)strtoul(buffer, TM_NULL, base);
+    errno = 0;
+    unsigned int result = (unsigned int)strtoul(buffer, TM_NULL, base);
+    if (errno == ERANGE) return def;
+    return result;
 }
 static double tmj_to_double(const char* data, tm_size_t size, double def) {
     TM_ASSERT_VALID_SIZE(size);
@@ -886,7 +894,10 @@ static double tmj_to_double(const char* data, tm_size_t size, double def) {
     char buffer[512];
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
-    return strtod(buffer, TM_NULL);
+    errno = 0;
+    double result = strtod(buffer, TM_NULL);
+    if (errno == ERANGE) return def;
+    return result;
 }
 #ifndef TMJ_NO_INT64
 static long long tmj_to_int64(const char* data, tm_size_t size, int base, long long def) {
@@ -895,7 +906,10 @@ static long long tmj_to_int64(const char* data, tm_size_t size, int base, long l
     char buffer[65];
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
-    return (long long)strtoll(buffer, TM_NULL, base);
+    errno = 0;
+    long long result = (long long)strtoll(buffer, TM_NULL, base);
+    if (errno == ERANGE) return def;
+    return result;
 }
 static unsigned long long tmj_to_uint64(const char* data, tm_size_t size, int base, unsigned long long def) {
     TM_ASSERT_VALID_SIZE(size);
@@ -903,7 +917,10 @@ static unsigned long long tmj_to_uint64(const char* data, tm_size_t size, int ba
     char buffer[65];
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
-    return (unsigned long long)strtoull(buffer, TM_NULL, base);
+    errno = 0;
+    unsigned long long result =  (unsigned long long)strtoull(buffer, TM_NULL, base);
+    if (errno == ERANGE) return def;
+    return result;
 }
 #endif  // !defined(TMJ_NO_INT64)
 #endif  // defined(TMJ_DEFINE_OWN_STRING_CONVERSIONS)
@@ -918,6 +935,11 @@ TMJ_DEF int jsonToInt(JsonStringView str, int def) {
 }
 TMJ_DEF unsigned int jsonToUInt(JsonStringView str, unsigned int def) {
     if (str.size <= 0) return def;
+    if (str.data[0] == '-') {
+        // Special case for -0.
+        if (str.size == 2 && str.data[1] == '0') return 0;
+        return def;
+    }
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
         if (str.size == 2) return def;
         return TMJ_TO_UINT(str.data + 2, str.size - 2, 16, def);
@@ -1012,6 +1034,11 @@ TMJ_DEF long long jsonToInt64(JsonStringView str, long long def) {
 }
 TMJ_DEF unsigned long long jsonToUInt64(JsonStringView str, unsigned long long def) {
     if (str.size <= 0) return def;
+    if (str.data[0] == '-') {
+        // Special case for -0.
+        if (str.size == 2 && str.data[1] == '0') return 0;
+        return def;
+    }
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
         if (str.size == 2) return def;
         return TMJ_TO_UINT64(str.data + 2, str.size - 2, 16, def);
@@ -1128,6 +1155,8 @@ static tm_bool readNumber(JsonReader* reader) {
         jsonAdvance(reader);
     } else if ((reader->flags & JSON_READER_ALLOW_PLUS_SIGN) && reader->data[0] == '+') {
         jsonAdvance(reader);
+        // By skipping the plus sign in the token string we can use the usual json string conversion functions.
+        reader->current.data = reader->data;
     }
 
     if (reader->data[0] == '0') {
@@ -2017,7 +2046,7 @@ TMJ_DEF JsonTokenType jsonNextTokenEx(JsonReader* reader) {
 TMJ_DEF JsonContext jsonReadRootType(JsonReader* reader) {
     if (reader->contextStack.size) {
         JsonContext current = (JsonContext)reader->contextStack.data[reader->contextStack.size - 1].context;
-        assert(current == JSON_CONTEXT_NULL);
+        TM_ASSERT(current == JSON_CONTEXT_NULL);
         if (current != JSON_CONTEXT_NULL) {
             return JSON_CONTEXT_NULL;
         }
@@ -2112,7 +2141,7 @@ TMJ_DEF tm_bool jsonSkipCurrent(JsonReader* reader, JsonContext currentContext, 
             return TM_FALSE;
         }
     }
-    assert(reader->lastToken == JTOK_OBJECT_START || reader->lastToken == JTOK_ARRAY_START);
+    TM_ASSERT(reader->lastToken == JTOK_OBJECT_START || reader->lastToken == JTOK_ARRAY_START);
     JsonTokenType skipping = reader->lastToken;
 
     unsigned int depth = 1;
@@ -2911,12 +2940,6 @@ TMJ_DEF void jsonFreeDocument(JsonAllocatedDocument* doc) {
 }
 
 TMJ_DEF tm_bool jsonIsNull(JsonValueArg value) {
-#ifdef _DEBUG
-    if (TMJ_DEREF(value).type == JVAL_NULL) {
-        TM_ASSERT(
-            stringEqualsIgnoreCase(TMJ_DEREF(value).data.content.data, TMJ_DEREF(value).data.content.size, "null", 4));
-    }
-#endif  // _DEBUG
     return TMJ_DEREF(value).type == JVAL_NULL && TMJ_DEREF(value).data.content.data != TM_NULL;
 }
 TMJ_DEF tm_bool jsonIsIntegral(JsonValueArg value) { return TMJ_DEREF(value).type >= JVAL_INT; }

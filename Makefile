@@ -437,6 +437,9 @@ ${TM_JSON_UNMERGED_C}: ${build_dir} src/tm_json/*.c tm_json.h
 
 tm_json-tests: ${TM_JSON_TESTS_OUT}
 
+tm_json-run-tests: ${TM_JSON_TESTS_OUT} ${TM_JSON_UNMERGED} ${TM_JSON_UNMERGED_C}
+	${TM_JSON_TESTS_OUT}
+
 tm_json-unmerged: ${TM_JSON_UNMERGED}
 
 tm_json-unmerged-c: ${TM_JSON_UNMERGED_C}
