@@ -8,6 +8,7 @@
 #include <assert_throws.cpp>
 
 #define TM_JSON_IMPLEMENTATION
+#define TMJ_LOCALE_NO_WARNING
 #define TMJ_DEFINE_INFINITY_AND_NAN
 #define TM_STRING_VIEW std::string_view
 #define TM_STRING_VIEW_DATA(x) (x).data()
@@ -19,7 +20,11 @@ struct AllocatedDocument : JsonAllocatedDocument {
     ~AllocatedDocument() { jsonFreeDocument(this); };
 };
 
-TEST_CASE("int conversion") {
+// These tests may fail, because the fallback string conversion functions are locale-dependant
+TEST_CASE("int conversion"
+          * doctest::description("Test the fallback string to int conversions."
+                                 "These may fail depending on the conformity of the CRT.")
+          * doctest::may_fail(true)) {
     const std::string_view json = R"(
         [
             0, 1, -1, -0, 100, 32767,
@@ -88,18 +93,30 @@ TEST_CASE("int conversion") {
     REQUIRE(ints.size() == std::size(int32_values));
 
     for (size_t i = 0; i < std::size(int32_values); ++i) {
+        auto val = ints[i].getString();
+        CAPTURE(i);
+        INFO("value string: " << val);
         CHECK(ints[i].getInt(int32_def) == int32_values[i]);
     }
 
     for (size_t i = 0; i < std::size(int64_values); ++i) {
+        auto val = ints[i].getString();
+        CAPTURE(i);
+        INFO("value string: " << val);
         CHECK(ints[i].getInt64(int64_def) == int64_values[i]);
     }
 
     for (size_t i = 0; i < std::size(uint32_values); ++i) {
+        auto val = ints[i].getString();
+        CAPTURE(i);
+        INFO("value string: " << val);
         CHECK(ints[i].getUInt(uint32_def) == uint32_values[i]);
     }
 
     for (size_t i = 0; i < std::size(uint64_values); ++i) {
+        auto val = ints[i].getString();
+        CAPTURE(i);
+        INFO("value string: " << val);
         CHECK(ints[i].getUInt64(uint64_def) == uint64_values[i]);
     }
 }
@@ -129,7 +146,10 @@ bool ulps_comparison(double a, double b) {
     return (bm - am) <= 1;
 }
 
-TEST_CASE("float conversion") {
+TEST_CASE("float conversion"
+          * doctest::description("Test the fallback string to float conversions."
+                                 "These may fail depending on the conformity of the CRT.")
+          * doctest::may_fail(true)) {
     const std::string_view json = R"(
         [
             0, -0, 1, -1,
@@ -174,6 +194,7 @@ TEST_CASE("float conversion") {
     REQUIRE(floats.size() == std::size(float_values));
 
     for (size_t i = 0; i < std::size(float_values); ++i) {
+        CAPTURE(i);
         auto val = floats[i].getFloat(-1000.0f);
         if (isnan(float_values[i])) {
             // We check like this since nan == nan is always false.
@@ -184,6 +205,7 @@ TEST_CASE("float conversion") {
     }
 
     for (size_t i = 0; i < std::size(double_values); ++i) {
+        CAPTURE(i);
         auto val = floats[i].getDouble(-1000.0f);
         if (isnan(double_values[i])) {
             // We check like this since nan == nan is always false.

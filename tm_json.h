@@ -110,37 +110,38 @@ ISSUES
       json objects should be turned into hashmaps manually when applicable
 
 HISTORY
-    v0.1.8  01.01.19  removed unnecessary debug assertion from jsonIsNull
-    v0.1.7  31.12.18  added stringStartsWith to be used when appropriate instead of stringEquals
-                      fixed a bug with null values not being parsed properly
-                      added more error info to jsonDocument
-                      fixed GCC unused-function warning when building in release builds
-                      improved default implementation of string conversion functions
-                      fixed clang compilation errors for C99 compilation
-                      fixed cl compilation errors for C99 compilation
-                      switched from using toupper to tolower for case insensitive comparisons
-                      fixed jsonToFloat to also use TM_INFINITY and TM_NAN
-                      changed remaining assert calls to TM_ASSERT
-    v0.1.6  29.12.18  fixed GCC warnings for multi-line comment, missing-field-initializers and implicit-fallthrough
-                      fixed a bug with compareString acting like stringStartsWith
-                      renamed compareString functions to stringEquals, since they only check equality
-                      removed tmj_bool and TMJ_NULL, using tm_bool and TM_NULL instead
-                      reformatted and switched to indentation using spaces
-    v0.1.5  06.10.18  refactored preprocessor
-                      changed tmj_size_t to tm_size_t
-                      changed TMJ_STRING_VIEW to TM_STRING_VIEW
-    v0.1.4b 25.08.18  added repository link
-    v0.1.4a 22.07.18  fixed some warnings on C99 compilation
-    v0.1.4  22.07.18  removed overloads of C functions for C++, updated licensing
-    v0.1.3  10.02.17  string view operators are now preferred to const char* operators in JsonObject
-    v0.1.2  28.01.17  added jsonObjectArray for usage with C++11 range based loops
-    v0.1.1d 10.01.17  minor change from static const char* to static const char* const in some places
-    v0.1.1c 07.11.16  minor edits, no runtime changes
-    v0.1.1b 10.10.16  fixed some warnings when tm_size_t is signed
-    v0.1.1a 07.10.16  removed usage of unsigned arithmetic when tm_size_t is signed
-    v0.1.1  13.09.16  changed JsonValue interface to have operator[] overloads for convenience
-                      added more string_view support through TM_STRING_VIEW
-    v0.1    11.09.16  initial commit
+    v0.1.8  01.01.19  Removed unnecessary debug assertion from jsonIsNull.
+                      Made the fallback string conversion functions locale independent.
+    v0.1.7  31.12.18  Added stringStartsWith to be used when appropriate instead of stringEquals.
+                      Fixed a bug with null values not being parsed properly.
+                      Added more error info to jsonDocument.
+                      Fixed GCC unused-function warning when building in release builds.
+                      Improved default implementation of string conversion functions.
+                      Fixed clang compilation errors for C99 compilation.
+                      Fixed cl compilation errors for C99 compilation.
+                      Switched from using toupper to tolower for case insensitive comparisons.
+                      Fixed jsonToFloat to also use TM_INFINITY and TM_NAN.
+                      Changed remaining assert calls to TM_ASSERT.
+    v0.1.6  29.12.18  Fixed GCC warnings for multi-line comment, missing-field-initializers and implicit-fallthrough.
+                      Fixed a bug with compareString acting like stringStartsWith.
+                      Renamed compareString functions to stringEquals, since they only check equality.
+                      Removed tmj_bool and TMJ_NULL, using tm_bool and TM_NULL instead.
+                      Reformatted and switched to indentation using spaces.
+    v0.1.5  06.10.18  Refactored preprocessor.
+                      Changed tmj_size_t to tm_size_t.
+                      Changed TMJ_STRING_VIEW to TM_STRING_VIEW.
+    v0.1.4b 25.08.18  Added repository link.
+    v0.1.4a 22.07.18  Fixed some warnings on C99 compilation.
+    v0.1.4  22.07.18  Removed overloads of C functions for C++, updated licensing.
+    v0.1.3  10.02.17  String view operators are now preferred to const char* operators in JsonObject.
+    v0.1.2  28.01.17  Added jsonObjectArray for usage with C++11 range based loops.
+    v0.1.1d 10.01.17  Minor change from static const char* to static const char* const in some places.
+    v0.1.1c 07.11.16  Minor edits, no runtime changes.
+    v0.1.1b 10.10.16  Fixed some warnings when tm_size_t is signed.
+    v0.1.1a 07.10.16  Removed usage of unsigned arithmetic when tm_size_t is signed.
+    v0.1.1  13.09.16  Changed JsonValue interface to have operator[] overloads for convenience.
+                      Added more string_view support through TM_STRING_VIEW.
+    v0.1    11.09.16  Initial commit.
 */
 
 /* clang-format off */
@@ -860,12 +861,66 @@ static tm_bool stringStartsWithIgnoreCase(const char* a, size_t aSize, const cha
 
 #ifdef TMJ_DEFINE_OWN_STRING_CONVERSIONS
 
-#ifndef TM_UNREFERENCED_PARAM
-#define TM_UNREFERENCED_PARAM(x) ((void)(x))
-#endif
-
 #include <stdlib.h>
 #include <errno.h>
+
+// We need to use CRT extensions to be able use "locale-independent" string conversions.
+// clang-format off
+#if defined(_MSC_VER)
+    #include <locale.h>
+
+    // We are forced to create and leak this locale, since there is no good time to free it.
+    #ifdef __cplusplus
+        static const _locale_t tmj_internal_locale = _create_locale(LC_NUMERIC, "C");
+        #define tmj_internal_get_locale() tmj_internal_locale
+    #else
+        static _locale_t tmj_internal_locale = TM_NULL;
+        static _locale_t tmj_internal_get_locale() {
+            if (!tmj_internal_locale) tmj_internal_locale = _create_locale(LC_NUMERIC, "C");
+            return tmj_internal_locale;
+        }
+    #endif
+
+    #define TMJ_STRTOL(buffer, base) _strtol_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
+    #define TMJ_STRTOUL(buffer, base) _strtoul_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
+    #define TMJ_STRTOLL(buffer, base) _strtoll_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
+    #define TMJ_STRTOULL(buffer, base) _strtoull_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
+    #define TMJ_STRTOD(buffer) _strtod_l((buffer), TM_NULL, tmj_internal_get_locale())
+
+#elif defined(__GNUC__)
+    #include <locale.h>
+
+    // We are forced to create and leak this locale, since there is no good time to free it.
+    #ifdef __cplusplus
+        static const _locale_t tmj_internal_locale = newlocale(LC_NUMERIC_MASK, "C", TM_NULL);
+        #define tmj_internal_get_locale() tmj_internal_locale
+    #else
+        static _locale_t tmj_internal_locale = TM_NULL;
+        static _locale_t tmj_internal_get_locale() {
+            if (!tmj_internal_locale) tmj_internal_locale = newlocale(LC_NUMERIC_MASK, "C", TM_NULL);
+            return tmj_internal_locale;
+        }
+    #endif
+
+    #define TMJ_STRTOL(buffer, base) strtol_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
+    #define TMJ_STRTOUL(buffer, base) strtoul_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
+    #define TMJ_STRTOLL(buffer, base) strtoll_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
+    #define TMJ_STRTOULL(buffer, base) strtoull_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
+    #define TMJ_STRTOD(buffer) strtod_l((buffer), TM_NULL, tmj_internal_get_locale())
+
+#elif !defined(TMJ_LOCALE_NO_WARNING)
+#warning TMJ_DEFINE_OWN_STRING_CONVERSIONS is defined, but string conversions are locale-dependent. \
+It is not recommended to use TMJ_DEFINE_OWN_STRING_CONVERSIONS in this case, see examples for other options. \
+Define TMJ_LOCALE_NO_WARNING to ignore this warning.
+
+    #define TMJ_STRTOL(buffer, base) strtol((buffer), TM_NULL, (base))
+    #define TMJ_STRTOUL(buffer, base) strtoul((buffer), TM_NULL, (base))
+    #define TMJ_STRTOLL(buffer, base) strtoll((buffer), TM_NULL, (base))
+    #define TMJ_STRTOULL(buffer, base) strtoull((buffer), TM_NULL, (base))
+    #define TMJ_STRTOD(buffer) strtod((buffer), TM_NULL)
+#endif
+// clang-format on
+
 static int tmj_to_int(const char* data, tm_size_t size, int base, int def) {
     TM_ASSERT_VALID_SIZE(size);
     if (size > 32) return def;
@@ -873,7 +928,7 @@ static int tmj_to_int(const char* data, tm_size_t size, int base, int def) {
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     errno = 0;
-    int result = (int)strtol(buffer, TM_NULL, base);
+    int result = (int)TMJ_STRTOL(buffer, base);
     if (errno == ERANGE) return def;
     return result;
 }
@@ -884,7 +939,7 @@ static unsigned int tmj_to_uint(const char* data, tm_size_t size, int base, unsi
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     errno = 0;
-    unsigned int result = (unsigned int)strtoul(buffer, TM_NULL, base);
+    unsigned int result = (unsigned int)TMJ_STRTOUL(buffer, base);
     if (errno == ERANGE) return def;
     return result;
 }
@@ -895,7 +950,7 @@ static double tmj_to_double(const char* data, tm_size_t size, double def) {
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     errno = 0;
-    double result = strtod(buffer, TM_NULL);
+    double result = TMJ_STRTOD(buffer);
     if (errno == ERANGE) return def;
     return result;
 }
@@ -907,7 +962,7 @@ static long long tmj_to_int64(const char* data, tm_size_t size, int base, long l
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     errno = 0;
-    long long result = (long long)strtoll(buffer, TM_NULL, base);
+    long long result = (long long)TMJ_STRTOLL(buffer, base);
     if (errno == ERANGE) return def;
     return result;
 }
@@ -918,11 +973,21 @@ static unsigned long long tmj_to_uint64(const char* data, tm_size_t size, int ba
     TM_MEMCPY(buffer, data, size);
     buffer[size] = 0;
     errno = 0;
-    unsigned long long result =  (unsigned long long)strtoull(buffer, TM_NULL, base);
+    unsigned long long result =  (unsigned long long)TMJ_STRTOULL(buffer, base);
     if (errno == ERANGE) return def;
     return result;
 }
 #endif  // !defined(TMJ_NO_INT64)
+
+#ifdef tmj_internal_get_locale
+    #undef tmj_internal_get_locale
+#endif
+#undef TMJ_STRTOL
+#undef TMJ_STRTOUL
+#undef TMJ_STRTOLL
+#undef TMJ_STRTOULL
+#undef TMJ_STRTOD
+
 #endif  // defined(TMJ_DEFINE_OWN_STRING_CONVERSIONS)
 
 TMJ_DEF int jsonToInt(JsonStringView str, int def) {
