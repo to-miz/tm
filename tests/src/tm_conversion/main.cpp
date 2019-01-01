@@ -643,3 +643,10 @@ TEST_CASE("Test float accuracy") {
     CHECK(print_test(0, 100, 10000000));
     CHECK(print_test(0, 1, 10000000));
 }
+
+TEST_CASE("Test float corner cases" * doctest::may_fail(true)) {
+    float value = 0;
+    auto result = scan_float("0.0000000000000000000000000000001", &value, 0);
+    CHECK(result.ec == TM_OK);
+    CHECK(value != 0);
+}
