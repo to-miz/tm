@@ -422,12 +422,15 @@ tm_print-run-tests: tm_print-tests
 
 TM_JSON_DEPS := ${build_dir} ${TESTS_DOCTEST_DEP} tm_json.h tests/src/tm_json/main.cpp
 TM_JSON_SRC := tests/src/tm_json/main.cpp
-TM_JSON_TESTS_OUT := ${build_dir}/tm_json_tests${ext}
+TM_JSON_TESTS_AUTODETECT_OUT := ${build_dir}/tm_json_tests-autodetect${ext}
+TM_JSON_TESTS_FALLBACK_OUT := ${build_dir}/tm_json_tests-fallback${ext}
 TM_JSON_UNMERGED := ${build_dir}/tm_json-unmerged${ext}
 TM_JSON_UNMERGED_C := ${build_dir}/tm_json-unmerged-c${ext}
 
-${TM_JSON_TESTS_OUT}: ${TM_JSON_DEPS}
+${TM_JSON_TESTS_AUTODETECT_OUT}: ${TM_JSON_DEPS}
 	@$(call cxx_compile,${TM_JSON_SRC},$@,${TESTS_INCLUDE_DIRS},)
+${TM_JSON_TESTS_FALLBACK_OUT}: ${TM_JSON_DEPS}
+	@$(call cxx_compile,${TM_JSON_SRC},$@,${TESTS_INCLUDE_DIRS},TMJ_NO_AUTODETECT)
 
 ${TM_JSON_UNMERGED}: ${build_dir} src/tm_json/*.cpp tm_json.h
 	@$(call cxx_compile,src/tm_json/test.cpp,$@,src/tm_json ./,)
@@ -435,10 +438,17 @@ ${TM_JSON_UNMERGED}: ${build_dir} src/tm_json/*.cpp tm_json.h
 ${TM_JSON_UNMERGED_C}: ${build_dir} src/tm_json/*.c tm_json.h
 	@$(call c_compile,src/tm_json/test.c,$@,src/tm_json ./,)
 
-tm_json-tests: ${TM_JSON_TESTS_OUT}
+tm_json-tests: ${TM_JSON_TESTS_AUTODETECT_OUT}
 
-tm_json-run-tests: ${TM_JSON_TESTS_OUT} ${TM_JSON_UNMERGED} ${TM_JSON_UNMERGED_C}
-	${TM_JSON_TESTS_OUT}
+tm_json-run-tests: ${TM_JSON_TESTS_AUTODETECT_OUT} ${TM_JSON_TESTS_FALLBACK_OUT} ${TM_JSON_UNMERGED} ${TM_JSON_UNMERGED_C}
+	@echo Testing tm_json.h with CRT autodetection
+	@echo ===================================================
+	@${TM_JSON_TESTS_AUTODETECT_OUT}
+	@echo ---------------------------------------------------
+	@echo ---------------------------------------------------
+	@echo Testing tm_json.h with fallback locale-independence
+	@echo ===================================================
+	@${TM_JSON_TESTS_FALLBACK_OUT}
 
 tm_json-unmerged: ${TM_JSON_UNMERGED}
 

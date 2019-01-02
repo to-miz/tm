@@ -216,7 +216,7 @@ HISTORY
         #define TMJ_TO_UINT(str, len, base, def) tmj_to_uint((str), (len), (base), (def))
         #define TMJ_TO_INT64(str, len, base, def) tmj_to_int64((str), (len), (base), (def))
         #define TMJ_TO_UINT64(str, len, base, def) tmj_to_uint64((str), (len), (base), (def))
-        #define TMJ_TO_FLOAT(str, len, def) (float)tmj_to_double((str), (len), (double)(def))
+        #define TMJ_TO_FLOAT(str, len, def) tmj_to_float((str), (len), (def))
         #define TMJ_TO_DOUBLE(str, len, def) tmj_to_double((str), (len), (def))
     #endif
 #endif
@@ -863,11 +863,11 @@ static tm_bool stringStartsWithIgnoreCase(const char* a, size_t aSize, const cha
 
 #include <stdlib.h>
 #include <errno.h>
+#include <locale.h>
 
 // We need to use CRT extensions to be able use "locale-independent" string conversions.
 // clang-format off
-#if defined(_MSC_VER)
-    #include <locale.h>
+#if defined(_MSC_VER) && !defined(TMJ_NO_AUTODETECT)
 
     // We are forced to create and leak this locale, since there is no good time to free it.
     #ifdef __cplusplus
@@ -887,8 +887,7 @@ static tm_bool stringStartsWithIgnoreCase(const char* a, size_t aSize, const cha
     #define TMJ_STRTOULL(buffer, base) _strtoull_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
     #define TMJ_STRTOD(buffer) _strtod_l((buffer), TM_NULL, tmj_internal_get_locale())
 
-#elif defined(__GNUC__)
-    #include <locale.h>
+#elif defined(__GNUC__) && !defined(TMJ_NO_AUTODETECT)
 
     // We are forced to create and leak this locale, since there is no good time to free it.
     #ifdef __cplusplus
@@ -908,74 +907,106 @@ static tm_bool stringStartsWithIgnoreCase(const char* a, size_t aSize, const cha
     #define TMJ_STRTOULL(buffer, base) strtoull_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
     #define TMJ_STRTOD(buffer) strtod_l((buffer), TM_NULL, tmj_internal_get_locale())
 
-#elif !defined(TMJ_LOCALE_NO_WARNING)
-#warning TMJ_DEFINE_OWN_STRING_CONVERSIONS is defined, but string conversions are locale-dependent. \
-It is not recommended to use TMJ_DEFINE_OWN_STRING_CONVERSIONS in this case, see examples for other options. \
-Define TMJ_LOCALE_NO_WARNING to ignore this warning.
+#else
+
+    // We need to make the string to float conversion locale-independent.
+    static double tmj_strtod_l(char* buffer) {
+        TM_ASSERT(buffer);
+        const struct lconv* lc = localeconv();
+        const char decimal_point = (lc && lc->decimal_point) ? (*lc->decimal_point) : '.';
+        if (decimal_point != '.') {
+            // Change decimal point to the one defined in the locale.
+            for (char* p = buffer; *p; ++p) {
+                if(*p == '.') {
+                    *p = decimal_point;
+                    break;
+                }
+            }
+        }
+        return strtod(buffer, TM_NULL);
+    }
 
     #define TMJ_STRTOL(buffer, base) strtol((buffer), TM_NULL, (base))
     #define TMJ_STRTOUL(buffer, base) strtoul((buffer), TM_NULL, (base))
     #define TMJ_STRTOLL(buffer, base) strtoll((buffer), TM_NULL, (base))
     #define TMJ_STRTOULL(buffer, base) strtoull((buffer), TM_NULL, (base))
-    #define TMJ_STRTOD(buffer) strtod((buffer), TM_NULL)
+    #define TMJ_STRTOD(buffer) tmj_strtod_l((buffer))
+
 #endif
 // clang-format on
 
-static int tmj_to_int(const char* data, tm_size_t size, int base, int def) {
-    TM_ASSERT_VALID_SIZE(size);
-    if (size > 32) return def;
+static void tmj_to_int(const char* first, const char* last, int* value, int base) {
+    TM_ASSERT(value);
+    TM_ASSERT(last >= first);
+    size_t size = (size_t)(last - first);
+    if (size > 32) return;
     char buffer[33];
-    TM_MEMCPY(buffer, data, size);
+    TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
     int result = (int)TMJ_STRTOL(buffer, base);
-    if (errno == ERANGE) return def;
-    return result;
+    if (errno == ERANGE) return;
+    *value = result;
 }
-static unsigned int tmj_to_uint(const char* data, tm_size_t size, int base, unsigned int def) {
-    TM_ASSERT_VALID_SIZE(size);
-    if (size > 32) return def;
+static void tmj_to_uint(const char* first, const char* last, unsigned int* value, int base) {
+    TM_ASSERT(value);
+    TM_ASSERT(last >= first);
+    size_t size = (size_t)(last - first);
+    if (size > 32) return;
     char buffer[33];
-    TM_MEMCPY(buffer, data, size);
+    TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
     unsigned int result = (unsigned int)TMJ_STRTOUL(buffer, base);
-    if (errno == ERANGE) return def;
-    return result;
+    if (errno == ERANGE) return;
+    *value = result;
 }
-static double tmj_to_double(const char* data, tm_size_t size, double def) {
-    TM_ASSERT_VALID_SIZE(size);
-    if (size > 511) return def;
+static tm_bool tmj_to_double(const char* first, const char* last, double* value) {
+    TM_ASSERT(value);
+    TM_ASSERT(last >= first);
+    size_t size = (size_t)(last - first);
+    if (size > 511) return TM_FALSE;
     char buffer[512];
-    TM_MEMCPY(buffer, data, size);
+    TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
     double result = TMJ_STRTOD(buffer);
-    if (errno == ERANGE) return def;
-    return result;
+    if (errno == ERANGE) return TM_FALSE;
+    *value = result;
+    return TM_TRUE;
+}
+static void tmj_to_float(const char* first, const char* last, float* value) {
+    double val = 0;
+    if (tmj_to_double(first, last, &val)) {
+        *value = (float)val;
+    }
 }
 #ifndef TMJ_NO_INT64
-static long long tmj_to_int64(const char* data, tm_size_t size, int base, long long def) {
-    TM_ASSERT_VALID_SIZE(size);
-    if (size > 64) return def;
+static void tmj_to_int64(const char* first, const char* last, long long* value, int base) {
+    TM_ASSERT(value);
+    TM_ASSERT(last >= first);
+    size_t size = (size_t)(last - first);
+    if (size > 64) return;
     char buffer[65];
-    TM_MEMCPY(buffer, data, size);
+    TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
     long long result = (long long)TMJ_STRTOLL(buffer, base);
-    if (errno == ERANGE) return def;
-    return result;
+    if (errno == ERANGE) return;
+    *value = result;
 }
-static unsigned long long tmj_to_uint64(const char* data, tm_size_t size, int base, unsigned long long def) {
-    TM_ASSERT_VALID_SIZE(size);
-    if (size > 64) return def;
+static void tmj_to_uint64(const char* first, const char* last, unsigned long long* value, int base) {
+    TM_ASSERT(value);
+    TM_ASSERT(last >= first);
+    size_t size = (size_t)(last - first);
+    if (size > 64) return;
     char buffer[65];
-    TM_MEMCPY(buffer, data, size);
+    TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
     unsigned long long result =  (unsigned long long)TMJ_STRTOULL(buffer, base);
-    if (errno == ERANGE) return def;
-    return result;
+    if (errno == ERANGE) return;
+    *value = result;
 }
 #endif  // !defined(TMJ_NO_INT64)
 
@@ -994,9 +1025,11 @@ TMJ_DEF int jsonToInt(JsonStringView str, int def) {
     if (str.size <= 0) return def;
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
         if (str.size == 2) return def;
-        return TMJ_TO_INT(str.data + 2, str.size - 2, 16, def);
+        TMJ_TO_INT(str.data + 2, str.data + str.size - 2, &def, 16);
+    } else {
+        TMJ_TO_INT(str.data, str.data + str.size, &def, 10);
     }
-    return TMJ_TO_INT(str.data, str.size, 10, def);
+    return def;
 }
 TMJ_DEF unsigned int jsonToUInt(JsonStringView str, unsigned int def) {
     if (str.size <= 0) return def;
@@ -1007,9 +1040,11 @@ TMJ_DEF unsigned int jsonToUInt(JsonStringView str, unsigned int def) {
     }
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
         if (str.size == 2) return def;
-        return TMJ_TO_UINT(str.data + 2, str.size - 2, 16, def);
+        TMJ_TO_UINT(str.data + 2, str.data + str.size - 2, &def, 16);
+    } else {
+        TMJ_TO_UINT(str.data, str.data + str.size, &def, 10);
     }
-    return TMJ_TO_UINT(str.data, str.size, 10, def);
+    return def;
 }
 TMJ_DEF float jsonToFloat(JsonStringView str, float def) {
     if (str.size <= 0) return def;
@@ -1038,7 +1073,8 @@ TMJ_DEF float jsonToFloat(JsonStringView str, float def) {
 #endif
     }
 #endif
-    return TMJ_TO_FLOAT(str.data, str.size, def);
+    TMJ_TO_FLOAT(str.data, str.data + str.size, &def);
+    return def;
 }
 TMJ_DEF double jsonToDouble(JsonStringView str, double def) {
     if (str.size <= 0) return def;
@@ -1067,7 +1103,8 @@ TMJ_DEF double jsonToDouble(JsonStringView str, double def) {
 #endif
     }
 #endif
-    return TMJ_TO_DOUBLE(str.data, str.size, def);
+    TMJ_TO_DOUBLE(str.data, str.data + str.size, &def);
+    return def;
 }
 TMJ_DEF tm_bool jsonToBool(JsonStringView str, tm_bool def) {
     if (str.size <= 0) return def;
@@ -1093,9 +1130,11 @@ TMJ_DEF long long jsonToInt64(JsonStringView str, long long def) {
     if (str.size <= 0) return def;
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
         if (str.size == 2) return def;
-        return TMJ_TO_INT64(str.data + 2, str.size - 2, 16, def);
+        TMJ_TO_INT64(str.data + 2, str.data + str.size - 2, &def, 16);
+    } else {
+        TMJ_TO_INT64(str.data, str.data + str.size, &def, 10);
     }
-    return TMJ_TO_INT64(str.data, str.size, 10, def);
+    return def;
 }
 TMJ_DEF unsigned long long jsonToUInt64(JsonStringView str, unsigned long long def) {
     if (str.size <= 0) return def;
@@ -1106,9 +1145,11 @@ TMJ_DEF unsigned long long jsonToUInt64(JsonStringView str, unsigned long long d
     }
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
         if (str.size == 2) return def;
-        return TMJ_TO_UINT64(str.data + 2, str.size - 2, 16, def);
+        TMJ_TO_UINT64(str.data + 2, str.data + str.size - 2, &def, 16);
+    } else {
+        TMJ_TO_UINT64(str.data, str.data + str.size, &def, 10);
     }
-    return TMJ_TO_UINT64(str.data, str.size, 10, def);
+    return def;
 }
 #endif
 

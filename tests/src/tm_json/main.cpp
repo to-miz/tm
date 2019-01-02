@@ -1,14 +1,15 @@
-﻿#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
 #include <string_view>
 #include <iterator>
+#include <locale.h>
 
 #include <assert_throws.h>
 #include <assert_throws.cpp>
 
 #define TM_JSON_IMPLEMENTATION
-#define TMJ_LOCALE_NO_WARNING
+// #define TMJ_NO_AUTODETECT
 #define TMJ_DEFINE_INFINITY_AND_NAN
 #define TM_STRING_VIEW std::string_view
 #define TM_STRING_VIEW_DATA(x) (x).data()
@@ -20,68 +21,13 @@ struct AllocatedDocument : JsonAllocatedDocument {
     ~AllocatedDocument() { jsonFreeDocument(this); };
 };
 
-// These tests may fail, because the fallback string conversion functions are locale-dependant
-TEST_CASE("int conversion"
-          * doctest::description("Test the fallback string to int conversions."
-                                 "These may fail depending on the conformity of the CRT.")
-          * doctest::may_fail(true)) {
-    const std::string_view json = R"(
-        [
-            0, 1, -1, -0, 100, 32767,
-            65535, 2147483647, -2147483647, 4294967295,
-            9223372036854775807, -9223372036854775808, 18446744073709551615,
-            +0, +1, +100,
+int32_t get_value(JsonValue value, int32_t def) { return value.getInt(def); }
+uint32_t get_value(JsonValue value, uint32_t def) { return value.getUInt(def); }
+int64_t get_value(JsonValue value, int64_t def) { return value.getInt64(def); }
+uint64_t get_value(JsonValue value, uint64_t def) { return value.getUInt64(def); }
 
-            11111111111111111111111111111111111111111111111,
-            11111111111111111111111111111111111111111111111111111111111111111111111
-        ]
-    )";
-
-    const int32_t int32_def = -1000;
-    const uint32_t uint32_def = 1000;
-    const int64_t int64_def = -1000;
-    const uint64_t uint64_def = 1000;
-
-    // clang-format off
-    const int32_t int32_values[] = {
-        0, 1, -1, -0, 100, 32767,
-        65535, 2147483647, -2147483647, int32_def,
-        int32_def, int32_def, int32_def,
-        0, 1, 100,
-        int32_def, int32_def
-    };
-
-    const uint32_t uint32_values[] = {
-        0, 1, uint32_def, 0, 100, 32767,
-        65535, 2147483647, uint32_def, 4294967295,
-        uint32_def, uint32_def, uint32_def,
-        0, 1, 100,
-        uint32_def,
-        uint32_def
-    };
-
-    const int64_t int64_values[] = {
-        0, 1, -1, -0, 100, 32767,
-        65535, 2147483647, -2147483647, 4294967295,
-        9223372036854775807, -9223372036854775807 - 1, int64_def,
-        +0, +1, +100,
-        int64_def, int64_def
-    };
-
-    const uint64_t uint64_values[] = {
-        0, 1, uint64_def, 0, 100, 32767,
-        65535, 2147483647, uint64_def, 4294967295,
-        9223372036854775807, uint64_def, 18446744073709551615,
-        0, 1, 100,
-        uint64_def, uint64_def
-    };
-    // clang-format on
-
-    static_assert(std::size(int32_values) == 18);
-    static_assert(std::size(uint32_values) == 18);
-    static_assert(std::size(int64_values) == 18);
-    static_assert(std::size(uint64_values) == 18);
-
+template <class A, class B>
+void test_int_conversion(std::string_view json, A* values, size_t values_size, B def) {
     const uint32_t flags = JSON_READER_ALLOW_PLUS_SIGN | JSON_READER_HEXADECIMAL | JSON_READER_EXTENDED_FLOATS;
     AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
     auto& doc = pool.document;
@@ -90,35 +36,105 @@ TEST_CASE("int conversion"
     auto ints = doc.root.getArray();
 
     REQUIRE(ints);
-    REQUIRE(ints.size() == std::size(int32_values));
+    REQUIRE(ints.size() == values_size);
 
-    for (size_t i = 0; i < std::size(int32_values); ++i) {
+    for (size_t i = 0; i < values_size; ++i) {
         auto val = ints[i].getString();
         CAPTURE(i);
         INFO("value string: " << val);
-        CHECK(ints[i].getInt(int32_def) == int32_values[i]);
+        CHECK(get_value(ints[i], def) == values[i]);
+    }
+};
+
+// These tests may fail, because the fallback string conversion functions are locale-dependant
+TEST_CASE("int conversion" * doctest::description("Test the fallback string to int conversions.")) {
+    const int32_t int32_def = -1000;
+    const uint32_t uint32_def = 1000;
+    const int64_t int64_def = -1000;
+    const uint64_t uint64_def = 1000;
+
+    SUBCASE("int32_t") {
+        const std::string_view json = "[0, 1, -1, -0, 100, 32767, 65535, 2147483647, -2147483647, +0, +1, +100]";
+        const int32_t values[] = {0, 1, -1, -0, 100, 32767, 65535, 2147483647, -2147483647, +0, +1, +100};
+        test_int_conversion(json, values, std::size(values), int32_def);
     }
 
-    for (size_t i = 0; i < std::size(int64_values); ++i) {
-        auto val = ints[i].getString();
-        CAPTURE(i);
-        INFO("value string: " << val);
-        CHECK(ints[i].getInt64(int64_def) == int64_values[i]);
+    SUBCASE("uint32_t") {
+        const std::string_view json =
+            "[0, 1, -1, -0, 100, 32767,65535, 2147483647, -2147483647, 4294967295, +0, +1, +100]";
+        const uint32_t values[] = {0,          1,          uint32_def, 0,  100, 32767, 65535,
+                                   2147483647, uint32_def, 4294967295, +0, +1,  +100};
+        test_int_conversion(json, values, std::size(values), uint32_def);
     }
 
-    for (size_t i = 0; i < std::size(uint32_values); ++i) {
-        auto val = ints[i].getString();
-        CAPTURE(i);
-        INFO("value string: " << val);
-        CHECK(ints[i].getUInt(uint32_def) == uint32_values[i]);
+    SUBCASE("int64_t") {
+        const std::string_view json = R"([
+            0, 1, -1, -0, 100, 32767,65535, 2147483647, -2147483647, 4294967295,
+            +0, +1, +100,9223372036854775807, -9223372036854775808
+        ])";
+        const int64_t values[] = {0,
+                                  1,
+                                  -1,
+                                  -0,
+                                  100,
+                                  32767,
+                                  65535,
+                                  2147483647,
+                                  -2147483647,
+                                  4294967295,
+                                  +0,
+                                  +1,
+                                  +100,
+                                  9223372036854775807,
+                                  -9223372036854775807 - 1};
+        test_int_conversion(json, values, std::size(values), int64_def);
     }
 
-    for (size_t i = 0; i < std::size(uint64_values); ++i) {
-        auto val = ints[i].getString();
-        CAPTURE(i);
-        INFO("value string: " << val);
-        CHECK(ints[i].getUInt64(uint64_def) == uint64_values[i]);
+    SUBCASE("uint64_t") {
+        const std::string_view json = R"([
+            0, 1, -1, -0, 100, 32767,
+            65535, 2147483647, -2147483647, 4294967295,
+            +0, +1, +100,
+            9223372036854775807, -9223372036854775808,
+            18446744073709551615
+        ])";
+        const uint64_t values[] = {0,          1,
+                                   uint64_def, 0,
+                                   100,        32767,
+                                   65535,      2147483647,
+                                   uint64_def, 4294967295,
+                                   +0,         +1,
+                                   +100,       9223372036854775807,
+                                   uint64_def, 18446744073709551615};
+        test_int_conversion(json, values, std::size(values), uint64_def);
     }
+}
+
+TEST_CASE("int conversion overflow" *
+          doctest::description("Test int conversion with values that should overflow. "
+                               "May fail depending on the implementation of strtol "
+                               "and the way it reports ERANGE.") *
+          doctest::may_fail(true)) {
+    const int32_t int32_def = -1000;
+    const uint32_t uint32_def = 1000;
+    const int64_t int64_def = -1000;
+    const uint64_t uint64_def = 1000;
+
+    const std::string_view json = R"([
+            4294967295, 18446744073709551615,
+            11111111111111111111111111111111111111111111111,
+            11111111111111111111111111111111111111111111111111111111111111111111111
+        ])";
+
+    const int32_t int32_values[] = {int32_def, int32_def, int32_def, int32_def};
+    const uint32_t uint32_values[] = {4294967295, uint32_def, uint32_def, uint32_def};
+    const int64_t int64_values[] = {4294967295, int64_def, int64_def, int64_def};
+    const uint64_t uint64_values[] = {4294967295, 18446744073709551615, uint64_def, uint64_def};
+
+    test_int_conversion(json, int32_values, std::size(int32_values), int32_def);
+    test_int_conversion(json, uint32_values, std::size(uint32_values), uint32_def);
+    test_int_conversion(json, int64_values, std::size(int64_values), int64_def);
+    test_int_conversion(json, uint64_values, std::size(uint64_values), uint64_def);
 }
 
 bool ulps_comparison(float a, float b) {
@@ -146,12 +162,10 @@ bool ulps_comparison(double a, double b) {
     return (bm - am) <= 1;
 }
 
-TEST_CASE("float conversion"
-          * doctest::description("Test the fallback string to float conversions."
-                                 "These may fail depending on the conformity of the CRT.")
-          * doctest::may_fail(true)) {
-    const std::string_view json = R"(
-        [
+TEST_CASE("float conversion" *
+          doctest::description("Test the fallback locale-independent string to float conversions.")) {
+    auto do_test = []() {
+        const std::string_view json = R"([
             0, -0, 1, -1,
             +0, +1,
             0.01, -0.01, 1.01, -1.01,
@@ -159,102 +173,100 @@ TEST_CASE("float conversion"
             1e0, 1e10, -1e+10, 1e-10, +1e+10,
             1.01e0, 1.01e10, -1.01e+10, 1.01e-10, +1.01e+10,
             infinity, nan, -infinity, -nan, +infinity, +nan
-        ]
-    )";
+        ])";
 
-    const float float_values[] = {
-        0, -0, 1, -1,
-        +0, +1,
-        0.01f, -0.01f, 1.01f, -1.01f,
-        +0.01f, +1.01f,
-        1e0f, 1e10f, -1e+10f, 1e-10f, +1e+10f,
-        1.01e0f, 1.01e10f, -1.01e+10f, 1.01e-10f, +1.01e+10f,
-        TM_INFINITY, TM_NAN, -TM_INFINITY, -TM_NAN, +TM_INFINITY, +TM_NAN
-    };
+        const float float_values[] = {0,          -0,          1,       -1,           +0,       +1,           0.01f,
+                                      -0.01f,     1.01f,       -1.01f,  +0.01f,       +1.01f,   1e0f,         1e10f,
+                                      -1e+10f,    1e-10f,      +1e+10f, 1.01e0f,      1.01e10f, -1.01e+10f,   1.01e-10f,
+                                      +1.01e+10f, TM_INFINITY, TM_NAN,  -TM_INFINITY, -TM_NAN,  +TM_INFINITY, +TM_NAN};
 
-    const double double_values[] = {
-        0, -0, 1, -1,
-        +0, +1,
-        0.01, -0.01, 1.01, -1.01,
-        +0.01, +1.01,
-        1e0, 1e10, -1e+10, 1e-10, +1e+10,
-        1.01e0, 1.01e10, -1.01e+10, 1.01e-10, +1.01e+10,
-        TM_INFINITY, TM_NAN, -TM_INFINITY, -TM_NAN, +TM_INFINITY, +TM_NAN
-    };
+        const double double_values[] = {0,         -0,          1,      -1,           +0,      +1,           0.01,
+                                        -0.01,     1.01,        -1.01,  +0.01,        +1.01,   1e0,          1e10,
+                                        -1e+10,    1e-10,       +1e+10, 1.01e0,       1.01e10, -1.01e+10,    1.01e-10,
+                                        +1.01e+10, TM_INFINITY, TM_NAN, -TM_INFINITY, -TM_NAN, +TM_INFINITY, +TM_NAN};
 
-    static_assert(std::size(float_values) == 28);
-    static_assert(std::size(double_values) == 28);
+        static_assert(std::size(float_values) == 28);
+        static_assert(std::size(double_values) == 28);
 
-    const uint32_t flags = JSON_READER_ALLOW_PLUS_SIGN | JSON_READER_EXTENDED_FLOATS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
-    auto& doc = pool.document;
-    REQUIRE(doc.error.type == JSON_OK);
+        const uint32_t flags = JSON_READER_ALLOW_PLUS_SIGN | JSON_READER_EXTENDED_FLOATS;
+        AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
+        auto& doc = pool.document;
+        REQUIRE(doc.error.type == JSON_OK);
 
-    auto floats = doc.root.getArray();
-    REQUIRE(floats.size() == std::size(float_values));
+        auto floats = doc.root.getArray();
+        REQUIRE(floats.size() == std::size(float_values));
 
-    for (size_t i = 0; i < std::size(float_values); ++i) {
-        CAPTURE(i);
-        auto val = floats[i].getFloat(-1000.0f);
-        if (isnan(float_values[i])) {
-            // We check like this since nan == nan is always false.
-            CHECK(isnan(val));
-        } else {
-            CHECK(ulps_comparison(val, float_values[i]));
+        for (size_t i = 0; i < std::size(float_values); ++i) {
+            CAPTURE(i);
+            auto val = floats[i].getFloat(-1000.0f);
+            if (isnan(float_values[i])) {
+                // We check like this since nan == nan is always false.
+                CHECK(isnan(val));
+            } else {
+                CHECK(ulps_comparison(val, float_values[i]));
+            }
         }
+
+        for (size_t i = 0; i < std::size(double_values); ++i) {
+            CAPTURE(i);
+            auto val = floats[i].getDouble(-1000.0f);
+            if (isnan(double_values[i])) {
+                // We check like this since nan == nan is always false.
+                CHECK(isnan(val));
+            } else {
+                CHECK(ulps_comparison(val, double_values[i]));
+            }
+        }
+    };
+
+    SUBCASE("default locale") {
+        do_test();
     }
 
-    for (size_t i = 0; i < std::size(double_values); ++i) {
-        CAPTURE(i);
-        auto val = floats[i].getDouble(-1000.0f);
-        if (isnan(double_values[i])) {
-            // We check like this since nan == nan is always false.
-            CHECK(isnan(val));
-        } else {
-            CHECK(ulps_comparison(val, double_values[i]));
-        }
+    SUBCASE("english locale") {
+        auto prev = setlocale(LC_ALL, "en");
+        REQUIRE(prev);
+        do_test();
+        setlocale(LC_ALL, prev);
+    }
+
+    SUBCASE("german locale") {
+        // German locale should use ',' as decimal point.
+        auto prev = setlocale(LC_ALL, "de");
+        REQUIRE(prev);
+        auto lc = localeconv();
+        bool has_comma_decimal_point = lc && lc->decimal_point && *lc->decimal_point == ',';
+        REQUIRE(has_comma_decimal_point);
+        do_test();
+        setlocale(LC_ALL, prev);
+    }
+
+    SUBCASE("turkish locale") {
+        // Turkish has different uppercase behavior.
+        auto prev = setlocale(LC_ALL, "tr");
+        REQUIRE(prev);
+        do_test();
+        setlocale(LC_ALL, prev);
     }
 }
 
 TEST_CASE("keywords") {
-    const std::string_view json = R"(
-        {
-            "array": [
-                null,
-                Null,
-                NULL,
-                true,
-                True,
-                TRUE,
-                false,
-                False,
-                FALSE,
-                infinity,
-                Infinity,
-                INFINITY,
-                nan,
-                Nan,
-                NAN
-            ],
-            "object": {
-                "null": null,
-                "Null": Null,
-                "NULL": NULL,
-                "true": true,
-                "True": True,
-                "TRUE": TRUE,
-                "false": false,
-                "False": False,
-                "FALSE": FALSE,
-                "infinity": infinity,
-                "Infinity": Infinity,
-                "INFINITY": INFINITY,
-                "nan": nan,
-                "Nan": Nan,
-                "NAN": NAN
-            }
+    const std::string_view json = R"({
+        "array": [
+            null,Null,NULL,
+            true,True,TRUE,
+            false,False,FALSE,
+            infinity,Infinity,INFINITY,
+            nan,Nan,NAN
+        ],
+        "object": {
+            "null": null, "Null": Null, "NULL": NULL,
+            "true": true, "True": True, "TRUE": TRUE,
+            "false": false, "False": False, "FALSE": FALSE,
+            "infinity": infinity, "Infinity": Infinity, "INFINITY": INFINITY,
+            "nan": nan, "Nan": Nan, "NAN": NAN
         }
-    )";
+    })";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
     AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
@@ -319,12 +331,7 @@ TEST_CASE("keywords") {
 }
 
 TEST_CASE("strings") {
-    const std::string_view json = R"(
-        [
-            "Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello"
-        ]
-    )";
-
+    const std::string_view json = R"(["Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello"])";
     const std::string_view comp = "Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
@@ -336,11 +343,9 @@ TEST_CASE("strings") {
 }
 
 TEST_CASE("unicode" * doctest::should_fail(true)) {
-    const std::string_view json = R"(
-        {
-            "copyright_symbol": "\u00A9"
-        }
-    )";
+    const std::string_view json = R"({
+        "copyright_symbol": "\u00A9"
+    })";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
     AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
@@ -409,6 +414,7 @@ TEST_CASE("operator[]") {
 
 // TODO: implement following tests
 
+TEST_CASE("numbers") {}
 TEST_CASE("hex conversion") {}
 TEST_CASE("extended flags") {}
 TEST_CASE("invalid json") {}
