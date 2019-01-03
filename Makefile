@@ -39,7 +39,7 @@ INCLUDE_DIRS :=
 
 # tests
 
-TESTS_INCLUDE_DIRS  := tests/external ./ tests/src/
+TESTS_INCLUDE_DIRS  := tests/external . tests/src/
 TESTS_DOCTEST_DEP   := tests/external/doctest/doctest.h
 
 # tm_conversion

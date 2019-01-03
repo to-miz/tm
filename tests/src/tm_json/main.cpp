@@ -6,6 +6,10 @@
 #include <assert_throws.h>
 #include <assert_throws.cpp>
 
+#include <cstring>
+using std::strlen;
+using std::strncmp;
+
 #if 0
 #include <charconv>
 #define TMJ_TO_INT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
@@ -16,10 +20,12 @@
 #define TMJ_TO_DOUBLE(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
 #endif
 
+#if 0
 #include <string_view>
-#define TM_STRING_VIEW std::string_view
+#define TM_STRING_VIEW char*
 #define TM_STRING_VIEW_DATA(x) (x).data()
 #define TM_STRING_VIEW_SIZE(x) ((tm_size_t)(x).size())
+#endif
 
 #define TM_JSON_IMPLEMENTATION
 #define TMJ_DEFINE_INFINITY_AND_NAN
@@ -35,10 +41,16 @@ uint32_t get_value(JsonValue value, uint32_t def) { return value.getUInt(def); }
 int64_t get_value(JsonValue value, int64_t def) { return value.getInt64(def); }
 uint64_t get_value(JsonValue value, uint64_t def) { return value.getUInt64(def); }
 
+bool str_equal(tmj_string_view a, const char* b) {
+    auto b_size = strlen(b);
+    if (a.size != b_size) return false;
+    return strncmp(a.data, b, a.size) == 0;
+}
+
 template <class A, class B>
-void test_int_conversion(std::string_view json, A* values, size_t values_size, B def) {
+void test_int_conversion(const char* json, A* values, size_t values_size, B def) {
     const uint32_t flags = JSON_READER_ALLOW_PLUS_SIGN | JSON_READER_HEXADECIMAL | JSON_READER_EXTENDED_FLOATS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
@@ -53,7 +65,7 @@ void test_int_conversion(std::string_view json, A* values, size_t values_size, B
         INFO("value string: " << val);
         CHECK(get_value(ints[i], def) == values[i]);
     }
-};
+}
 
 TEST_CASE("int conversion" * doctest::description("Test the fallback string to int conversions.")) {
     const int32_t int32_def = -1000;
@@ -62,21 +74,20 @@ TEST_CASE("int conversion" * doctest::description("Test the fallback string to i
     const uint64_t uint64_def = 1000;
 
     SUBCASE("int32_t") {
-        const std::string_view json = "[0, 1, -1, -0, 100, 32767, 65535, 2147483647, -2147483647, +0, +1, +100]";
+        const char* json = "[0, 1, -1, -0, 100, 32767, 65535, 2147483647, -2147483647, +0, +1, +100]";
         const int32_t values[] = {0, 1, -1, -0, 100, 32767, 65535, 2147483647, -2147483647, +0, +1, +100};
         test_int_conversion(json, values, std::size(values), int32_def);
     }
 
     SUBCASE("uint32_t") {
-        const std::string_view json =
-            "[0, 1, -1, -0, 100, 32767,65535, 2147483647, -2147483647, 4294967295, +0, +1, +100]";
+        const char* json = "[0, 1, -1, -0, 100, 32767,65535, 2147483647, -2147483647, 4294967295, +0, +1, +100]";
         const uint32_t values[] = {0,          1,          uint32_def, 0,  100, 32767, 65535,
                                    2147483647, uint32_def, 4294967295, +0, +1,  +100};
         test_int_conversion(json, values, std::size(values), uint32_def);
     }
 
     SUBCASE("int64_t") {
-        const std::string_view json = R"([
+        const char* json = R"([
             0, 1, -1, -0, 100, 32767,65535, 2147483647, -2147483647, 4294967295,
             +0, +1, +100,9223372036854775807, -9223372036854775808
         ])";
@@ -99,7 +110,7 @@ TEST_CASE("int conversion" * doctest::description("Test the fallback string to i
     }
 
     SUBCASE("uint64_t") {
-        const std::string_view json = R"([
+        const char* json = R"([
             0, 1, -1, -0, 100, 32767,
             65535, 2147483647, -2147483647, 4294967295,
             +0, +1, +100,
@@ -128,11 +139,11 @@ TEST_CASE("int conversion overflow" *
     const int64_t int64_def = -1000;
     const uint64_t uint64_def = 1000;
 
-    const std::string_view json = R"([
-            4294967295, 18446744073709551615,
-            11111111111111111111111111111111111111111111111,
-            11111111111111111111111111111111111111111111111111111111111111111111111
-        ])";
+    const char* json = R"([
+        4294967295, 18446744073709551615,
+        11111111111111111111111111111111111111111111111,
+        11111111111111111111111111111111111111111111111111111111111111111111111
+    ])";
 
     const int32_t int32_values[] = {int32_def, int32_def, int32_def, int32_def};
     const uint32_t uint32_values[] = {4294967295, uint32_def, uint32_def, uint32_def};
@@ -173,7 +184,7 @@ bool ulps_comparison(double a, double b) {
 TEST_CASE("float conversion" *
           doctest::description("Test the fallback string to float conversions.")) {
     auto do_test = []() {
-        const std::string_view json = R"([
+        const char* json = R"([
             0, -0, 1, -1,
             +0, +1,
             0.01, -0.01, 1.01, -1.01,
@@ -197,7 +208,7 @@ TEST_CASE("float conversion" *
         static_assert(std::size(double_values) == 28);
 
         const uint32_t flags = JSON_READER_ALLOW_PLUS_SIGN | JSON_READER_EXTENDED_FLOATS;
-        AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
+        AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
         auto& doc = pool.document;
         REQUIRE(doc.error.type == JSON_OK);
 
@@ -263,7 +274,7 @@ TEST_CASE("float conversion" *
 }
 
 TEST_CASE("keywords") {
-    const std::string_view json = R"({
+    const char* json = R"({
         "array": [
             null,Null,NULL,
             true,True,TRUE,
@@ -281,7 +292,7 @@ TEST_CASE("keywords") {
     })";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
@@ -343,48 +354,46 @@ TEST_CASE("keywords") {
 }
 
 TEST_CASE("strings") {
-    const std::string_view json = R"(["Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello"])";
-    const std::string_view comp = "Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello";
+    const char* json = R"(["Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello"])";
+    const char* comp = "Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
-    CHECK(std::string_view{doc.root.getArray()[0].getString()} == comp);
+    CHECK(str_equal(doc.root.getArray()[0].getString(), comp));
 }
 
 TEST_CASE("unicode" * doctest::should_fail(true)) {
-    const std::string_view json = R"({
+    const char* json = R"({
         "copyright_symbol": "\u00A9"
     })";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
     auto root = doc.root.getObject();
     REQUIRE(root);
 
-    CHECK(root["copyright_symbol"].getString() == std::string_view{u8"©"});
+    CHECK(str_equal(root["copyright_symbol"].getString(), u8"©"));
 }
 
 TEST_CASE("operator[]") {
-    const std::string_view json = R"(
-        {
-            "aaa": 1,
-            "a": 2,
+    const char* json = R"({
+        "aaa": 1,
+        "a": 2,
 
-            "b": 1,
-            "bbb": 2,
+        "b": 1,
+        "bbb": 2,
 
-            "array": []
-        }
-    )";
+        "array": []
+    })";
 
     const uint32_t flags = 0;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json.data(), json.size(), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
@@ -400,7 +409,7 @@ TEST_CASE("operator[]") {
     CHECK(root["c"].isNull() == false);
     CHECK(root["ab"].getInt(-1) == -1);
     CHECK(root["bb"].getFloat(-1.0f) == -1.0f);
-    CHECK(root["ba"].getString() == std::string_view{});
+    CHECK(root["ba"].getString().size == 0);
     CHECK(root["aa"].getBool(true) == true);
     CHECK(root["aa"].getArray().count == 0);
     CHECK(root["aa"].getObject().count == 0);

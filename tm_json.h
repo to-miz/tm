@@ -112,7 +112,9 @@ ISSUES
 
 HISTORY
     v0.2.0  03.01.19  Removed TMJ_PASS_BY_POINTER.
-                      Removed attempts ate locale independent string conversions based on CRT due to being unsafe/slow.
+                      Removed attempts ate locale independent string conversions based on CRT due to
+                      being unsafe/slow.
+                      Changed the TMJ_TO_INT/etc macros to be easier to redefine using <charconv>.
     v0.1.8  01.01.19  Removed unnecessary debug assertion from jsonIsNull.
                       Made the fallback string conversion functions locale independent.
     v0.1.7  31.12.18  Added stringStartsWith to be used when appropriate instead of stringEquals.
