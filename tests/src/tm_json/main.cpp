@@ -1,19 +1,28 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
-#include <string_view>
 #include <iterator>
-#include <locale.h>
 
 #include <assert_throws.h>
 #include <assert_throws.cpp>
 
-#define TM_JSON_IMPLEMENTATION
-// #define TMJ_NO_AUTODETECT
-#define TMJ_DEFINE_INFINITY_AND_NAN
+#if 0
+#include <charconv>
+#define TMJ_TO_INT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+#define TMJ_TO_UINT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+#define TMJ_TO_INT64(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+#define TMJ_TO_UINT64(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+#define TMJ_TO_FLOAT(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
+#define TMJ_TO_DOUBLE(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
+#endif
+
+#include <string_view>
 #define TM_STRING_VIEW std::string_view
 #define TM_STRING_VIEW_DATA(x) (x).data()
 #define TM_STRING_VIEW_SIZE(x) ((tm_size_t)(x).size())
+
+#define TM_JSON_IMPLEMENTATION
+#define TMJ_DEFINE_INFINITY_AND_NAN
 #include <tm_json.h>
 
 struct AllocatedDocument : JsonAllocatedDocument {
@@ -46,7 +55,6 @@ void test_int_conversion(std::string_view json, A* values, size_t values_size, B
     }
 };
 
-// These tests may fail, because the fallback string conversion functions are locale-dependant
 TEST_CASE("int conversion" * doctest::description("Test the fallback string to int conversions.")) {
     const int32_t int32_def = -1000;
     const uint32_t uint32_def = 1000;
@@ -105,7 +113,7 @@ TEST_CASE("int conversion" * doctest::description("Test the fallback string to i
                                    uint64_def, 4294967295,
                                    +0,         +1,
                                    +100,       9223372036854775807,
-                                   uint64_def, 18446744073709551615};
+                                   uint64_def, 18446744073709551615ull};
         test_int_conversion(json, values, std::size(values), uint64_def);
     }
 }
@@ -129,7 +137,7 @@ TEST_CASE("int conversion overflow" *
     const int32_t int32_values[] = {int32_def, int32_def, int32_def, int32_def};
     const uint32_t uint32_values[] = {4294967295, uint32_def, uint32_def, uint32_def};
     const int64_t int64_values[] = {4294967295, int64_def, int64_def, int64_def};
-    const uint64_t uint64_values[] = {4294967295, 18446744073709551615, uint64_def, uint64_def};
+    const uint64_t uint64_values[] = {4294967295, 18446744073709551615ull, uint64_def, uint64_def};
 
     test_int_conversion(json, int32_values, std::size(int32_values), int32_def);
     test_int_conversion(json, uint32_values, std::size(uint32_values), uint32_def);
@@ -163,7 +171,7 @@ bool ulps_comparison(double a, double b) {
 }
 
 TEST_CASE("float conversion" *
-          doctest::description("Test the fallback locale-independent string to float conversions.")) {
+          doctest::description("Test the fallback string to float conversions.")) {
     auto do_test = []() {
         const std::string_view json = R"([
             0, -0, 1, -1,
@@ -223,6 +231,9 @@ TEST_CASE("float conversion" *
         do_test();
     }
 
+    // The fallback string to float conversion (strtod) is locale dependent, so these tests will fail.
+    // There is just no reliable, threadsafe way to do string to float conversion other than implementing it yourself.
+#if 0
     SUBCASE("english locale") {
         auto prev = setlocale(LC_ALL, "en");
         REQUIRE(prev);
@@ -248,6 +259,7 @@ TEST_CASE("float conversion" *
         do_test();
         setlocale(LC_ALL, prev);
     }
+#endif
 }
 
 TEST_CASE("keywords") {

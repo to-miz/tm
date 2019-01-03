@@ -62,29 +62,28 @@ SWITCHES
                 #define TM_STRING_VIEW_SIZE(name) (name).size()
             The example above assumes that getting the data and size of the string_view happens
             through member functions. If your string_view interface differs, change accordingly.
-        TMJ_TO_INT(str, len, base, def):
-        TMJ_TO_UINT(str, len, base, def):
-        TMJ_TO_INT64(str, len, base, def):
-        TMJ_TO_UINT64(str, len, base, def):
-        TMJ_TO_FLOAT(str, len, def):
-        TMJ_TO_DOUBLE(str, len, def):
-            define these macros if you have string conversion functions that accept non
-            nullterminated strings.
+        TMJ_TO_INT(first, last, out_ptr, base):
+        TMJ_TO_UINT(first, last, out_ptr, base):
+        TMJ_TO_INT64(first, last, out_ptr, base):
+        TMJ_TO_UINT64(first, last, out_ptr, base):
+        TMJ_TO_FLOAT(first, last, out_ptr):
+        TMJ_TO_DOUBLE(first, last, out_ptr):
+            Define these macros if you have locale independent string conversion functions that
+            accept non nullterminated strings.
             These macros represent functions with these signatures:
-                int to_int(const char* data, size_t size, int base, int def)
-                unsigned int to_uint(const char* data, size_t size, int base, unsigned int def)
-                double to_double(const char* data, size_t size, double def)
-                float to_float(const char* data, size_t size, float def)
-                long long to_int64(const char* data, size_t size, int base, long long def)
-                unsigned long long to_uint64(const char* data, size_t size, int base,
-                                             unsigned long long def)
+                void to_int(const char* first, const char* last, int32_t* out_ptr, int32_t base)
+                void to_uint(const char* first, const char* last, uint32_t* out_ptr, int base)
+                void to_int64(const char* first, const char* last, int64_t* out_ptr, int base)
+                void to_uint64(const char* first, const char* last, uint64_t* out_ptr, int base)
+                void to_float(const char* first, const char* last, float* out_ptr)
+                void to_double(const char* first, const char* last, double* out_ptr)
             Arguments:
-                str: a non nullterminated string
-                len: the length of str
-                base: base to use when converting str into the return value
-                def: the default value to use if conversion fails
+                first/last: A pair of iterators to a non nullterminated string.
+                out_ptr:    Output value to be written on successful conversion. On error, it should
+                            stay unmodified.
+                base:       Base to use for the integer conversion.
             If you do not define these, the implementation will use stdlib.h to implement them.
-            Since the crt string conversion functions do not allow non nullterminated strings, the
+            Since the crt string conversion functions are do not allow non nullterminated strings, the
             implementation has to copy the strings into a temporary buffer and nullterminate it
             before passing them into the crt string conversion functions.
         TMJ_DEFINE_INFINITY_AND_NAN:
@@ -103,13 +102,17 @@ SWITCHES
 
 ISSUES
     - \u isn't implemented in strings, it will just be ignored currently
-    - mismatched brackets will be reported as JERR_UNEXPECTED_EOF instead of JERR_MISMATCHED_BRACKETS
+    - Mismatched brackets will be reported as JERR_UNEXPECTED_EOF instead of JERR_MISMATCHED_BRACKETS
       when using jsonMakeDocument, because jsonSkipCurrent skips until eof on mismatched brackets.
-    - missing documentation and example usage code
-    - json objects aren't implemented as dictionaries/hashmaps, instead they use linear lookup
-      json objects should be turned into hashmaps manually when applicable
+    - missing documentation and example usage code.
+    - Json objects aren't implemented as dictionaries/hashmaps, instead they use linear lookup
+      json objects should be turned into hashmaps manually when applicable.
+    - Fallback string conversion is based on <strlib.h> and thus locale dependent.
+      Workaround is not changing the LC_NUMERIC locale from the default "C" locale.
 
 HISTORY
+    v0.2.0  03.01.19  Removed TMJ_PASS_BY_POINTER.
+                      Removed attempts ate locale independent string conversions based on CRT due to being unsafe/slow.
     v0.1.8  01.01.19  Removed unnecessary debug assertion from jsonIsNull.
                       Made the fallback string conversion functions locale independent.
     v0.1.7  31.12.18  Added stringStartsWith to be used when appropriate instead of stringEquals.
@@ -143,6 +146,26 @@ HISTORY
                       Added more string_view support through TM_STRING_VIEW.
     v0.1    11.09.16  Initial commit.
 */
+
+/* Examples. */
+
+#if 0
+// Sample code to use C++17 <charconv> header as the backend for string conversions.
+// <charconv> has the advantage that it is faster and locale independent from the get go.
+
+#include <charconv>
+
+#define TMJ_TO_INT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+#define TMJ_TO_UINT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+#define TMJ_TO_INT64(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+#define TMJ_TO_UINT64(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+#define TMJ_TO_FLOAT(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
+#define TMJ_TO_DOUBLE(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
+#define TM_JSON_IMPLEMENTATION
+#include <tm_json.h>
+
+// Now the implementation of tm_json will use <charconv> as the backend for string conversions.
+#endif
 
 /* clang-format off */
 #ifdef TM_JSON_IMPLEMENTATION
@@ -682,59 +705,45 @@ TMJ_DEF JsonDocument jsonMakeDocumentEx(JsonStackAllocator* allocator, const cha
     JsonObjectArrayIterator begin(const JsonObjectArray& a);
     JsonObjectArrayIterator end(const JsonObjectArray& a);
 #endif
-
-#if !defined(TMJ_PASS_BY_POINTER) && defined(__cplusplus)
-    typedef const JsonValue& JsonValueArg;
-    typedef const JsonObject& JsonObjectArg;
-    typedef const JsonArray& JsonArrayArg;
-    #define TMJ_ARG(arg) (arg)
-    #define TMJ_DEREF(arg) (arg)
-#else
-    typedef const JsonValue* JsonValueArg;
-    typedef const JsonObject* JsonObjectArg;
-    typedef const JsonArray* JsonArrayArg;
-    #define TMJ_ARG(arg) (&(arg))
-    #define TMJ_DEREF(arg) (*(arg))
-#endif
 /* clang-format on */
 
-TMJ_DEF tm_bool jsonIsNull(JsonValueArg value);
-TMJ_DEF tm_bool jsonIsIntegral(JsonValueArg value);
-TMJ_DEF tm_bool jsonIsString(JsonValueArg value);
+TMJ_DEF tm_bool jsonIsNull(const JsonValue* value);
+TMJ_DEF tm_bool jsonIsIntegral(const JsonValue* value);
+TMJ_DEF tm_bool jsonIsString(const JsonValue* value);
 // returns a JsonObject if value contains an object, returns a nil object otherwise
 // see documentation at the top of the file for what nil objects are
-TMJ_DEF JsonObject jsonGetObject(JsonValueArg value);
+TMJ_DEF JsonObject jsonGetObject(const JsonValue* value);
 // returns a JsonArray if value contains an array, returns a nil array otherwise
 // see documentation at the top of the file for what nil arrays are
-TMJ_DEF JsonArray jsonGetArray(JsonValueArg value);
-TMJ_DEF JsonObjectArray jsonGetObjectArray(JsonValueArg value);
+TMJ_DEF JsonArray jsonGetArray(const JsonValue* value);
+TMJ_DEF JsonObjectArray jsonGetObjectArray(const JsonValue* value);
 
-TMJ_DEF JsonValue jsonGetMember(JsonObjectArg object, const char* name);
-TMJ_DEF JsonValue* jsonQueryMember(JsonObjectArg object, const char* name);
-TMJ_DEF JsonValue jsonGetMemberCached(JsonObjectArg object, const char* name, tm_size_t* lastAccess);
-TMJ_DEF JsonValue* jsonQueryMemberCached(JsonObjectArg object, const char* name, tm_size_t* lastAccess);
-TMJ_DEF JsonValue jsonGetEntry(JsonArrayArg object, tm_size_t index);
+TMJ_DEF JsonValue jsonGetMember(const JsonObject* object, const char* name);
+TMJ_DEF JsonValue* jsonQueryMember(const JsonObject* object, const char* name);
+TMJ_DEF JsonValue jsonGetMemberCached(const JsonObject* object, const char* name, tm_size_t* lastAccess);
+TMJ_DEF JsonValue* jsonQueryMemberCached(const JsonObject* object, const char* name, tm_size_t* lastAccess);
+TMJ_DEF JsonValue jsonGetEntry(const JsonArray* object, tm_size_t index);
 
 // string_view overloads
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
-TMJ_DEF JsonValue jsonGetMember(JsonObjectArg object, TM_STRING_VIEW name);
-TMJ_DEF JsonValue* jsonQueryMember(JsonObjectArg object, TM_STRING_VIEW name);
-TMJ_DEF JsonValue jsonGetMemberCached(JsonObjectArg object, TM_STRING_VIEW name, tm_size_t* lastAccess);
-TMJ_DEF JsonValue* jsonQueryMemberCached(JsonObjectArg object, TM_STRING_VIEW name, tm_size_t* lastAccess);
+TMJ_DEF JsonValue jsonGetMember(const JsonObject* object, TM_STRING_VIEW name);
+TMJ_DEF JsonValue* jsonQueryMember(const JsonObject* object, TM_STRING_VIEW name);
+TMJ_DEF JsonValue jsonGetMemberCached(const JsonObject* object, TM_STRING_VIEW name, tm_size_t* lastAccess);
+TMJ_DEF JsonValue* jsonQueryMemberCached(const JsonObject* object, TM_STRING_VIEW name, tm_size_t* lastAccess);
 #endif  // defined( __cplusplus ) && defined( TM_STRING_VIEW )
 
-TMJ_DEF tm_bool jsonIsValidObject(JsonObjectArg object);
-TMJ_DEF tm_bool jsonIsValidArray(JsonArrayArg array);
-TMJ_DEF tm_bool jsonIsValidValue(JsonValueArg value);
+TMJ_DEF tm_bool jsonIsValidObject(const JsonObject* object);
+TMJ_DEF tm_bool jsonIsValidArray(const JsonArray* array);
+TMJ_DEF tm_bool jsonIsValidValue(const JsonValue* value);
 
-TMJ_DEF int jsonGetInt(JsonValueArg value, int def);
-TMJ_DEF unsigned int jsonGetUInt(JsonValueArg value, unsigned int def);
-TMJ_DEF float jsonGetFloat(JsonValueArg value, float def);
-TMJ_DEF double jsonGetDouble(JsonValueArg value, double def);
-TMJ_DEF tm_bool jsonGetBool(JsonValueArg value, tm_bool def);
+TMJ_DEF int jsonGetInt(const JsonValue* value, int def);
+TMJ_DEF unsigned int jsonGetUInt(const JsonValue* value, unsigned int def);
+TMJ_DEF float jsonGetFloat(const JsonValue* value, float def);
+TMJ_DEF double jsonGetDouble(const JsonValue* value, double def);
+TMJ_DEF tm_bool jsonGetBool(const JsonValue* value, tm_bool def);
 #ifndef TMJ_NO_INT64
-TMJ_DEF long long jsonGetInt64(JsonValueArg value, long long def);
-TMJ_DEF unsigned long long jsonGetUInt64(JsonValueArg value, unsigned long long def);
+TMJ_DEF long long jsonGetInt64(const JsonValue* value, long long def);
+TMJ_DEF unsigned long long jsonGetUInt64(const JsonValue* value, unsigned long long def);
 #endif
 
 // inline implementations
@@ -775,36 +784,36 @@ inline tmj_string_view JsonValueStruct::getString(tmj_string_view def) const {
     return {data.content.data, data.content.size};
 }
 
-inline JsonObject JsonValueStruct::getObject() const { return jsonGetObject(TMJ_ARG(*this)); }
-inline JsonArray JsonValueStruct::getArray() const { return jsonGetArray(TMJ_ARG(*this)); }
-inline JsonObjectArray JsonValueStruct::getObjectArray() const { return jsonGetObjectArray(TMJ_ARG(*this)); }
-inline bool JsonValueStruct::isNull() const { return jsonIsNull(TMJ_ARG(*this)); }
-inline bool JsonValueStruct::isIntegral() const { return jsonIsIntegral(TMJ_ARG(*this)); }
-inline bool JsonValueStruct::isString() const { return jsonIsString(TMJ_ARG(*this)); }
+inline JsonObject JsonValueStruct::getObject() const { return jsonGetObject(this); }
+inline JsonArray JsonValueStruct::getArray() const { return jsonGetArray(this); }
+inline JsonObjectArray JsonValueStruct::getObjectArray() const { return jsonGetObjectArray(this); }
+inline bool JsonValueStruct::isNull() const { return jsonIsNull(this); }
+inline bool JsonValueStruct::isIntegral() const { return jsonIsIntegral(this); }
+inline bool JsonValueStruct::isString() const { return jsonIsString(this); }
 
 inline tm_size_t JsonArray::size() const { return count; }
-inline JsonValue JsonArray::operator[](tm_size_t index) const { return jsonGetEntry(TMJ_ARG(*this), index); }
+inline JsonValue JsonArray::operator[](tm_size_t index) const { return jsonGetEntry(this, index); }
 
 inline tm_size_t JsonObjectArray::size() const { return count; }
 inline JsonObject JsonObjectArray::operator[](tm_size_t index) const {
     TM_ASSERT(tmj_valid_index(index, count));
-    return jsonGetObject(values[index]);
+    return jsonGetObject(&values[index]);
 }
 
 inline tm_size_t JsonObject::size() const { return count; }
-inline JsonValue JsonObject::operator[](tmj_string_arg name) const { return jsonGetMember(*this, name); }
-inline bool JsonObject::exists(tmj_string_arg name) const { return jsonQueryMember(TMJ_ARG(*this), name) != TM_NULL; }
-inline JsonValue* JsonObject::find(tmj_string_arg name) const { return jsonQueryMember(TMJ_ARG(*this), name); }
+inline JsonValue JsonObject::operator[](tmj_string_arg name) const { return jsonGetMember(this, name); }
+inline bool JsonObject::exists(tmj_string_arg name) const { return jsonQueryMember(this, name) != TM_NULL; }
+inline JsonValue* JsonObject::find(tmj_string_arg name) const { return jsonQueryMember(this, name); }
 
-inline int JsonValueStruct::getInt(int def) const { return jsonGetInt(TMJ_ARG(*this), def); }
-inline unsigned int JsonValueStruct::getUInt(unsigned int def) const { return jsonGetUInt(TMJ_ARG(*this), def); }
-inline float JsonValueStruct::getFloat(float def) const { return jsonGetFloat(TMJ_ARG(*this), def); }
-inline double JsonValueStruct::getDouble(double def) const { return jsonGetDouble(TMJ_ARG(*this), def); }
-inline bool JsonValueStruct::getBool(bool def) const { return jsonGetBool(TMJ_ARG(*this), def); }
+inline int JsonValueStruct::getInt(int def) const { return jsonGetInt(this, def); }
+inline unsigned int JsonValueStruct::getUInt(unsigned int def) const { return jsonGetUInt(this, def); }
+inline float JsonValueStruct::getFloat(float def) const { return jsonGetFloat(this, def); }
+inline double JsonValueStruct::getDouble(double def) const { return jsonGetDouble(this, def); }
+inline bool JsonValueStruct::getBool(bool def) const { return jsonGetBool(this, def); }
 #ifndef TMJ_NO_INT64
-inline long long JsonValueStruct::getInt64(long long def) const { return jsonGetInt64(TMJ_ARG(*this), def); }
+inline long long JsonValueStruct::getInt64(long long def) const { return jsonGetInt64(this, def); }
 inline unsigned long long JsonValueStruct::getUInt64(unsigned long long def) const {
-    return jsonGetUInt64(TMJ_ARG(*this), def);
+    return jsonGetUInt64(this, def);
 }
 #endif /* !defined(TMJ_NO_INT64) */
 #endif /* defined(__cplusplus) */
@@ -863,77 +872,6 @@ static tm_bool stringStartsWithIgnoreCase(const char* a, size_t aSize, const cha
 
 #include <stdlib.h>
 #include <errno.h>
-#include <locale.h>
-
-// We need to use CRT extensions to be able use "locale-independent" string conversions.
-// clang-format off
-#if defined(_MSC_VER) && !defined(TMJ_NO_AUTODETECT)
-
-    // We are forced to create and leak this locale, since there is no good time to free it.
-    #ifdef __cplusplus
-        static const _locale_t tmj_internal_locale = _create_locale(LC_NUMERIC, "C");
-        #define tmj_internal_get_locale() tmj_internal_locale
-    #else
-        static _locale_t tmj_internal_locale = TM_NULL;
-        static _locale_t tmj_internal_get_locale() {
-            if (!tmj_internal_locale) tmj_internal_locale = _create_locale(LC_NUMERIC, "C");
-            return tmj_internal_locale;
-        }
-    #endif
-
-    #define TMJ_STRTOL(buffer, base) _strtol_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
-    #define TMJ_STRTOUL(buffer, base) _strtoul_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
-    #define TMJ_STRTOLL(buffer, base) _strtoll_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
-    #define TMJ_STRTOULL(buffer, base) _strtoull_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
-    #define TMJ_STRTOD(buffer) _strtod_l((buffer), TM_NULL, tmj_internal_get_locale())
-
-#elif defined(__GNUC__) && !defined(TMJ_NO_AUTODETECT)
-
-    // We are forced to create and leak this locale, since there is no good time to free it.
-    #ifdef __cplusplus
-        static const _locale_t tmj_internal_locale = newlocale(LC_NUMERIC_MASK, "C", TM_NULL);
-        #define tmj_internal_get_locale() tmj_internal_locale
-    #else
-        static _locale_t tmj_internal_locale = TM_NULL;
-        static _locale_t tmj_internal_get_locale() {
-            if (!tmj_internal_locale) tmj_internal_locale = newlocale(LC_NUMERIC_MASK, "C", TM_NULL);
-            return tmj_internal_locale;
-        }
-    #endif
-
-    #define TMJ_STRTOL(buffer, base) strtol_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
-    #define TMJ_STRTOUL(buffer, base) strtoul_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
-    #define TMJ_STRTOLL(buffer, base) strtoll_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
-    #define TMJ_STRTOULL(buffer, base) strtoull_l((buffer), TM_NULL, (base), tmj_internal_get_locale())
-    #define TMJ_STRTOD(buffer) strtod_l((buffer), TM_NULL, tmj_internal_get_locale())
-
-#else
-
-    // We need to make the string to float conversion locale-independent.
-    static double tmj_strtod_l(char* buffer) {
-        TM_ASSERT(buffer);
-        const struct lconv* lc = localeconv();
-        const char decimal_point = (lc && lc->decimal_point) ? (*lc->decimal_point) : '.';
-        if (decimal_point != '.') {
-            // Change decimal point to the one defined in the locale.
-            for (char* p = buffer; *p; ++p) {
-                if(*p == '.') {
-                    *p = decimal_point;
-                    break;
-                }
-            }
-        }
-        return strtod(buffer, TM_NULL);
-    }
-
-    #define TMJ_STRTOL(buffer, base) strtol((buffer), TM_NULL, (base))
-    #define TMJ_STRTOUL(buffer, base) strtoul((buffer), TM_NULL, (base))
-    #define TMJ_STRTOLL(buffer, base) strtoll((buffer), TM_NULL, (base))
-    #define TMJ_STRTOULL(buffer, base) strtoull((buffer), TM_NULL, (base))
-    #define TMJ_STRTOD(buffer) tmj_strtod_l((buffer))
-
-#endif
-// clang-format on
 
 static void tmj_to_int(const char* first, const char* last, int* value, int base) {
     TM_ASSERT(value);
@@ -944,7 +882,7 @@ static void tmj_to_int(const char* first, const char* last, int* value, int base
     TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
-    int result = (int)TMJ_STRTOL(buffer, base);
+    int result = (int)strtol(buffer, TM_NULL, base);
     if (errno == ERANGE) return;
     *value = result;
 }
@@ -957,7 +895,7 @@ static void tmj_to_uint(const char* first, const char* last, unsigned int* value
     TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
-    unsigned int result = (unsigned int)TMJ_STRTOUL(buffer, base);
+    unsigned int result = (unsigned int)strtoul(buffer, TM_NULL, base);
     if (errno == ERANGE) return;
     *value = result;
 }
@@ -970,7 +908,7 @@ static tm_bool tmj_to_double(const char* first, const char* last, double* value)
     TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
-    double result = TMJ_STRTOD(buffer);
+    double result = strtod(buffer, TM_NULL);
     if (errno == ERANGE) return TM_FALSE;
     *value = result;
     return TM_TRUE;
@@ -991,7 +929,7 @@ static void tmj_to_int64(const char* first, const char* last, long long* value, 
     TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
-    long long result = (long long)TMJ_STRTOLL(buffer, base);
+    long long result = (long long)strtoll(buffer, TM_NULL, base);
     if (errno == ERANGE) return;
     *value = result;
 }
@@ -1004,20 +942,11 @@ static void tmj_to_uint64(const char* first, const char* last, unsigned long lon
     TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
-    unsigned long long result =  (unsigned long long)TMJ_STRTOULL(buffer, base);
+    unsigned long long result =  (unsigned long long)strtoull(buffer, TM_NULL, base);
     if (errno == ERANGE) return;
     *value = result;
 }
 #endif  // !defined(TMJ_NO_INT64)
-
-#ifdef tmj_internal_get_locale
-    #undef tmj_internal_get_locale
-#endif
-#undef TMJ_STRTOL
-#undef TMJ_STRTOUL
-#undef TMJ_STRTOLL
-#undef TMJ_STRTOULL
-#undef TMJ_STRTOD
 
 #endif  // defined(TMJ_DEFINE_OWN_STRING_CONVERSIONS)
 
@@ -1290,7 +1219,6 @@ static tm_bool readNumber(JsonReader* reader) {
                     return TM_FALSE;
                 }
             } while (TM_ISXDIGIT((unsigned char)reader->data[0]));
-            reader->valueType = JVAL_UINT;
             reader->current.size = (tm_size_t)(reader->data - reader->current.data);
             return TM_TRUE;
         }
@@ -2080,18 +2008,10 @@ TMJ_DEF JsonTokenType jsonNextTokenImplicitEx(JsonReader* reader, JsonContext cu
                     case 'r':
                     case 'R': {
                         if (reader->lastToken == JTOK_PROPERTYNAME) {
-                            if (jsonParseCppRawString(reader, currentContext)) {
-                                return reader->lastToken;
-                            }
-                            if (reader->errorType != JSON_OK) {
-                                return JTOK_ERROR;
-                            }
-                            if (jsonParsePythonRawString(reader, currentContext)) {
-                                return reader->lastToken;
-                            }
-                            if (reader->errorType != JSON_OK) {
-                                return JTOK_ERROR;
-                            }
+                            if (jsonParseCppRawString(reader, currentContext)) return reader->lastToken;
+                            if (reader->errorType != JSON_OK) return JTOK_ERROR;
+                            if (jsonParsePythonRawString(reader, currentContext)) return reader->lastToken;
+                            if (reader->errorType != JSON_OK) return JTOK_ERROR;
                         }
                         break;
                     }
@@ -2100,12 +2020,8 @@ TMJ_DEF JsonTokenType jsonNextTokenImplicitEx(JsonReader* reader, JsonContext cu
                     setError(reader, JERR_UNEXPECTED_TOKEN);
                     return JTOK_ERROR;
                 }
-                if (jsonParseUnquotedPropertyName(reader, currentContext)) {
-                    return JTOK_PROPERTYNAME;
-                }
-                if (reader->errorType != JSON_OK) {
-                    return JTOK_ERROR;
-                }
+                if (jsonParseUnquotedPropertyName(reader, currentContext)) return JTOK_PROPERTYNAME;
+                if (reader->errorType != JSON_OK) return JTOK_ERROR;
                 // json value case
                 if (!jsonCanValueFollowLastToken(reader, currentContext)) {
                     setError(reader, JERR_UNEXPECTED_TOKEN);
@@ -2129,17 +2045,13 @@ TMJ_DEF JsonTokenType jsonNextTokenEx(JsonReader* reader) {
         case JTOK_OBJECT_START:
         case JTOK_ARRAY_START: {
             JsonContext context = (JsonContext)(token - JTOK_OBJECT_START + JSON_CONTEXT_OBJECT);
-            if (!jsonPushContext(reader, context)) {
-                return JTOK_ERROR;
-            }
+            if (!jsonPushContext(reader, context)) return JTOK_ERROR;
             break;
         }
         case JTOK_OBJECT_END:
         case JTOK_ARRAY_END: {
             JsonContext context = (JsonContext)(token - JTOK_OBJECT_END + JSON_CONTEXT_OBJECT);
-            if (!jsonPopContext(reader, context)) {
-                return JTOK_ERROR;
-            }
+            if (!jsonPopContext(reader, context)) return JTOK_ERROR;
             break;
         }
         default: {
@@ -2153,55 +2065,41 @@ TMJ_DEF JsonContext jsonReadRootType(JsonReader* reader) {
     if (reader->contextStack.size) {
         JsonContext current = (JsonContext)reader->contextStack.data[reader->contextStack.size - 1].context;
         TM_ASSERT(current == JSON_CONTEXT_NULL);
-        if (current != JSON_CONTEXT_NULL) {
-            return JSON_CONTEXT_NULL;
-        }
+        if (current != JSON_CONTEXT_NULL) return JSON_CONTEXT_NULL;
 
         for (;;) {
             JsonTokenType token = jsonNextToken(reader);
             switch (token) {
-                case JTOK_OBJECT_START: {
+                case JTOK_OBJECT_START:
                     return JSON_CONTEXT_OBJECT;
-                }
-                case JTOK_ARRAY_START: {
+                case JTOK_ARRAY_START:
                     return JSON_CONTEXT_ARRAY;
-                }
-                case JTOK_COMMENT: {
+                case JTOK_COMMENT:
                     continue;
-                }
-                default: {
+                default:
                     return JSON_CONTEXT_NULL;
-                }
             }
         }
     } else {
         for (;;) {
             JsonTokenType token = jsonNextTokenImplicit(reader, JSON_CONTEXT_NULL);
             switch (token) {
-                case JTOK_OBJECT_START: {
+                case JTOK_OBJECT_START:
                     return JSON_CONTEXT_OBJECT;
-                }
-                case JTOK_ARRAY_START: {
+                case JTOK_ARRAY_START:
                     return JSON_CONTEXT_ARRAY;
-                }
-                case JTOK_COMMENT: {
+                case JTOK_COMMENT:
                     continue;
-                }
-                default: {
+                default:
                     return JSON_CONTEXT_NULL;
-                }
             }
         }
     }
 }
 
 TMJ_DEF tm_bool jsonSkipCurrent(JsonReader* reader, JsonContext currentContext, tm_bool ex) {
-    if (reader->errorType != JSON_OK) {
-        return TM_FALSE;
-    }
-    if (!reader->size) {
-        return TM_FALSE;
-    }
+    if (reader->errorType != JSON_OK) return TM_FALSE;
+    if (!reader->size) return TM_FALSE;
     if (reader->lastToken != JTOK_OBJECT_START && reader->lastToken != JTOK_ARRAY_START &&
         reader->lastToken != JTOK_PROPERTYNAME) {
         return TM_FALSE;
@@ -2243,9 +2141,7 @@ TMJ_DEF tm_bool jsonSkipCurrent(JsonReader* reader, JsonContext currentContext, 
                 }
             }
         } while (run);
-        if (reader->errorType != JSON_OK) {
-            return TM_FALSE;
-        }
+        if (reader->errorType != JSON_OK) return TM_FALSE;
     }
     TM_ASSERT(reader->lastToken == JTOK_OBJECT_START || reader->lastToken == JTOK_ARRAY_START);
     JsonTokenType skipping = reader->lastToken;
@@ -2265,9 +2161,7 @@ TMJ_DEF tm_bool jsonSkipCurrent(JsonReader* reader, JsonContext currentContext, 
         jsonAdvance(reader);
         switch (c) {
             case '{': {
-                if (skipping == JTOK_OBJECT_START) {
-                    ++depth;
-                }
+                if (skipping == JTOK_OBJECT_START) ++depth;
                 break;
             }
             case '}': {
@@ -2281,9 +2175,7 @@ TMJ_DEF tm_bool jsonSkipCurrent(JsonReader* reader, JsonContext currentContext, 
                 break;
             }
             case '[': {
-                if (skipping == JTOK_ARRAY_START) {
-                    ++depth;
-                }
+                if (skipping == JTOK_ARRAY_START) ++depth;
                 break;
             }
             case ']': {
@@ -2299,9 +2191,7 @@ TMJ_DEF tm_bool jsonSkipCurrent(JsonReader* reader, JsonContext currentContext, 
             case '"': {
                 --reader->data;
                 ++reader->size;
-                if (!readQuotedString(reader)) {
-                    return TM_FALSE;
-                }
+                if (!readQuotedString(reader)) return TM_FALSE;
                 break;
             }
         }
@@ -2327,9 +2217,7 @@ TMJ_DEF JsonReader jsonMakeReader(const char* data, tm_size_t size, JsonContextE
 }
 
 tm_size_t jsonCopyUnescapedString(JsonStringView str, char* buffer, tm_size_t size) {
-    if (!str.data || str.size <= 0 || size <= 0) {
-        return 0;
-    }
+    if (!str.data || str.size <= 0 || size <= 0) return 0;
     TM_ASSERT(buffer);
     tm_size_t sz = TM_MIN(size, str.size);
     const char* p = str.data;
@@ -2538,9 +2426,7 @@ static JsonErrorType jsonReadObject(JsonReader* reader, JsonStackAllocator* allo
 
     *reader = readerState;
     out->nodes = (JsonNode*)jsonAllocate(allocator, memberCount * sizeof(JsonNode), JSON_ALIGNMENT_NODE);
-    if (!out->nodes) {
-        return JERR_OUT_OF_MEMORY;
-    }
+    if (!out->nodes) return JERR_OUT_OF_MEMORY;
     out->count = memberCount;
 
     tm_size_t nodesIndex = 0;
@@ -2653,9 +2539,7 @@ static JsonErrorType jsonReadArray(JsonReader* reader, JsonStackAllocator* alloc
 
     *reader = readerState;
     out->values = (JsonValue*)jsonAllocate(allocator, memberCount * sizeof(JsonValue), JSON_ALIGNMENT_VALUE);
-    if (!out->values) {
-        return JERR_OUT_OF_MEMORY;
-    }
+    if (!out->values) return JERR_OUT_OF_MEMORY;
     out->count = memberCount;
 
     int valuesIndex = 0;
@@ -2822,9 +2706,7 @@ static JsonErrorType jsonReadObjectEx(JsonReader* reader, JsonStackAllocator* al
 
     *reader = readerState;
     out->nodes = (JsonNode*)jsonAllocate(allocator, memberCount * sizeof(JsonNode), JSON_ALIGNMENT_NODE);
-    if (!out->nodes) {
-        return JERR_OUT_OF_MEMORY;
-    }
+    if (!out->nodes) return JERR_OUT_OF_MEMORY;
     out->count = memberCount;
 
     tm_size_t nodesIndex = 0;
@@ -2932,9 +2814,7 @@ static JsonErrorType jsonReadArrayEx(JsonReader* reader, JsonStackAllocator* all
 
     *reader = readerState;
     out->values = (JsonValue*)jsonAllocate(allocator, memberCount * sizeof(JsonValue), JSON_ALIGNMENT_VALUE);
-    if (!out->values) {
-        return JERR_OUT_OF_MEMORY;
-    }
+    if (!out->values) return JERR_OUT_OF_MEMORY;
     out->count = memberCount;
 
     int valuesIndex = 0;
@@ -3045,45 +2925,47 @@ TMJ_DEF void jsonFreeDocument(JsonAllocatedDocument* doc) {
     }
 }
 
-TMJ_DEF tm_bool jsonIsNull(JsonValueArg value) {
-    return TMJ_DEREF(value).type == JVAL_NULL && TMJ_DEREF(value).data.content.data != TM_NULL;
+TMJ_DEF tm_bool jsonIsNull(const JsonValue* value) {
+    TM_ASSERT(value);
+    return value->type == JVAL_NULL && value->data.content.data != TM_NULL;
 }
-TMJ_DEF tm_bool jsonIsIntegral(JsonValueArg value) { return TMJ_DEREF(value).type >= JVAL_INT; }
-TMJ_DEF tm_bool jsonIsString(JsonValueArg value) { return TMJ_DEREF(value).type == JVAL_STRING; }
-TMJ_DEF JsonObject jsonGetObject(JsonValueArg value) {
+TMJ_DEF tm_bool jsonIsIntegral(const JsonValue* value) { return value->type >= JVAL_INT; }
+TMJ_DEF tm_bool jsonIsString(const JsonValue* value) { return value->type == JVAL_STRING; }
+TMJ_DEF JsonObject jsonGetObject(const JsonValue* value) {
 #ifdef __cplusplus
     JsonObject result = {TM_NULL, 0, 0};
 #else
     JsonObject result = {TM_NULL, 0};
 #endif
-    if (TMJ_DEREF(value).type == JVAL_OBJECT) {
-        result = TMJ_DEREF(value).data.object;
+    if (value->type == JVAL_OBJECT) {
+        result = value->data.object;
     }
     return result;
 }
-TMJ_DEF JsonArray jsonGetArray(JsonValueArg value) {
+TMJ_DEF JsonArray jsonGetArray(const JsonValue* value) {
     JsonArray result = {TM_NULL, 0};
-    if (TMJ_DEREF(value).type == JVAL_ARRAY) {
-        result = TMJ_DEREF(value).data.array;
+    if (value->type == JVAL_ARRAY) {
+        result = value->data.array;
     }
     return result;
 }
-TMJ_DEF JsonObjectArray jsonGetObjectArray(JsonValueArg value) {
+TMJ_DEF JsonObjectArray jsonGetObjectArray(const JsonValue* value) {
     JsonObjectArray result = {TM_NULL, 0};
-    if (TMJ_DEREF(value).type == JVAL_ARRAY) {
-        result.values = TMJ_DEREF(value).data.array.values;
-        result.count = TMJ_DEREF(value).data.array.count;
+    if (value->type == JVAL_ARRAY) {
+        result.values = value->data.array.values;
+        result.count = value->data.array.count;
     }
     return result;
 }
 
-TMJ_DEF JsonValue jsonGetMember(JsonObjectArg object, const char* name) {
+TMJ_DEF JsonValue jsonGetMember(const JsonObject* object, const char* name) {
+    TM_ASSERT(object);
 #ifdef __cplusplus
-    return jsonGetMemberCached(object, name, &object.lastAccess);
+    return jsonGetMemberCached(object, name, &object->lastAccess);
 #else
     JsonValue result = {0};
-    JsonNode* it = TMJ_DEREF(object).nodes;
-    JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    JsonNode* it = object->nodes;
+    JsonNode* last = object->nodes + object->count;
     size_t len = TM_STRLEN(name);
     for (; it < last; ++it) {
         if (stringEquals(it->name.data, it->name.size, name, len)) {
@@ -3094,12 +2976,13 @@ TMJ_DEF JsonValue jsonGetMember(JsonObjectArg object, const char* name) {
     return result;
 #endif
 }
-TMJ_DEF JsonValue* jsonQueryMember(JsonObjectArg object, const char* name) {
+TMJ_DEF JsonValue* jsonQueryMember(const JsonObject* object, const char* name) {
+    TM_ASSERT(object);
 #ifdef __cplusplus
-    return jsonQueryMemberCached(object, name, &object.lastAccess);
+    return jsonQueryMemberCached(object, name, &object->lastAccess);
 #else
-    JsonNode* it = TMJ_DEREF(object).nodes;
-    JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    JsonNode* it = object->nodes;
+    JsonNode* last = object->nodes + object->count;
     size_t len = TM_STRLEN(name);
     for (; it < last; ++it) {
         if (stringEquals(it->name.data, it->name.size, name, len)) {
@@ -3109,7 +2992,8 @@ TMJ_DEF JsonValue* jsonQueryMember(JsonObjectArg object, const char* name) {
     return TM_NULL;
 #endif
 }
-TMJ_DEF JsonValue jsonGetMemberCached(JsonObjectArg object, const char* name, tm_size_t* lastAccess) {
+TMJ_DEF JsonValue jsonGetMemberCached(const JsonObject* object, const char* name, tm_size_t* lastAccess) {
+    TM_ASSERT(object);
     JsonValue result = {JVAL_NULL, {{TM_NULL, 0}}};
     JsonValue* value = jsonQueryMemberCached(object, name, lastAccess);
     if (value) {
@@ -3117,28 +3001,29 @@ TMJ_DEF JsonValue jsonGetMemberCached(JsonObjectArg object, const char* name, tm
     }
     return result;
 }
-TMJ_DEF JsonValue* jsonQueryMemberCached(JsonObjectArg object, const char* name, tm_size_t* lastAccess) {
+TMJ_DEF JsonValue* jsonQueryMemberCached(const JsonObject* object, const char* name, tm_size_t* lastAccess) {
+    TM_ASSERT(object);
     TM_ASSERT(lastAccess);
     JsonValue* result = TM_NULL;
     tm_bool found = TM_FALSE;
-    JsonNode* it = TMJ_DEREF(object).nodes + *lastAccess;
-    JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    JsonNode* it = object->nodes + *lastAccess;
+    JsonNode* last = object->nodes + object->count;
     size_t len = TM_STRLEN(name);
     for (; it < last; ++it) {
         if (stringEquals(it->name.data, it->name.size, name, len)) {
             result = &it->value;
-            *lastAccess = (tm_size_t)(it - TMJ_DEREF(object).nodes);
+            *lastAccess = (tm_size_t)(it - object->nodes);
             found = TM_TRUE;
             break;
         }
     }
     if (!found) {
-        it = TMJ_DEREF(object).nodes;
-        last = TMJ_DEREF(object).nodes + *lastAccess;
+        it = object->nodes;
+        last = object->nodes + *lastAccess;
         for (; it < last; ++it) {
             if (stringEquals(it->name.data, it->name.size, name, len)) {
                 result = &it->value;
-                *lastAccess = (tm_size_t)(it - TMJ_DEREF(object).nodes);
+                *lastAccess = (tm_size_t)(it - object->nodes);
                 break;
             }
         }
@@ -3147,13 +3032,14 @@ TMJ_DEF JsonValue* jsonQueryMemberCached(JsonObjectArg object, const char* name,
 }
 
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
-TMJ_DEF JsonValue jsonGetMember(JsonObjectArg object, TM_STRING_VIEW name) {
+TMJ_DEF JsonValue jsonGetMember(const JsonObject* object, TM_STRING_VIEW name) {
+    TM_ASSERT(object);
 #ifdef __cplusplus
-    return jsonGetMemberCached(object, name, &object.lastAccess);
+    return jsonGetMemberCached(object, name, &object->lastAccess);
 #else
     JsonValue result = {0};
-    JsonNode* it = TMJ_DEREF(object).nodes;
-    JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    JsonNode* it = object->nodes;
+    JsonNode* last = object->nodes + object->count;
     for (; it < last; ++it) {
         if (stringEquals(it->name.data, it->name.size, TM_STRING_VIEW_DATA(name), TM_STRING_VIEW_SIZE(name))) {
             result = it->value;
@@ -3163,12 +3049,13 @@ TMJ_DEF JsonValue jsonGetMember(JsonObjectArg object, TM_STRING_VIEW name) {
     return result;
 #endif
 }
-TMJ_DEF JsonValue* jsonQueryMember(JsonObjectArg object, TM_STRING_VIEW name) {
+TMJ_DEF JsonValue* jsonQueryMember(const JsonObject* object, TM_STRING_VIEW name) {
+    TM_ASSERT(object);
 #ifdef __cplusplus
-    return jsonQueryMemberCached(object, name, &object.lastAccess);
+    return jsonQueryMemberCached(object, name, &object->lastAccess);
 #else
-    JsonNode* it = TMJ_DEREF(object).nodes;
-    JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    JsonNode* it = object->nodes;
+    JsonNode* last = object->nodes + object->count;
     for (; it < last; ++it) {
         if (stringEquals(it->name.data, it->name.size, TM_STRING_VIEW_DATA(name), TM_STRING_VIEW_SIZE(name))) {
             return &it->value;
@@ -3177,34 +3064,36 @@ TMJ_DEF JsonValue* jsonQueryMember(JsonObjectArg object, TM_STRING_VIEW name) {
     return TM_NULL;
 #endif
 }
-TMJ_DEF JsonValue jsonGetMemberCached(JsonObjectArg object, TM_STRING_VIEW name, tm_size_t* lastAccess) {
+TMJ_DEF JsonValue jsonGetMemberCached(const JsonObject* object, TM_STRING_VIEW name, tm_size_t* lastAccess) {
+    TM_ASSERT(object);
     JsonValue result = {JVAL_NULL, {TM_NULL, 0}};
     if (JsonValue* value = jsonQueryMemberCached(object, name, lastAccess)) {
         result = *value;
     }
     return result;
 }
-TMJ_DEF JsonValue* jsonQueryMemberCached(JsonObjectArg object, TM_STRING_VIEW name, tm_size_t* lastAccess) {
+TMJ_DEF JsonValue* jsonQueryMemberCached(const JsonObject* object, TM_STRING_VIEW name, tm_size_t* lastAccess) {
+    TM_ASSERT(object);
     TM_ASSERT(lastAccess);
     JsonValue* result = TM_NULL;
     tm_bool found = TM_FALSE;
-    JsonNode* it = TMJ_DEREF(object).nodes + *lastAccess;
-    JsonNode* last = TMJ_DEREF(object).nodes + TMJ_DEREF(object).count;
+    JsonNode* it = object->nodes + *lastAccess;
+    JsonNode* last = object->nodes + object->count;
     for (; it < last; ++it) {
         if (stringEquals(it->name.data, it->name.size, TM_STRING_VIEW_DATA(name), TM_STRING_VIEW_SIZE(name))) {
             result = &it->value;
-            *lastAccess = (tm_size_t)(it - TMJ_DEREF(object).nodes);
+            *lastAccess = (tm_size_t)(it - object->nodes);
             found = TM_TRUE;
             break;
         }
     }
     if (!found) {
-        it = TMJ_DEREF(object).nodes;
-        last = TMJ_DEREF(object).nodes + *lastAccess;
+        it = object->nodes;
+        last = object->nodes + *lastAccess;
         for (; it < last; ++it) {
             if (stringEquals(it->name.data, it->name.size, TM_STRING_VIEW_DATA(name), TM_STRING_VIEW_SIZE(name))) {
                 result = &it->value;
-                *lastAccess = (tm_size_t)(it - TMJ_DEREF(object).nodes);
+                *lastAccess = (tm_size_t)(it - object->nodes);
                 break;
             }
         }
@@ -3213,97 +3102,107 @@ TMJ_DEF JsonValue* jsonQueryMemberCached(JsonObjectArg object, TM_STRING_VIEW na
 }
 #endif  // defined( __cplusplus ) && defined( TM_STRING_VIEW )
 
-TMJ_DEF JsonValue jsonGetEntry(JsonArrayArg array, tm_size_t index) {
-    TM_ASSERT(tmj_valid_index(index, TMJ_DEREF(array).count));
-    return TMJ_DEREF(array).values[index];
+TMJ_DEF JsonValue jsonGetEntry(const JsonArray* array, tm_size_t index) {
+    TM_ASSERT(array);
+    TM_ASSERT(tmj_valid_index(index, array->count));
+    return array->values[index];
 }
 
-TMJ_DEF tm_bool jsonIsValidObject(JsonObjectArg object) { return TMJ_DEREF(object).nodes != TM_NULL; }
-TMJ_DEF tm_bool jsonIsValidArray(JsonArrayArg array) { return TMJ_DEREF(array).values != TM_NULL; }
-TMJ_DEF tm_bool jsonIsValidValue(JsonValueArg value) { return TMJ_DEREF(value).type != JVAL_NULL; }
+TMJ_DEF tm_bool jsonIsValidObject(const JsonObject* object) {
+    TM_ASSERT(object);
+    return object->nodes != TM_NULL;
+}
+TMJ_DEF tm_bool jsonIsValidArray(const JsonArray* array) {
+    TM_ASSERT(array);
+    return array->values != TM_NULL;
+}
+TMJ_DEF tm_bool jsonIsValidValue(const JsonValue* value) {
+    TM_ASSERT(value);
+    return value->type != JVAL_NULL;
+}
 
-TMJ_DEF int jsonGetInt(JsonValueArg value, int def) {
-    switch (TMJ_DEREF(value).type) {
+TMJ_DEF int jsonGetInt(const JsonValue* value, int def) {
+    switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
         case JVAL_ARRAY: {
             return def;
         }
         default: {
-            return jsonToInt(TMJ_DEREF(value).data.content, def);
+            return jsonToInt(value->data.content, def);
         }
     }
 }
-TMJ_DEF unsigned int jsonGetUInt(JsonValueArg value, unsigned int def) {
-    switch (TMJ_DEREF(value).type) {
+TMJ_DEF unsigned int jsonGetUInt(const JsonValue* value, unsigned int def) {
+    switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
         case JVAL_ARRAY: {
             return def;
         }
         default: {
-            return jsonToUInt(TMJ_DEREF(value).data.content, def);
+            return jsonToUInt(value->data.content, def);
         }
     }
 }
-TMJ_DEF float jsonGetFloat(JsonValueArg value, float def) {
-    switch (TMJ_DEREF(value).type) {
+TMJ_DEF float jsonGetFloat(const JsonValue* value, float def) {
+    switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
         case JVAL_ARRAY: {
             return def;
         }
         default: {
-            return jsonToFloat(TMJ_DEREF(value).data.content, def);
+            return jsonToFloat(value->data.content, def);
         }
     }
 }
-TMJ_DEF double jsonGetDouble(JsonValueArg value, double def) {
-    switch (TMJ_DEREF(value).type) {
+TMJ_DEF double jsonGetDouble(const JsonValue* value, double def) {
+    switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
         case JVAL_ARRAY: {
             return def;
         }
         default: {
-            return jsonToDouble(TMJ_DEREF(value).data.content, def);
+            return jsonToDouble(value->data.content, def);
         }
     }
 }
-TMJ_DEF tm_bool jsonGetBool(JsonValueArg value, tm_bool def) {
-    switch (TMJ_DEREF(value).type) {
+TMJ_DEF tm_bool jsonGetBool(const JsonValue* value, tm_bool def) {
+    switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
         case JVAL_ARRAY: {
             return def;
         }
         default: {
-            return jsonToBool(TMJ_DEREF(value).data.content, def);
+            return jsonToBool(value->data.content, def);
         }
     }
 }
 #ifndef TMJ_NO_INT64
-TMJ_DEF long long jsonGetInt64(JsonValueArg value, long long def) {
-    switch (TMJ_DEREF(value).type) {
+TMJ_DEF long long jsonGetInt64(const JsonValue* value, long long def) {
+    switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
         case JVAL_ARRAY: {
             return def;
         }
         default: {
-            return jsonToInt64(TMJ_DEREF(value).data.content, def);
+            return jsonToInt64(value->data.content, def);
         }
     }
 }
-TMJ_DEF unsigned long long jsonGetUInt64(JsonValueArg value, unsigned long long def) {
-    switch (TMJ_DEREF(value).type) {
+TMJ_DEF unsigned long long jsonGetUInt64(const JsonValue* value, unsigned long long def) {
+    switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
         case JVAL_ARRAY: {
             return def;
         }
         default: {
-            return jsonToUInt64(TMJ_DEREF(value).data.content, def);
+            return jsonToUInt64(value->data.content, def);
         }
     }
 }
