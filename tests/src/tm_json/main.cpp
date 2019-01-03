@@ -1,4 +1,4 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+﻿#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
 #include <iterator>
@@ -45,6 +45,11 @@ bool str_equal(tmj_string_view a, const char* b) {
     auto b_size = strlen(b);
     if (a.size != b_size) return false;
     return strncmp(a.data, b, a.size) == 0;
+}
+
+std::ostream& operator<< (std::ostream& os, const JsonStringView& value) {
+    os.write(value.data, value.size);
+    return os;
 }
 
 template <class A, class B>
