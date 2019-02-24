@@ -80,45 +80,51 @@ TEST_CASE("Test tmsu_find_char_unescaped_n") {
 }
 
 TEST_CASE("Test tmsu_find_first_of_unescaped_n") {
+    // tmsu_find_first_of_unescaped_n is overloaded, so we get a specific signature of it.
+    auto func = [](const char* str_first, const char* str_last, const char* find_str_first, const char* find_str_last,
+                   char escape_char) {
+        return tmsu_find_first_of_unescaped_n(str_first, str_last, find_str_first, find_str_last, escape_char);
+    };
+
     // Not found.
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "d", "abc", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "", "abc", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "", "", '/') == -1);
+    CHECK(ptr_to_index_view(func, "d", "abc", '/') == -1);
+    CHECK(ptr_to_index_view(func, "", "abc", '/') == -1);
+    CHECK(ptr_to_index_view(func, "", "", '/') == -1);
 
     // No escaped chars.
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "a", "abc", '/') == 0);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "b", "abc", '/') == 0);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "c", "abc", '/') == 0);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "abc", "abc", '/') == 0);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "dddddabc", "abc", '/') == 5);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "a", "", '/') == 0);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "a", "", '/') == 0);
+    CHECK(ptr_to_index_view(func, "a", "abc", '/') == 0);
+    CHECK(ptr_to_index_view(func, "b", "abc", '/') == 0);
+    CHECK(ptr_to_index_view(func, "c", "abc", '/') == 0);
+    CHECK(ptr_to_index_view(func, "abc", "abc", '/') == 0);
+    CHECK(ptr_to_index_view(func, "dddddabc", "abc", '/') == 5);
+    CHECK(ptr_to_index_view(func, "a", "", '/') == 0);
+    CHECK(ptr_to_index_view(func, "a", "", '/') == 0);
 
     // Some escaped chars.
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "/a", "abc", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "/b", "abc", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "/c", "abc", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "/ab", "abc", '/') == 2);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "/aa", "abc", '/') == 2);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "/a/aa", "abc", '/') == 4);
+    CHECK(ptr_to_index_view(func, "/a", "abc", '/') == -1);
+    CHECK(ptr_to_index_view(func, "/b", "abc", '/') == -1);
+    CHECK(ptr_to_index_view(func, "/c", "abc", '/') == -1);
+    CHECK(ptr_to_index_view(func, "/ab", "abc", '/') == 2);
+    CHECK(ptr_to_index_view(func, "/aa", "abc", '/') == 2);
+    CHECK(ptr_to_index_view(func, "/a/aa", "abc", '/') == 4);
 
     // Escaped escape chars.
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "//b", "abc", '/') == 2);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "//b", "abc", '/') == 2);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "///b", "abc", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "///ba", "abc", '/') == 4);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "c///a", "abc", '/') == 0);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "d///a", "abc", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "d///ac", "abc", '/') == 5);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "d////a", "abc", '/') == 5);
+    CHECK(ptr_to_index_view(func, "//b", "abc", '/') == 2);
+    CHECK(ptr_to_index_view(func, "//b", "abc", '/') == 2);
+    CHECK(ptr_to_index_view(func, "///b", "abc", '/') == -1);
+    CHECK(ptr_to_index_view(func, "///ba", "abc", '/') == 4);
+    CHECK(ptr_to_index_view(func, "c///a", "abc", '/') == 0);
+    CHECK(ptr_to_index_view(func, "d///a", "abc", '/') == -1);
+    CHECK(ptr_to_index_view(func, "d///ac", "abc", '/') == 5);
+    CHECK(ptr_to_index_view(func, "d////a", "abc", '/') == 5);
 
     // Looking for unescaped escape chars.
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "/", "ab/", '/') == 0);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "//", "ab/", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "///", "ab/", '/') == 2);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "///a", "ab/", '/') == 2);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "///a", "ab/", '/') == 2);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "cc///", "ab/", '/') == 4);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "////", "ab/", '/') == -1);
-    CHECK(ptr_to_index_view(tmsu_find_first_of_unescaped_n, "ccc////a", "ab/", '/') == 7);
+    CHECK(ptr_to_index_view(func, "/", "ab/", '/') == 0);
+    CHECK(ptr_to_index_view(func, "//", "ab/", '/') == -1);
+    CHECK(ptr_to_index_view(func, "///", "ab/", '/') == 2);
+    CHECK(ptr_to_index_view(func, "///a", "ab/", '/') == 2);
+    CHECK(ptr_to_index_view(func, "///a", "ab/", '/') == 2);
+    CHECK(ptr_to_index_view(func, "cc///", "ab/", '/') == 4);
+    CHECK(ptr_to_index_view(func, "////", "ab/", '/') == -1);
+    CHECK(ptr_to_index_view(func, "ccc////a", "ab/", '/') == 7);
 }

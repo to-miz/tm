@@ -10,22 +10,48 @@
 using std::strlen;
 using std::strncmp;
 
-#if 0
-#include <charconv>
-#define TMJ_TO_INT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
-#define TMJ_TO_UINT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
-#define TMJ_TO_INT64(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
-#define TMJ_TO_UINT64(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
-#define TMJ_TO_FLOAT(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
-#define TMJ_TO_DOUBLE(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
+// clang-format off
+#ifdef USE_STRING_VIEW
+    #include <string_view>
+    #define TM_STRING_VIEW std::string_view
+    #define TM_STRING_VIEW_DATA(x) (x).data()
+    #define TM_STRING_VIEW_SIZE(x) ((tm_size_t)(x).size())
+    #define TM_STRING_VIEW_MAKE(data, size) std::string_view((data), (size_t)(size))
+
+    bool str_equal(std::string_view a, const char* b) { return a == std::string_view{b}; }
 #endif
 
-#if 0
-#include <string_view>
-#define TM_STRING_VIEW char*
-#define TM_STRING_VIEW_DATA(x) (x).data()
-#define TM_STRING_VIEW_SIZE(x) ((tm_size_t)(x).size())
+#ifdef SIGNED_SIZE_T
+    #define TM_SIZE_T_DEFINED
+    #define TM_SIZE_T_IS_SIGNED 1
+    typedef int tm_size_t;
 #endif
+
+#ifdef USE_CHARCONV
+    #include <charconv>
+    #define TMJ_TO_INT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+    #define TMJ_TO_UINT(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+    #define TMJ_TO_INT64(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+    #define TMJ_TO_UINT64(first, last, out_ptr, base) std::from_chars((first), (last), *(out_ptr), (base))
+    #define TMJ_TO_FLOAT(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
+    #define TMJ_TO_DOUBLE(first, last, out_ptr) std::from_chars((first), (last), *(out_ptr))
+#endif
+
+#ifdef USE_TM_CONVERSION
+    #define TM_CONVERSION_IMPLEMENTATION
+    #include <tm_conversion.h>
+    #define TMJ_TO_INT(first, last, out_ptr, base) \
+        scan_i32_n((first), (tm_size_t)((last) - (first)), (out_ptr), (base))
+    #define TMJ_TO_UINT(first, last, out_ptr, base) \
+        scan_u32_n((first), (tm_size_t)((last) - (first)), (out_ptr), (base))
+    #define TMJ_TO_INT64(first, last, out_ptr, base) \
+        scan_i64_n((first), (tm_size_t)((last) - (first)), (out_ptr), (base))
+    #define TMJ_TO_UINT64(first, last, out_ptr, base) \
+        scan_u64_n((first), (tm_size_t)((last) - (first)), (out_ptr), (base))
+    #define TMJ_TO_FLOAT(first, last, out_ptr) scan_float_n((first), (tm_size_t)((last) - (first)), (out_ptr), 0)
+    #define TMJ_TO_DOUBLE(first, last, out_ptr) scan_double_n((first), (tm_size_t)((last) - (first)), (out_ptr), 0)
+#endif
+// clang-format on
 
 #define TM_JSON_IMPLEMENTATION
 #define TMJ_DEFINE_INFINITY_AND_NAN
@@ -41,8 +67,8 @@ uint32_t get_value(JsonValue value, uint32_t def) { return value.getUInt(def); }
 int64_t get_value(JsonValue value, int64_t def) { return value.getInt64(def); }
 uint64_t get_value(JsonValue value, uint64_t def) { return value.getUInt64(def); }
 
-bool str_equal(tmj_string_view a, const char* b) {
-    auto b_size = strlen(b);
+bool str_equal(JsonStringView a, const char* b) {
+    auto b_size = (tm_size_t)strlen(b);
     if (a.size != b_size) return false;
     return strncmp(a.data, b, a.size) == 0;
 }
@@ -55,7 +81,7 @@ std::ostream& operator<< (std::ostream& os, const JsonStringView& value) {
 template <class A, class B>
 void test_int_conversion(const char* json, A* values, size_t values_size, B def) {
     const uint32_t flags = JSON_READER_ALLOW_PLUS_SIGN | JSON_READER_HEXADECIMAL | JSON_READER_EXTENDED_FLOATS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
@@ -65,10 +91,10 @@ void test_int_conversion(const char* json, A* values, size_t values_size, B def)
     REQUIRE(ints.size() == values_size);
 
     for (size_t i = 0; i < values_size; ++i) {
-        auto val = ints[i].getString();
+        auto val = ints[(tm_size_t)i].getString();
         CAPTURE(i);
         INFO("value string: " << val);
-        CHECK(get_value(ints[i], def) == values[i]);
+        CHECK(get_value(ints[(tm_size_t)i], def) == values[i]);
     }
 }
 
@@ -213,14 +239,14 @@ TEST_CASE("float conversion" *
         static_assert(std::size(double_values) == 28);
 
         const uint32_t flags = JSON_READER_ALLOW_PLUS_SIGN | JSON_READER_EXTENDED_FLOATS;
-        AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
+        AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
         auto& doc = pool.document;
         REQUIRE(doc.error.type == JSON_OK);
 
         auto floats = doc.root.getArray();
         REQUIRE(floats.size() == std::size(float_values));
 
-        for (size_t i = 0; i < std::size(float_values); ++i) {
+        for (tm_size_t i = 0; i < (tm_size_t)std::size(float_values); ++i) {
             CAPTURE(i);
             auto val = floats[i].getFloat(-1000.0f);
             if (isnan(float_values[i])) {
@@ -231,7 +257,7 @@ TEST_CASE("float conversion" *
             }
         }
 
-        for (size_t i = 0; i < std::size(double_values); ++i) {
+        for (tm_size_t i = 0; i < (tm_size_t)std::size(double_values); ++i) {
             CAPTURE(i);
             auto val = floats[i].getDouble(-1000.0f);
             if (isnan(double_values[i])) {
@@ -297,7 +323,7 @@ TEST_CASE("keywords") {
     })";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
@@ -363,7 +389,7 @@ TEST_CASE("strings") {
     const char* comp = "Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
@@ -376,7 +402,7 @@ TEST_CASE("unicode" * doctest::should_fail(true)) {
     })";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
@@ -398,7 +424,7 @@ TEST_CASE("operator[]") {
     })";
 
     const uint32_t flags = 0;
-    AllocatedDocument pool = jsonAllocateDocumentEx(json, strlen(json), flags);
+    AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
     auto& doc = pool.document;
     REQUIRE(doc.error.type == JSON_OK);
 
@@ -414,7 +440,11 @@ TEST_CASE("operator[]") {
     CHECK(root["c"].isNull() == false);
     CHECK(root["ab"].getInt(-1) == -1);
     CHECK(root["bb"].getFloat(-1.0f) == -1.0f);
+#ifndef USE_STRING_VIEW
     CHECK(root["ba"].getString().size == 0);
+#else
+    CHECK(root["ba"].getString().empty());
+#endif
     CHECK(root["aa"].getBool(true) == true);
     CHECK(root["aa"].getArray().count == 0);
     CHECK(root["aa"].getObject().count == 0);

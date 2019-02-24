@@ -271,23 +271,25 @@ struct indentation_result {
 
 indentation_result get_indent(std::vector<char>::iterator first, std::vector<char>::iterator last) {
     indentation_result result = {};
-    auto spaces = 0;
-    --last;
-    for (auto it = last; it != first; --it) {
-        auto c = *it;
-        if (c == '\t') {
-            ++result.amount;
-        } else if (c == ' ') {
-            result.use_spaces = true;
-            ++spaces;
-            if (spaces == 4) {
+    if (first != last) {
+        auto spaces = 0;
+        --last;
+        for (auto it = last; it != first; --it) {
+            auto c = *it;
+            if (c == '\t') {
                 ++result.amount;
-                spaces = 0;
+            } else if (c == ' ') {
+                result.use_spaces = true;
+                ++spaces;
+                if (spaces == 4) {
+                    ++result.amount;
+                    spaces = 0;
+                }
+            } else {
+                break;
             }
-        } else {
-            break;
         }
-    }
+	}
     return result;
 }
 void indent_range(std::vector<char>& data, std::vector<char>::iterator first, std::vector<char>::iterator last,

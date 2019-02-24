@@ -1,8 +1,35 @@
+/* clang-format off */
+#ifdef TMCLI_USE_WCHAR_T
+    #define TMCLI_TEXT(x) L##x
+    #define TMCLI_STRFORMAT L"%ls"
+
+    #include <wctype.h>
+    #define TMCLI_STRLEN wcslen
+    #define TMCLI_STRNCMP wcsncmp
+    #define TMCLI_FPRINTF fwprintf
+
+    #define TMCLI_ISDIGIT iswdigit
+    #define TMCLI_ISALNUM iswalnum
+    #define TMCLI_ISALPHA iswalpha
+
+#else
+    #define TMCLI_TEXT(x) x
+    #define TMCLI_STRFORMAT "%s"
+
+    #define TMCLI_STRLEN TM_STRLEN
+    #define TMCLI_STRNCMP TM_STRNCMP
+    #define TMCLI_FPRINTF fprintf
+
+    #define TMCLI_ISDIGIT(x) TM_ISDIGIT((unsigned char)(x))
+    #define TMCLI_ISALNUM(x) TM_ISALNUM((unsigned char)(x))
+    #define TMCLI_ISALPHA(x) TM_ISALPHA((unsigned char)(x))
+
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* clang-format off */
 #include <stdint.h>
 
 #include "../common/tm_assert_valid_size.inc"
@@ -18,45 +45,41 @@ extern "C" {
 
 /* clang-format on */
 
-static const char* tmcli_skip_digits(const char* str) {
+static const tmcli_tchar* tmcli_skip_digits(const tmcli_tchar* str) {
     TM_ASSERT(str);
-    if (!TM_ISDIGIT((unsigned char)*str)) {
-        return TM_NULL;
-    }
+    if (!TMCLI_ISDIGIT(*str)) return TM_NULL;
     ++str;
     while (*str) {
-        if (!TM_ISDIGIT((unsigned char)*str)) {
-            return str;
-        }
+        if (!TMCLI_ISDIGIT(*str)) return str;
         ++str;
     }
     return str;
 }
-TMCLI_DEF tm_bool CLI_ARGUMENT_INT(const char* str) {
+TMCLI_DEF tm_bool CLI_ARGUMENT_INT(const tmcli_tchar* str) {
     if (!*str) return TM_FALSE;
-    if (*str == '-') {
+    if (*str == TMCLI_TEXT('-')) {
         ++str;
         if (!*str) return TM_FALSE;
     }
     str = tmcli_skip_digits(str);
     return str && *str == 0;
 }
-TMCLI_DEF tm_bool CLI_ARGUMENT_UINT(const char* str) {
+TMCLI_DEF tm_bool CLI_ARGUMENT_UINT(const tmcli_tchar* str) {
     if (!*str) return TM_FALSE;
     str = tmcli_skip_digits(str);
     return str && *str == 0;
 }
-TMCLI_DEF tm_bool CLI_ARGUMENT_FLOAT(const char* str) {
+TMCLI_DEF tm_bool CLI_ARGUMENT_FLOAT(const tmcli_tchar* str) {
     if (!*str) return TM_FALSE;
-    if (*str == '-') {
+    if (*str == TMCLI_TEXT('-')) {
         ++str;
         if (!*str) return TM_FALSE;
     }
-    if (*str == '0') {
+    if (*str == TMCLI_TEXT('0')) {
         ++str;
-    } else if (*str >= '1' && *str <= '9') {
+    } else if (*str >= TMCLI_TEXT('1') && *str <= TMCLI_TEXT('9')) {
         ++str;
-        const char* skip = tmcli_skip_digits(str);
+        const tmcli_tchar* skip = tmcli_skip_digits(str);
         if (skip) str = skip;
     } else {
         return TM_FALSE;
@@ -68,11 +91,9 @@ TMCLI_DEF tm_bool CLI_ARGUMENT_FLOAT(const char* str) {
         if (!str) return TM_FALSE;
         if (!*str) return TM_TRUE;
     }
-    if (*str == 'e' || *str == 'E') {
+    if (*str == TMCLI_TEXT('e') || *str == TMCLI_TEXT('E')) {
         ++str;
-        if (*str == '-' || *str == '+') {
-            ++str;
-        }
+        if (*str == TMCLI_TEXT('-') || *str == TMCLI_TEXT('+')) ++str;
         str = tmcli_skip_digits(str);
         if (!str) return TM_FALSE;
     }
@@ -92,7 +113,7 @@ TMCLI_DEF tmcli_parser_settings tmcli_default_parser_settings() {
     return result;
 }
 
-TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const char* program_name, int argc, char const** argv,
+TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const tmcli_tchar* program_name, int argc, tmcli_tchar const** argv,
                                             const tmcli_option* options, tm_size_t options_count,
                                             tmcli_parser_settings settings) {
     TM_ASSERT(options_count <= 128);
@@ -101,6 +122,21 @@ TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const char* program_name, int argc, 
     result.argv = argv;
     result.options = options;
     result.options_count = options_count;
+
+#if defined(_DEBUG) || !defined(NDEBUG)
+    for (tm_size_t i = 0; i < options_count; i++) {
+        TM_ASSERT((options[i].short_option && *options[i].short_option) ||
+                  (options[i].long_option && *options[i].long_option));
+        if ((!options[i].short_option || !*options[i].short_option) &&
+            (!options[i].long_option || !*options[i].long_option)) {
+            if (settings.error_log) {
+                TMCLI_FPRINTF(settings.error_log,
+                              TMCLI_TEXT("Option with index %d has neither a short nor a long name.\n"), (int)i);
+            }
+            result.error = TM_TRUE;
+        }
+    }
+#endif
 
     result.current = 0;
 
@@ -113,11 +149,11 @@ TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const char* program_name, int argc, 
 #pragma GCC diagnostic pop
 #endif
 
-TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, char const** argv, const tmcli_option* options,
+TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, tmcli_tchar const** argv, const tmcli_option* options,
                                          tm_size_t options_count) {
     TM_ASSERT(argc > 0);
     /* Skip first argument in argv, since it's just the program name. */
-    const char* program_name = argv[0];
+    const tmcli_tchar* program_name = argv[0];
     return tmcli_make_parser_ex(program_name, argc - 1, argv + 1, options, options_count,
                                 tmcli_default_parser_settings());
 }
@@ -153,8 +189,16 @@ TMCLI_DEF tm_bool tmcli_validate(tmcli_parser* parser) {
             tmcli_flag_pair pair = tmcli_get_flag_pair(i);
             if (!(parser->given_options[pair.index] & pair.flag)) {
                 if (parser->settings.error_log) {
-                    fprintf(parser->settings.error_log, "Option -%s or --%s is required.\n", option->short_option,
-                            option->long_option);
+                    if (option->short_option) {
+                        TMCLI_FPRINTF(parser->settings.error_log,
+                                      TMCLI_TEXT("Option -") TMCLI_STRFORMAT TMCLI_TEXT(" or --")
+                                          TMCLI_STRFORMAT TMCLI_TEXT(" is required.\n"),
+                                      option->short_option, option->long_option);
+                    } else {
+                        TMCLI_FPRINTF(parser->settings.error_log,
+                                      TMCLI_TEXT("Option --") TMCLI_STRFORMAT TMCLI_TEXT(" is required.\n"),
+                                      option->long_option);
+                    }
                 }
                 parser->error = TM_TRUE;
                 return TM_FALSE;
@@ -167,7 +211,7 @@ TMCLI_DEF tm_bool tmcli_validate(tmcli_parser* parser) {
 TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_option_out) {
     TM_ASSERT(!parser->error);
 
-    const char* current = parser->current_arg;
+    const tmcli_tchar* current = parser->current_arg;
     if (!current || !*current) {
         if (parser->current >= parser->argc) {
             return TM_FALSE;
@@ -184,7 +228,8 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
         ++current;
         if (*current == '-') {
             ++current;
-            if (!TM_ISALNUM((unsigned char)(*current))) {
+            /* FIXME: Is this correct? Shouldn't it be !*current instead? */
+            if (!TMCLI_ISALNUM(*current)) {
                 /* Parsing ends since we encountered "--" that isn't followed by an option. */
                 return TM_FALSE;
             }
@@ -194,9 +239,9 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
             tm_bool found = TM_FALSE;
             for (tm_size_t i = 0, count = parser->options_count; i < count; ++i) {
                 const tmcli_option* option = &parser->options[i];
-                size_t option_length = strlen(option->long_option);
-                if (strncmp(current, option->long_option, option_length) == 0) {
-                    const char last_char = *(current + option_length);
+                size_t option_length = TMCLI_STRLEN(option->long_option);
+                if (TMCLI_STRNCMP(current, option->long_option, option_length) == 0) {
+                    const tmcli_tchar last_char = *(current + option_length);
                     if (last_char == 0 || last_char == '=') {
                         /* Matched completely to an option */
                         current += option_length;
@@ -208,7 +253,8 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
             }
             if (!found) {
                 if (parser->settings.error_log) {
-                    fprintf(parser->settings.error_log, "Unrecognized option: \"%s\".\n", current);
+                    TMCLI_FPRINTF(parser->settings.error_log,
+                                  TMCLI_TEXT("Unrecognized option: \"") TMCLI_STRFORMAT TMCLI_TEXT("\".\n"), current);
                 }
                 parser->error = TM_TRUE;
                 return TM_FALSE;
@@ -222,7 +268,9 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
             /* Current arg is an argument without an option, like input.txt */
             if (!parser->settings.allow_free_arguments) {
                 if (parser->settings.error_log) {
-                    fprintf(parser->settings.error_log, "Free arguments not allowed: \"%s\".\n", current);
+                    TMCLI_FPRINTF(parser->settings.error_log,
+                                  TMCLI_TEXT("Free arguments not allowed: \"") TMCLI_STRFORMAT TMCLI_TEXT("\".\n"),
+                                  current);
                 }
                 parser->error = TM_TRUE;
                 return TM_FALSE;
@@ -242,6 +290,7 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
         tm_bool found = TM_FALSE;
         for (tm_size_t i = 0, count = parser->options_count; i < count; ++i) {
             const tmcli_option* option = &parser->options[i];
+            if (!option->short_option) continue;
             TM_ASSERT(option->short_option[0] != 0);
             if (current[0] == option->short_option[0]) {
                 ++current;
@@ -252,7 +301,7 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
         }
         if (!found) {
             if (parser->settings.error_log) {
-                fprintf(parser->settings.error_log, "Unrecognized option: \"%c\".\n", current[0]);
+                TMCLI_FPRINTF(parser->settings.error_log, TMCLI_TEXT("Unrecognized option: \"%c\".\n"), current[0]);
             }
             parser->error = TM_TRUE;
             return TM_FALSE;
@@ -262,8 +311,8 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
 
     TM_ASSERT(!parser->error);
     const tmcli_option* option = &parser->options[option_index];
-    const char* argument_start = TM_NULL;
-    const char* option_name = (is_short) ? option->short_option : option->long_option;
+    const tmcli_tchar* argument_start = TM_NULL;
+    const tmcli_tchar* option_name = (is_short) ? option->short_option : option->long_option;
 
     {
         unsigned counter = 0;
@@ -279,7 +328,9 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
             if (option->multiple.max_amount == 0 || option->multiple.max_amount == 1 ||
                 (option->multiple.max_amount > 0 && counter > (unsigned)option->multiple.max_amount)) {
                 if (parser->settings.error_log) {
-                    fprintf(parser->settings.error_log, "Option \"%s\" was given too many times.\n", option_name);
+                    TMCLI_FPRINTF(parser->settings.error_log,
+                                  TMCLI_TEXT("Option \"") TMCLI_STRFORMAT TMCLI_TEXT("\" was given too many times.\n"),
+                                  option_name);
                 }
                 parser->error = TM_TRUE;
                 return TM_FALSE;
@@ -308,9 +359,12 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
 
     if (is_short && *current != 0 && option->argument_type == CLI_NO_ARGUMENT) {
         /* Commandline argument is in the form of multiple short options, like -abc */
-        if (!isalpha(*current)) {
+        if (!TMCLI_ISALPHA(*current)) {
             if (parser->settings.error_log) {
-                fprintf(parser->settings.error_log, "Invalid command line format after option \"%s\".\n", option_name);
+                TMCLI_FPRINTF(parser->settings.error_log,
+                              TMCLI_TEXT("Invalid command line format after option \"")
+                                  TMCLI_STRFORMAT TMCLI_TEXT("\".\n"),
+                              option_name);
             }
             parser->error = TM_TRUE;
             return TM_FALSE;
@@ -322,7 +376,7 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
 
         if (*current != '=') {
             if (parser->current < parser->argc) {
-                const char* next = parser->argv[parser->current];
+                const tmcli_tchar* next = parser->argv[parser->current];
                 if (*next != '-') {
                     next_is_argument = TM_TRUE;
                     argument_found = TM_TRUE;
@@ -347,29 +401,37 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
 
         if (option->argument_type == CLI_NO_ARGUMENT && argument_found) {
             if (parser->settings.error_log) {
-                fprintf(parser->settings.error_log, "Option \"%s\" takes no arguments.\n", option_name);
+                TMCLI_FPRINTF(parser->settings.error_log,
+                              TMCLI_TEXT("Option \"") TMCLI_STRFORMAT TMCLI_TEXT("\" takes no arguments.\n"),
+                              option_name);
             }
             parser->error = TM_TRUE;
             return TM_FALSE;
         }
         if (current_has_argument && next_is_argument) {
             if (parser->settings.error_log) {
-                fprintf(parser->settings.error_log, "Option \"%s\" has too many arguments.\n", option_name);
+                TMCLI_FPRINTF(parser->settings.error_log,
+                              TMCLI_TEXT("Option \"") TMCLI_STRFORMAT TMCLI_TEXT("\" has too many arguments.\n"),
+                              option_name);
             }
             parser->error = TM_TRUE;
             return TM_FALSE;
         }
         if (option->argument_type == CLI_REQUIRED_ARGUMENT && (!argument_found || *argument_start == 0)) {
             if (parser->settings.error_log) {
-                fprintf(parser->settings.error_log, "Option \"%s\" needs an argument.\n", option_name);
+                TMCLI_FPRINTF(parser->settings.error_log,
+                              TMCLI_TEXT("Option \"") TMCLI_STRFORMAT TMCLI_TEXT("\" needs an argument.\n"),
+                              option_name);
             }
             parser->error = TM_TRUE;
             return TM_FALSE;
         }
         if (argument_start && option->argument_validator && !option->argument_validator(argument_start)) {
             if (parser->settings.error_log) {
-                fprintf(parser->settings.error_log, "\"%s\" is not a valid argument to option \"%s\".\n",
-                        argument_start, option_name);
+                TMCLI_FPRINTF(parser->settings.error_log,
+                              TMCLI_TEXT("\"") TMCLI_STRFORMAT TMCLI_TEXT("\" is not a valid argument to option \"")
+                                  TMCLI_STRFORMAT TMCLI_TEXT("\".\n"),
+                              argument_start, option_name);
             }
             parser->error = TM_TRUE;
             return TM_FALSE;

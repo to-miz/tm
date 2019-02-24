@@ -1,5 +1,5 @@
 /*
-tm_json.h v0.2.0 - public domain - https://github.com/to-miz/tm
+tm_json.h v0.2.2 - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -111,6 +111,10 @@ ISSUES
       Workaround is not changing the LC_NUMERIC locale from the default "C" locale.
 
 HISTORY
+    v0.2.2  15.01.19  Changed signature of conversion functions to use sized integer types like int32_t.
+    v0.2.1  14.01.19  Fixed some compilation errors when both TM_SIGNED_SIZE_T and TM_STRING_VIEW
+                      are defined.
+                      Improved support for TM_STRING_VIEW.
     v0.2.0  03.01.19  Removed TMJ_PASS_BY_POINTER.
                       Removed attempts ate locale independent string conversions based on CRT due to
                       being unsafe/slow.
@@ -127,7 +131,8 @@ HISTORY
                       Switched from using toupper to tolower for case insensitive comparisons.
                       Fixed jsonToFloat to also use TM_INFINITY and TM_NAN.
                       Changed remaining assert calls to TM_ASSERT.
-    v0.1.6  29.12.18  Fixed GCC warnings for multi-line comment, missing-field-initializers and implicit-fallthrough.
+    v0.1.6  29.12.18  Fixed GCC warnings for multi-line comment, missing-field-initializers
+                      and implicit-fallthrough.
                       Fixed a bug with compareString acting like stringStartsWith.
                       Renamed compareString functions to stringEquals, since they only check equality.
                       Removed tmj_bool and TMJ_NULL, using tm_bool and TM_NULL instead.
@@ -171,7 +176,7 @@ HISTORY
 
 /* clang-format off */
 #ifdef TM_JSON_IMPLEMENTATION
-    // define these to avoid crt
+    /* define these to avoid crt */
     #ifndef TM_MEMCHR
         #include <string.h>
         #define TM_MEMCHR memchr
@@ -180,13 +185,24 @@ HISTORY
         #include <string.h>
         #define TM_STRLEN strlen
     #endif
-    #ifndef TM_ISDIGIT
+    #if !defined(TM_ISDIGIT) || !defined(TM_ISALPHA) || !defined(TM_ISXDIGIT) \
+        || !defined(TM_ISSPACE) || !defined(TM_TOLOWER)
         #include <ctype.h>
-        #define TM_ISDIGIT isdigit
-        #define TM_ISALPHA isalpha
-        #define TM_ISXDIGIT isxdigit
-        #define TM_ISSPACE isspace
-        #define TM_TOLOWER tolower
+        #ifndef TM_ISDIGIT
+            #define TM_ISDIGIT isdigit
+        #endif
+        #ifndef TM_ISALPHA
+            #define TM_ISALPHA isalpha
+        #endif
+        #ifndef TM_ISXDIGIT
+            #define TM_ISXDIGIT isxdigit
+        #endif
+        #ifndef TM_ISSPACE
+            #define TM_ISSPACE isspace
+        #endif
+        #ifndef TM_TOLOWER
+            #define TM_TOLOWER tolower
+        #endif
     #endif
     #ifndef TM_MEMCMP
         #include <string.h>
@@ -439,7 +455,7 @@ typedef struct {
     tm_size_t size;
 
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
-    operator TM_STRING_VIEW() const { return {data, size}; };
+    inline operator TM_STRING_VIEW() const { return TM_STRING_VIEW_MAKE(data, size); };
 #endif
 } JsonStringView;
 typedef struct {
@@ -531,14 +547,14 @@ JsonStringView jsonAllocateUnescapedString(JsonStackAllocator* allocator, JsonSt
 JsonStringView jsonAllocateConcatenatedString(JsonStackAllocator* allocator, JsonStringView str);
 
 // value conversion functions to turn the contents of the current token to values
-TMJ_DEF int jsonToInt(JsonStringView str, int def);
-TMJ_DEF unsigned int jsonToUInt(JsonStringView str, unsigned int def);
+TMJ_DEF int32_t jsonToInt(JsonStringView str, int32_t def);
+TMJ_DEF uint32_t jsonToUInt(JsonStringView str, uint32_t def);
 TMJ_DEF float jsonToFloat(JsonStringView str, float def);
 TMJ_DEF double jsonToDouble(JsonStringView str, double def);
 TMJ_DEF tm_bool jsonToBool(JsonStringView str, tm_bool def);
 #ifndef TMJ_NO_INT64
-TMJ_DEF long long jsonToInt64(JsonStringView str, long long def);
-TMJ_DEF unsigned long long jsonToUInt64(JsonStringView str, unsigned long long def);
+TMJ_DEF int64_t jsonToInt64(JsonStringView str, int64_t def);
+TMJ_DEF uint64_t jsonToUInt64(JsonStringView str, uint64_t def);
 #endif
 
 // json document
@@ -551,9 +567,11 @@ typedef struct JsonValueStruct JsonValue;
 #ifdef TM_STRING_VIEW
 typedef TM_STRING_VIEW tmj_string_arg;
 typedef TM_STRING_VIEW tmj_string_view;
+#define TMJ_STRING_VIEW_MAKE(data, size) TM_STRING_VIEW_MAKE(data, size)
 #else
 typedef const char* tmj_string_arg;
 typedef JsonStringView tmj_string_view;
+#define TMJ_STRING_VIEW_MAKE(data, size) {(data), (size)}
 #endif
 
 typedef struct {
@@ -607,14 +625,14 @@ struct JsonValueStruct {
 #ifdef __cplusplus
     tmj_string_view getString(tmj_string_view def = {}) const;
 
-    int getInt(int def = 0) const;
-    unsigned int getUInt(unsigned int def = 0) const;
+    int32_t getInt(int32_t def = 0) const;
+    uint32_t getUInt(uint32_t def = 0) const;
     float getFloat(float def = 0.0f) const;
     double getDouble(double def = 0.0f) const;
     bool getBool(bool def = false) const;
 #ifndef TMJ_NO_INT64
-    long long getInt64(long long def = 0) const;
-    unsigned long long getUInt64(unsigned long long def = 0) const;
+    int64_t getInt64(int64_t def = 0) const;
+    uint64_t getUInt64(uint64_t def = 0) const;
 #endif
 
     // same as jsonGetObject
@@ -738,14 +756,14 @@ TMJ_DEF tm_bool jsonIsValidObject(const JsonObject* object);
 TMJ_DEF tm_bool jsonIsValidArray(const JsonArray* array);
 TMJ_DEF tm_bool jsonIsValidValue(const JsonValue* value);
 
-TMJ_DEF int jsonGetInt(const JsonValue* value, int def);
-TMJ_DEF unsigned int jsonGetUInt(const JsonValue* value, unsigned int def);
+TMJ_DEF int32_t jsonGetInt(const JsonValue* value, int32_t def);
+TMJ_DEF uint32_t jsonGetUInt(const JsonValue* value, uint32_t def);
 TMJ_DEF float jsonGetFloat(const JsonValue* value, float def);
 TMJ_DEF double jsonGetDouble(const JsonValue* value, double def);
 TMJ_DEF tm_bool jsonGetBool(const JsonValue* value, tm_bool def);
 #ifndef TMJ_NO_INT64
-TMJ_DEF long long jsonGetInt64(const JsonValue* value, long long def);
-TMJ_DEF unsigned long long jsonGetUInt64(const JsonValue* value, unsigned long long def);
+TMJ_DEF int64_t jsonGetInt64(const JsonValue* value, int64_t def);
+TMJ_DEF uint64_t jsonGetUInt64(const JsonValue* value, uint64_t def);
 #endif
 
 // inline implementations
@@ -783,7 +801,7 @@ inline tmj_string_view JsonValueStruct::getString(tmj_string_view def) const {
     if ((type == JVAL_NULL && data.content.size == 0) || type == JVAL_OBJECT || type == JVAL_ARRAY) {
         return def;
     }
-    return {data.content.data, data.content.size};
+    return TMJ_STRING_VIEW_MAKE(data.content.data, data.content.size);
 }
 
 inline JsonObject JsonValueStruct::getObject() const { return jsonGetObject(this); }
@@ -807,14 +825,14 @@ inline JsonValue JsonObject::operator[](tmj_string_arg name) const { return json
 inline bool JsonObject::exists(tmj_string_arg name) const { return jsonQueryMember(this, name) != TM_NULL; }
 inline JsonValue* JsonObject::find(tmj_string_arg name) const { return jsonQueryMember(this, name); }
 
-inline int JsonValueStruct::getInt(int def) const { return jsonGetInt(this, def); }
-inline unsigned int JsonValueStruct::getUInt(unsigned int def) const { return jsonGetUInt(this, def); }
+inline int32_t JsonValueStruct::getInt(int32_t def) const { return jsonGetInt(this, def); }
+inline uint32_t JsonValueStruct::getUInt(uint32_t def) const { return jsonGetUInt(this, def); }
 inline float JsonValueStruct::getFloat(float def) const { return jsonGetFloat(this, def); }
 inline double JsonValueStruct::getDouble(double def) const { return jsonGetDouble(this, def); }
 inline bool JsonValueStruct::getBool(bool def) const { return jsonGetBool(this, def); }
 #ifndef TMJ_NO_INT64
-inline long long JsonValueStruct::getInt64(long long def) const { return jsonGetInt64(this, def); }
-inline unsigned long long JsonValueStruct::getUInt64(unsigned long long def) const {
+inline int64_t JsonValueStruct::getInt64(int64_t def) const { return jsonGetInt64(this, def); }
+inline uint64_t JsonValueStruct::getUInt64(uint64_t def) const {
     return jsonGetUInt64(this, def);
 }
 #endif /* !defined(TMJ_NO_INT64) */
@@ -922,7 +940,7 @@ static void tmj_to_float(const char* first, const char* last, float* value) {
     }
 }
 #ifndef TMJ_NO_INT64
-static void tmj_to_int64(const char* first, const char* last, long long* value, int base) {
+static void tmj_to_int64(const char* first, const char* last, int64_t* value, int base) {
     TM_ASSERT(value);
     TM_ASSERT(last >= first);
     size_t size = (size_t)(last - first);
@@ -931,11 +949,11 @@ static void tmj_to_int64(const char* first, const char* last, long long* value, 
     TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
-    long long result = (long long)strtoll(buffer, TM_NULL, base);
+    int64_t result = (int64_t)strtoll(buffer, TM_NULL, base);
     if (errno == ERANGE) return;
     *value = result;
 }
-static void tmj_to_uint64(const char* first, const char* last, unsigned long long* value, int base) {
+static void tmj_to_uint64(const char* first, const char* last, uint64_t* value, int base) {
     TM_ASSERT(value);
     TM_ASSERT(last >= first);
     size_t size = (size_t)(last - first);
@@ -944,7 +962,7 @@ static void tmj_to_uint64(const char* first, const char* last, unsigned long lon
     TM_MEMCPY(buffer, first, size);
     buffer[size] = 0;
     errno = 0;
-    unsigned long long result =  (unsigned long long)strtoull(buffer, TM_NULL, base);
+    uint64_t result =  (uint64_t)strtoull(buffer, TM_NULL, base);
     if (errno == ERANGE) return;
     *value = result;
 }
@@ -952,7 +970,7 @@ static void tmj_to_uint64(const char* first, const char* last, unsigned long lon
 
 #endif  // defined(TMJ_DEFINE_OWN_STRING_CONVERSIONS)
 
-TMJ_DEF int jsonToInt(JsonStringView str, int def) {
+TMJ_DEF int32_t jsonToInt(JsonStringView str, int32_t def) {
     if (str.size <= 0) return def;
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
         if (str.size == 2) return def;
@@ -962,7 +980,7 @@ TMJ_DEF int jsonToInt(JsonStringView str, int def) {
     }
     return def;
 }
-TMJ_DEF unsigned int jsonToUInt(JsonStringView str, unsigned int def) {
+TMJ_DEF uint32_t jsonToUInt(JsonStringView str, uint32_t def) {
     if (str.size <= 0) return def;
     if (str.data[0] == '-') {
         // Special case for -0.
@@ -1057,7 +1075,7 @@ TMJ_DEF tm_bool jsonToBool(JsonStringView str, tm_bool def) {
     return def;
 }
 #ifndef TMJ_NO_INT64
-TMJ_DEF long long jsonToInt64(JsonStringView str, long long def) {
+TMJ_DEF int64_t jsonToInt64(JsonStringView str, int64_t def) {
     if (str.size <= 0) return def;
     if (str.size >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
         if (str.size == 2) return def;
@@ -1067,7 +1085,7 @@ TMJ_DEF long long jsonToInt64(JsonStringView str, long long def) {
     }
     return def;
 }
-TMJ_DEF unsigned long long jsonToUInt64(JsonStringView str, unsigned long long def) {
+TMJ_DEF uint64_t jsonToUInt64(JsonStringView str, uint64_t def) {
     if (str.size <= 0) return def;
     if (str.data[0] == '-') {
         // Special case for -0.
@@ -1855,7 +1873,7 @@ static tm_bool jsonParseCppRawString(JsonReader* reader, JsonContext currentCont
                     setError(reader, JERR_UNEXPECTED_EOF);
                     return TM_FALSE;
                 }
-                // get delimeter
+                // get delimiter
                 char delim[17];
                 tm_size_t delimSize = 0;
                 while (reader->size && jsonIsValidDelimChar(reader->data[0]) && delimSize < 16) {
@@ -1864,7 +1882,7 @@ static tm_bool jsonParseCppRawString(JsonReader* reader, JsonContext currentCont
                     ++delimSize;
                 }
                 if (reader->size && reader->data[0] == '(') {
-                    // append '"' to delimeter so that we do not need to check ending quotation mark
+                    // append '"' to delimiter so that we do not need to check ending quotation mark
                     delim[delimSize] = '"';
                     ++delimSize;
 
@@ -3068,7 +3086,7 @@ TMJ_DEF JsonValue* jsonQueryMember(const JsonObject* object, TM_STRING_VIEW name
 }
 TMJ_DEF JsonValue jsonGetMemberCached(const JsonObject* object, TM_STRING_VIEW name, tm_size_t* lastAccess) {
     TM_ASSERT(object);
-    JsonValue result = {JVAL_NULL, {TM_NULL, 0}};
+    JsonValue result = {JVAL_NULL, {{TM_NULL, 0}}};
     if (JsonValue* value = jsonQueryMemberCached(object, name, lastAccess)) {
         result = *value;
     }
@@ -3123,7 +3141,7 @@ TMJ_DEF tm_bool jsonIsValidValue(const JsonValue* value) {
     return value->type != JVAL_NULL;
 }
 
-TMJ_DEF int jsonGetInt(const JsonValue* value, int def) {
+TMJ_DEF int32_t jsonGetInt(const JsonValue* value, int32_t def) {
     switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
@@ -3135,7 +3153,7 @@ TMJ_DEF int jsonGetInt(const JsonValue* value, int def) {
         }
     }
 }
-TMJ_DEF unsigned int jsonGetUInt(const JsonValue* value, unsigned int def) {
+TMJ_DEF uint32_t jsonGetUInt(const JsonValue* value, uint32_t def) {
     switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
@@ -3184,7 +3202,7 @@ TMJ_DEF tm_bool jsonGetBool(const JsonValue* value, tm_bool def) {
     }
 }
 #ifndef TMJ_NO_INT64
-TMJ_DEF long long jsonGetInt64(const JsonValue* value, long long def) {
+TMJ_DEF int64_t jsonGetInt64(const JsonValue* value, int64_t def) {
     switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:
@@ -3196,7 +3214,7 @@ TMJ_DEF long long jsonGetInt64(const JsonValue* value, long long def) {
         }
     }
 }
-TMJ_DEF unsigned long long jsonGetUInt64(const JsonValue* value, unsigned long long def) {
+TMJ_DEF uint64_t jsonGetUInt64(const JsonValue* value, uint64_t def) {
     switch (value->type) {
         case JVAL_NULL:
         case JVAL_OBJECT:

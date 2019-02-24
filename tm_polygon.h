@@ -263,6 +263,15 @@ TMPO_DEF tm_size_t clipPolyEmitClippedPolygon(ClipVertices* a, ClipVertices* b, 
 
 #ifdef TM_POLYGON_IMPLEMENTATION
 
+#ifndef TM_ASSERT_VALID_SIZE
+    #if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
+        #define TM_ASSERT_VALID_SIZE(x) TM_ASSERT((x) >= 0)
+    #else
+        /* always true if size_t is unsigned */
+        #define TM_ASSERT_VALID_SIZE(x) ((void)0)
+    #endif
+#endif /* !defined(TM_ASSERT_VALID_SIZE) */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -334,7 +343,7 @@ TMPO_DEF tm_size_t triangulatePolygonEarClipping(const TMPO_VECTOR* vertices, tm
                                                  tmpo_index* queryList, tm_size_t queryCount, tmpo_index begin,
                                                  tmpo_index* out, tm_size_t maxIndices) {
     TM_ASSERT(vertices);
-    TM_ASSERT(count >= 0);
+    TM_ASSERT_VALID_SIZE(count);
     TM_ASSERT(queryList);
     TM_ASSERT(queryCount >= count);
     TM_ASSERT(out);

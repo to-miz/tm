@@ -1,0 +1,67 @@
+{
+  "folders": [
+    {
+      "path": "../../../",
+      "folder_exclude_patterns": ["builds", "build", "data", "src", "tests"]
+    },
+    {
+      "path": "../../",
+      "folder_exclude_patterns": ["builds", "build", "data", "src", "tests"]
+    },
+    {
+      "path": "./"
+    }
+  ],
+  "settings": {
+    "read_only_files": [
+      "tm_print.h",
+      "tm_cli.h",
+      "tm_unicode.h"
+    ],
+    "read_only_folders": [
+    ]
+  },
+  "build_systems": [
+    {
+      "name": "make",
+      "cmd": "make tests.tm_unicode",
+
+      "windows": {
+        "shell": false,
+        "file_regex": "(.*)\\(([0-9]+)\\): (error|note|warning)",
+        "selector": "source.cpp",
+        "working_dir": "${project_path}/../../../",
+      },
+
+      "linux": {
+        "shell": true,
+        "file_regex": "^(..[^:\n]*):([0-9]+):?([0-9]+)?:? (.*)$",
+        "selector": "source.cpp",
+        "working_dir": "${project_path}/../../../",
+      },
+
+      "variants": [
+        {
+          "name": "build C",
+          "cmd": "make tests.tm_unicode.c"
+        },
+        {
+          "name": "run tests",
+          "cmd": "make tests.tm_unicode.run"
+        },
+        {
+          "name": "run default tests",
+          "cmd": "make tests.tm_unicode.default.run"
+        },
+        {
+          "name": "run windows tests",
+          "cmd": "make tests.tm_unicode.windows.run"
+        },
+        {
+          "name": "run msvc_crt tests",
+          "cmd": "make tests.tm_unicode.msvc_crt.run"
+        }
+      ]
+    }
+  ]
+}

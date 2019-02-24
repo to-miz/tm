@@ -24,7 +24,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_json-merge",
+			"cmd": "make merge.tm_json",
 
 			"windows": {
 				"shell": false,
@@ -43,19 +43,19 @@
 			"variants": [
 				{
 					"name": "build unmerged",
-					"cmd": "make tm_json-unmerged"
+					"cmd": "make unmerged.tm_json"
 				},
 				{
 					"name": "build C version",
-					"cmd": "make tm_json-unmerged-c"
+					"cmd": "make unmerged.tm_json.c"
 				},
 				{
 					"name": "build tests",
-					"cmd": "make tm_json-tests"
+					"cmd": "make tests.tm_json"
 				},
 				{
 					"name": "run tests",
-					"cmd": "make tm_json-run-tests"
+					"cmd": "make tests.tm_json.run"
 				}
 			]
 		}

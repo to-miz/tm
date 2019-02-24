@@ -21,7 +21,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_stringutil-merge",
+			"cmd": "make merge.tm_stringutil",
 
 			"windows": {
 				"shell": false,
@@ -40,7 +40,7 @@
 			"variants": [
 				{
 					"name": "build unmerged",
-					"cmd": "make tm_stringutil-unmerged"
+					"cmd": "make unmerged.tm_stringutil"
 				}
 			]
 		}

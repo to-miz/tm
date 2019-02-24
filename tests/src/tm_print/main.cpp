@@ -89,9 +89,15 @@ TEST_CASE("Test integer format specifiers") {
 TEST_CASE("Test float format specifiers") {
     check_output("{:f}", 1.0, "1.000000");
     check_output("{:g}", 1.0, "1");
+}
 
-// check scientific output
-#if !defined(TMP_FLOAT_BACKEND_TM_CONVERSION) || (defined(TMC_VERSION)) && TMC_VERSION > 0x00090905u
+#if defined(TMP_FLOAT_BACKEND_TM_CONVERSION) && !defined(TMC_HAS_SCIENTIFIC)
+/* tm_conversion doesn't have support for scientific printing yet. */
+const bool scientific_may_fail = true;
+#else
+const bool scientific_may_fail = false;
+#endif
+TEST_CASE("Test float scientific format specifiers" * doctest::may_fail(scientific_may_fail)) {
     check_output("{:e}", 1.0, "1.000000e+00");
     check_output("{:E}", 1.0, "1.000000E+00");
 
@@ -100,7 +106,6 @@ TEST_CASE("Test float format specifiers") {
 
     check_output("{:#a}", 1.0, "0x1.000000p+0");
     check_output("{:#A}", 1.0, "0X1.000000P+0");
-#endif
 }
 
 TEST_CASE("Test width") {

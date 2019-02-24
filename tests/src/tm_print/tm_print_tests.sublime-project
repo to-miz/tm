@@ -24,7 +24,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_print-tests",
+			"cmd": "make tests.tm_print",
 
 			"windows": {
 				"shell": false,
@@ -43,11 +43,11 @@
 			"variants": [
 				{
 					"name": "run tests",
-					"cmd": "make tm_print-run-tests"
+					"cmd": "make tests.tm_print.run"
 				},
 				{
 					"name": "run tests (default config only)",
-					"cmd": "make tm_print-run-tests-default"
+					"cmd": "make tests.tm_print.default.run"
 				}
 			]
 		}

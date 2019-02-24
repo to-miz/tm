@@ -15,7 +15,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_conversion-tests",
+			"cmd": "make tests.tm_conversion",
 
 			"windows": {
 				"shell": false,
@@ -34,11 +34,11 @@
 			"variants": [
 				{
 					"name": "run tests",
-					"cmd": "make tm_conversion-run-tests"
+					"cmd": "make tests.tm_conversion.run"
 				},
 				{
 					"name": "run tests fast",
-					"cmd": "make tm_conversion-run-tests-fast"
+					"cmd": "make tests.tm_conversion.fast.run"
 				}
 			]
 		}

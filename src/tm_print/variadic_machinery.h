@@ -286,48 +286,11 @@ void fillPrintArgList(PrintArgList* list, TM_STRING_VIEW value, const Types&... 
 }
 #endif
 #ifdef TMP_CUSTOM_PRINTING
-// this looks very confusing, but it checks for the existence of a specific overload of snprint
-// this way we can do a static_assert on whether the overload exists and report an error
-// otherwise
-template <class T>
-class tmp_has_custom_printer {
-    typedef tm_size_t printer_t(char*, tm_size_t, const PrintFormat&, const T&);
-    typedef char no;
-
-    template <class C>
-    static auto test(C c)
-        -> decltype(static_cast<tm_size_t (*)(char*, tm_size_t, const PrintFormat&, const C&)>(&snprint));
-    template <class C>
-    static no test(...);
-
-   public:
-    enum { Value = (sizeof(test<T>(T{})) == sizeof(void*)) };
-};
-
 template <class T, class... Types>
-void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args) {
-    static_assert(tmp_has_custom_printer<T>::Value,
-                  "T is not printable, there is no snprint that takes value of type T");
-    // if the static assert fails, the compiler will also report that there are no overloads of
-    // snprint that accept the argument types. We could get rid of that error by using SFINAE
-    // but that introduces more boilerplate
-
-    // having constexpr if simplifies the error message
-#ifdef TMP_HAS_CONSTEXPR_IF
-    if constexpr (tmp_has_custom_printer<T>::Value)
-#endif
-    {
-        auto custom = &list->args[list->size++].custom;
-        custom->data = &value;
-        custom->customPrint = [](char* buffer, tm_size_t len, const PrintFormat& initialFormatting, const void* data) {
-            return snprint(buffer, len, initialFormatting, *(const T*)data);
-        };
-    }
-    fillPrintArgList(list, args...);
-}
+void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args);
 #else
 template <class T, class... Types>
-void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args) {
+void fillPrintArgList(PrintArgList*, const T&, const Types&...) {
     static_assert(tmp_type_flags<T>::Value != 0,
                   "T is not printable, custom printing is disabled (TMP_CUSTOM_PRINTING not defined)");
     static_assert(tmp_type_flags<T>::Value == 0, "");  // this function is not allowed to be instantiated
@@ -419,3 +382,45 @@ tm_size_t snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintF
     return tmp_snprint(dest, len, format, initialFormatting, argList);
 }
 #endif  // defined( TM_STRING_VIEW )
+
+#ifdef TMP_CUSTOM_PRINTING
+// this looks very confusing, but it checks for the existence of a specific overload of snprint
+// this way we can do a static_assert on whether the overload exists and report an error
+// otherwise
+template <class T>
+class tmp_has_custom_printer {
+    typedef tm_size_t printer_t(char*, tm_size_t, const PrintFormat&, const T&);
+    typedef char no;
+
+    template <class C>
+    static auto test(C c)
+        -> decltype(static_cast<tm_size_t (*)(char*, tm_size_t, const PrintFormat&, const C&)>(&snprint));
+    template <class C>
+    static no test(...);
+
+   public:
+    enum { Value = (sizeof(test<T>(T{})) == sizeof(void*)) };
+};
+
+template <class T, class... Types>
+void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args) {
+    static_assert(tmp_has_custom_printer<T>::Value,
+                  "T is not printable, there is no snprint that takes value of type T");
+    // if the static assert fails, the compiler will also report that there are no overloads of
+    // snprint that accept the argument types. We could get rid of that error by using SFINAE
+    // but that introduces more boilerplate
+
+    // having constexpr if simplifies the error message
+#ifdef TMP_HAS_CONSTEXPR_IF
+    if constexpr (tmp_has_custom_printer<T>::Value)
+#endif
+    {
+        auto custom = &list->args[list->size++].custom;
+        custom->data = &value;
+        custom->customPrint = [](char* buffer, tm_size_t len, const PrintFormat& initialFormatting, const void* data) {
+            return snprint(buffer, len, initialFormatting, *(const T*)data);
+        };
+    }
+    fillPrintArgList(list, args...);
+}
+#endif // defined(TMP_CUSTOM_PRINTING)

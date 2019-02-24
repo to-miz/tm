@@ -4,12 +4,23 @@ builds/
 projects/
 *.suo
 
+# Project files.
+*.sln
+*.VC.db
+
+
+# Visual Studio.
+.vs/
+
+# Workspace.
+config.mk
 *.sublime-workspace
 
-# misc test files
+# Misc test files.
 src/experimental/*
 tools/merge/tests/*
 
-# some files that aren't ready to push
+# Some files that aren't ready to push.
 tm_regex.h
 tm_string_matching.h
+tm_file.h

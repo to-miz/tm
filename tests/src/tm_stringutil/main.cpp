@@ -6,10 +6,21 @@
 
 #include <string_view>
 #include <type_traits>
-using std::string_view;
-#define TM_STRING_VIEW std::string_view
-#define TM_STRING_VIEW_DATA(x) (x).data()
-#define TM_STRING_VIEW_SIZE(x) ((tm_size_t)(x).size())
+
+// clang-format off
+#ifdef USE_SIGNED_SIZE_T
+    #define TM_SIZE_T_DEFINED
+    #define TM_SIZE_T_IS_SIGNED 1
+    typedef int tm_size_t;
+#endif
+
+#ifdef USE_STRING_VIEW
+    #define TM_STRING_VIEW std::string_view
+    #define TM_STRING_VIEW_DATA(x) (x).data()
+    #define TM_STRING_VIEW_SIZE(x) ((tm_size_t)(x).size())
+    #define TM_STRING_VIEW_MAKE(data, size) std::string_view{(data), (size_t)(size)}
+#endif
+// clang-format on
 
 // make stringutil use custom implementations of stricmp and strstr
 #include <cstring>
@@ -21,6 +32,10 @@ using std::string_view;
 
 #define TM_STRINGUTIL_IMPLEMENTATION
 #include <tm_stringutil.h>
+
+// Testing code starts here.
+
+using std::string_view;
 
 // Calls func with supplied arguments and returns index to match.
 template <class Func, class... T>
@@ -70,8 +85,13 @@ TEST_CASE("Test ordering") {
     test_ordering(tmsu_compare_n, strcmp, "Apple", "Cat");
     test_ordering(tmsu_compare_n, strcmp, "", "Cat");
     test_ordering(tmsu_compare_n, strcmp, "Ca", "Cat");
+    test_ordering(tmsu_compare_n, strcmp, "Cat", "Cat");
+    test_ordering(tmsu_compare_n, strcmp, "10", "2");
 
-    test_ordering(tmsu_compare_ignore_case_n, strcasecmp, "Apple", "Cat");
-    test_ordering(tmsu_compare_ignore_case_n, strcasecmp, "", "Cat");
-    test_ordering(tmsu_compare_ignore_case_n, strcasecmp, "Ca", "Cat");
+    test_ordering(tmsu_compare_ignore_case_ansi_n, strcasecmp, "Apple", "Cat");
+    test_ordering(tmsu_compare_ignore_case_ansi_n, strcasecmp, "", "Cat");
+    test_ordering(tmsu_compare_ignore_case_ansi_n, strcasecmp, "Ca", "Cat");
+    test_ordering(tmsu_compare_ignore_case_ansi_n, strcasecmp, "Cat", "Cat");
+    test_ordering(tmsu_compare_ignore_case_ansi_n, strcasecmp, "cAT", "Cat");
+    test_ordering(tmsu_compare_ignore_case_ansi_n, strcasecmp, "10", "2");
 }

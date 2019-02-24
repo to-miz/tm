@@ -1,5 +1,5 @@
 /*
-tm_cli.h v0.1 - public domain - https://github.com/to-miz/tm
+tm_cli.h v0.2.1 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -18,7 +18,11 @@ PURPOSE
     loading config files, preprocessing and parsing the same commandline with differing options.
 
 HISTORY
-    v0.1   07.10.18 initial commit
+    v0.2.1  03.02.19 Made short options optional if a long name is available.
+                     Added error checking for valid options. Options with no shortor long names will
+                     produce errors now.
+    v0.2    01.02.19 Added TMCLI_USE_WCHAR_T for wchar_t and Windows wmain support.
+    v0.1    07.10.18 Initial commit.
 */
 
 #include "../common/GENERATED_WARNING.inc"
@@ -30,20 +34,31 @@ HISTORY
 
     #include "../common/tm_assert.inc"
 
-    #if !defined(TM_ISDIGIT) || !defined(TM_ISALNUM)
-        #include <ctype.h>
-    #endif
-    #ifndef TM_ISDIGIT
-        #define TM_ISDIGIT isdigit
-    #endif
-    #ifndef TM_ISALNUM
-        #define TM_ISALNUM isalnum
+    #if !defined(TMCLI_USE_WCHAR_T)
+        #if !defined(TM_ISDIGIT) || !defined(TM_ISALNUM) || !defined(TM_ISALPHA)
+            #include <ctype.h>
+        #endif
+        #ifndef TM_ISDIGIT
+            #define TM_ISDIGIT isdigit
+        #endif
+        #ifndef TM_ISALNUM
+            #define TM_ISALNUM isalnum
+        #endif
+        #ifndef TM_ISALPHA
+            #define TM_ISALPHA isalpha
+        #endif
+        #if !defined(TM_STRLEN) || !defined(TM_STRNCMP)
+            #include <string.h>
+
+            #ifndef TM_STRLEN
+                #define TM_STRLEN strlen
+            #endif
+            #ifndef TM_STRNCMP
+                #define TM_STRNCMP strncmp
+            #endif
+        #endif
     #endif
 
-    #if !defined(TM_STRLEN)
-        #include <string.h>
-        #define TM_STRLEN strlen
-    #endif
 #endif /* defined(TM_CLI_IMPLEMENTATION) */
 
 #ifndef _TM_CLI_H_INCLUDED_7B17B815_63AF_4D95_B74B_B457740DFB9C_
@@ -75,6 +90,13 @@ HISTORY
 
 #define TMCLI_GIVEN_OPTIONS_COUNT 4u
 
+#ifdef TMCLI_USE_WCHAR_T
+    #include <wchar.h>
+    typedef wchar_t tmcli_tchar;
+#else
+    typedef char tmcli_tchar;
+#endif
+
 /* clang-format on */
 
 #ifdef __cplusplus
@@ -82,7 +104,7 @@ extern "C" {
 #endif
 
 enum tmcli_argument_type {
-    /* argument types */
+    /* Argument types */
     CLI_NO_ARGUMENT,
     CLI_OPTIONAL_ARGUMENT,
     CLI_REQUIRED_ARGUMENT,
@@ -105,24 +127,24 @@ typedef struct {
     unsigned* counter;
 } tmcli_multiple;
 
-typedef tm_bool (*tmcli_validator_type)(const char*);
+typedef tm_bool (*tmcli_validator_type)(const tmcli_tchar*);
 
 #define CLI_ARGUMENT_STRING TM_NULL
 #define CLI_NO_VALIDATOR TM_NULL
-TMCLI_DEF tm_bool CLI_ARGUMENT_INT(const char* str);
-TMCLI_DEF tm_bool CLI_ARGUMENT_UINT(const char* str);
-TMCLI_DEF tm_bool CLI_ARGUMENT_FLOAT(const char* str);
+TMCLI_DEF tm_bool CLI_ARGUMENT_INT(const tmcli_tchar* str);
+TMCLI_DEF tm_bool CLI_ARGUMENT_UINT(const tmcli_tchar* str);
+TMCLI_DEF tm_bool CLI_ARGUMENT_FLOAT(const tmcli_tchar* str);
 
 typedef struct tmcli_option_struct {
-    const char* short_option;
-    const char* long_option;
+    const tmcli_tchar* short_option;
+    const tmcli_tchar* long_option;
     int argument_type;
     int option_type;
 
     tmcli_multiple multiple;
     tmcli_validator_type argument_validator;
 
-    /* For options that have outputs, like options that can be multiple or flags */
+    /* For options that have outputs, like options that can be multiple or flags. */
     int output_type;
     unsigned* output;
     unsigned output_value;
@@ -130,22 +152,22 @@ typedef struct tmcli_option_struct {
 
 typedef struct tmcli_parser_settings_struct {
     FILE* error_log;              /* Error printing will be done into this file. */
-    tm_bool allow_free_arguments; /* Whether to allow free arguments that aren't tied to an option, like "input.txt" */
+    tm_bool allow_free_arguments; /* Whether to allow free arguments that aren't tied to an option, like "input.txt". */
 } tmcli_parser_settings;
 
 typedef struct tmcli_parser_struct {
     int argc;
-    char const** argv;
+    tmcli_tchar const** argv;
     const tmcli_option* options;
     tm_size_t options_count;
 
     int current;
 
     uint32_t given_options[TMCLI_GIVEN_OPTIONS_COUNT];
-    const char* current_arg;
+    const tmcli_tchar* current_arg;
 
     tmcli_parser_settings settings;
-    const char* program_name;
+    const tmcli_tchar* program_name;
     tm_bool error;
 } tmcli_parser;
 
@@ -155,7 +177,7 @@ TMCLI_DEF tmcli_parser_settings tmcli_default_parser_settings();
 Creates a cli parser from argc and argv from the main function.
 The resulting cli parser uses the default settings returned by tmcli_default_parser_settings.
 */
-TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, char const** argv, const tmcli_option* options,
+TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, tmcli_tchar const** argv, const tmcli_option* options,
                                          tm_size_t options_count);
 
 /*
@@ -165,13 +187,13 @@ To call this function from arguments from main directly, you would have to call 
     tmcli_make_parser_ex(argv[0], argc - 1, argv + 1, ...)
 See implementation of tmcli_make_parser for how to call this function from argc/argv you get from main.
 */
-TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const char* program_name, int argc, char const** argv,
+TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const tmcli_tchar* program_name, int argc, tmcli_tchar const** argv,
                                             const tmcli_option* options, tm_size_t options_count,
                                             tmcli_parser_settings settings);
 
 typedef struct tmcli_parsed_option_struct {
     const tmcli_option* option; /* Can be NULL if free arguments are allowed. */
-    const char* argument;
+    const tmcli_tchar* argument;
     tm_size_t option_index; /* Only holds a valid value if option != NULL. Refers to parser->options[option_index]. */
 } tmcli_parsed_option;
 

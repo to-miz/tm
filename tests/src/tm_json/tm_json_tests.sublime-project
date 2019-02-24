@@ -12,10 +12,19 @@
       "path": "./"
     }
   ],
+  "settings": {
+    "read_only_files": [
+      "tm_print.h",
+      "tm_cli.h",
+      "tm_file.h",
+    ],
+    "read_only_folders": [
+    ]
+  },
   "build_systems": [
     {
       "name": "make",
-      "cmd": "make tm_json-tests",
+      "cmd": "make tests.tm_json",
 
       "windows": {
         "shell": false,
@@ -33,8 +42,24 @@
 
       "variants": [
         {
+          "name": "make default tests",
+          "cmd": "make tests.tm_json.default"
+        },
+        {
+          "name": "make signed_size_t tests",
+          "cmd": "make tests.tm_json.signed_size_t"
+        },
+        {
+          "name": "run default tests",
+          "cmd": "make tests.tm_json.default.run"
+        },
+        {
+          "name": "make tm_conversion tests",
+          "cmd": "make tests.tm_json.tm_conversion"
+        },
+        {
           "name": "run tests",
-          "cmd": "make tm_json-run-tests"
+          "cmd": "make tests.tm_json.run"
         }
       ]
     }

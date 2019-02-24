@@ -15,7 +15,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_polygon-tests",
+			"cmd": "make tests.tm_polygon",
 
 			"windows": {
 				"shell": false,
@@ -33,16 +33,12 @@
 
 			"variants": [
 				{
-					"name": "C build",
-					"cmd": "make tm_polygon-c-build"
+					"name": "make tests.tm_polygon.c",
+					"cmd": "make tests.tm_polygon.c"
 				},
 				{
 					"name": "run tests",
-					"cmd": "make tm_polygon-run-tests"
-				},
-				{
-					"name": "run tests (default config only)",
-					"cmd": "make tm_polygon-run-tests-default"
+					"cmd": "make tests.tm_polygon.run"
 				}
 			]
 		}

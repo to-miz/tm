@@ -438,21 +438,6 @@ static PrintFormattedResult tmp_move_printed_value_and_decorate(char* dest, tm_s
     return printResult;
 }
 
-template <class T>
-static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, T value) {
-    TM_ASSERT(dest || maxlen == 0);
-    TM_ASSERT_VALID_SIZE(maxlen);
-
-    if (maxlen <= 0 || (format.width > 0 && (tm_size_t)format.width > maxlen)) {
-        return {maxlen, TM_EOVERFLOW};
-    }
-
-    auto pair = tmp_make_unsigned(value);
-    bool sign = pair.negative || ((format.flags & PrintFlags::Sign) != 0);
-    auto result = tmp_print(dest + sign, maxlen - sign, pair.value, format);
-    return tmp_move_printed_value_and_decorate(dest, maxlen, format, result, pair.negative);
-}
-
 #ifdef TMP_INT_BACKEND_CRT
 #include "int_backend_crt.cpp"
 #endif  // defined(TMP_INT_BACKEND_CRT)
@@ -476,6 +461,21 @@ static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const 
 #ifdef TMP_FLOAT_BACKEND_CHARCONV
 #include "float_backend_charconv.cpp"
 #endif  // defined(TMP_FLOAT_BACKEND_CHARCONV)
+
+template <class T>
+static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, T value) {
+    TM_ASSERT(dest || maxlen == 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+
+    if (maxlen <= 0 || (format.width > 0 && (tm_size_t)format.width > maxlen)) {
+        return {maxlen, TM_EOVERFLOW};
+    }
+
+    auto pair = tmp_make_unsigned(value);
+    bool sign = pair.negative || ((format.flags & PrintFlags::Sign) != 0);
+    auto result = tmp_print(dest + sign, maxlen - sign, pair.value, format);
+    return tmp_move_printed_value_and_decorate(dest, maxlen, format, result, pair.negative);
+}
 
 #include "memory_printer.cpp"
 

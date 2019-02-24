@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.3 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.3.1 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -20,11 +20,12 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
-    v0.3   15.10.18 Added more string_view overloads.
-    v0.2   14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
-                    Added tmsu_equals.
-                    Fixed MSVC warning about unreachable code.
-    v0.1   07.10.18 Initial commit.
+    v0.3.1  15.01.19 Fixed some warnings in msvc with signed size_t and string_view.
+    v0.3    15.10.18 Added more string_view overloads.
+    v0.2    14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
+                     Added tmsu_equals.
+                     Fixed MSVC warning about unreachable code.
+    v0.1    07.10.18 Initial commit.
 */
 
 /* This is a generated file, do not modify directly. You can find the generator files in the src directory. */
@@ -124,16 +125,32 @@ HISTORY
 extern "C" {
 #endif
 
+/* C++ string_view support. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA, TM_STRING_VIEW_SIZE
+   and TM_STRING_VIEW_MAKE.
+   Example:
+        #include <string_view>
+        #define TM_STRING_VIEW std::string_view
+        #define TM_STRING_VIEW_DATA(str) (str).data()
+        #define TM_STRING_VIEW_SIZE(str) ((tm_size_t)(str).size())
+        #define TM_STRING_VIEW_MAKE(data, size) std::string_view{(data), (size_t)(size)}
+*/
+#ifdef TM_STRING_VIEW
+    #if !defined(TM_STRING_VIEW_DATA) || !defined(TM_STRING_VIEW_SIZE) || !defined(TM_STRING_VIEW_MAKE)
+        #error Invalid TM_STRINV_VIEW. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA, \
+TM_STRING_VIEW_SIZE and TM_STRING_VIEW_MAKE.
+    #endif
+#endif
+
 /*
-Use the C++ string_view type if it is available. This will pull out any string_view returning function out of C-linkage,
-since they cannot be defined in C. If C interop is needed, #undef TM_STRING_VIEW before including this file, so both
-C and C++ use the same data types.
+Use the C++ string_view type if it is available. This will pull out any string_view returning function
+out of C-linkage, since they cannot be defined in C. If C interop is needed, #undef TM_STRING_VIEW before
+including this file, so both C and C++ use the same data types.
 */
 #if defined(TM_STRING_VIEW) && defined(__cplusplus)
     typedef TM_STRING_VIEW tmsu_string_view;
     #define TMSU_STRING_VIEW_DATA(x) TM_STRING_VIEW_DATA(x)
     #define TMSU_STRING_VIEW_SIZE(x) TM_STRING_VIEW_SIZE(x)
-    #define TMSU_STRING_VIEW_MAKE(str, size) TM_STRING_VIEW{(str), (size)}
+    #define TMSU_STRING_VIEW_MAKE(str, size) TM_STRING_VIEW_MAKE((str), (size))
 #else
     typedef struct {
         const char* data;
@@ -141,7 +158,7 @@ C and C++ use the same data types.
     } tmsu_string_view;
     #define TMSU_STRING_VIEW_DATA(x) (x).data
     #define TMSU_STRING_VIEW_SIZE(x) (x).size
-    #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, size)
+    #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, (tm_size_t)(size))
 #endif
 
 /* clang-format on */
@@ -196,10 +213,10 @@ TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* 
 TMSU_DEF const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
                                                 const char* find_str_last, const char* not_found);
 
-/* Ignores case for ascii characters. */
-TMSU_DEF const char* tmsu_find_char_ignore_case_n(const char* str_first, const char* str_last, char c);
-TMSU_DEF const char* tmsu_find_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                             const char* find_str_last);
+/* Ignores case for ansi characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi_n(const char* str_first, const char* str_last, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_ansi_n(const char* str_first, const char* str_last,
+                                                  const char* find_str_first, const char* find_str_last);
 
 /*
 Find functions that allow escaping of the character to look for. Useful for parsing.
@@ -213,9 +230,9 @@ TMSU_DEF const char* tmsu_find_first_of_unescaped_n(const char* str_first, const
                                                     const char* find_str_first, const char* find_str_last,
                                                     char escape_char);
 
-/* Ignores case for ascii characters. */
-TMSU_DEF const char* tmsu_find_char_ignore_case(const char* str, char c);
-TMSU_DEF const char* tmsu_find_ignore_case(const char* str, const char* find_str);
+/* Ignores case for ansi characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi(const char* str, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_ansi(const char* str, const char* find_str);
 
 typedef struct {
     const char* current;
@@ -256,19 +273,20 @@ TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
 
 /* Lexicographical comparisons. */
 TMSU_DEF int tmsu_compare(const char* a, const char* b);
-TMSU_DEF int tmsu_compare_ignore_case(const char* a, const char* b);
+TMSU_DEF int tmsu_compare_ignore_case_ansi(const char* a, const char* b);
 
 TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
-TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
-                                        const char* b_last);
+TMSU_DEF int tmsu_compare_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                             const char* b_last);
 
 /* String comparison for humans. See http://stereopsis.com/strcmp4humans.html. */
-TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+TMSU_DEF int tmsu_human_compare_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                       const char* b_last);
 
 /* Equality check, faster than lexicographical compare, since we can check lengths first. */
 TMSU_DEF tm_bool tmsu_equals_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
-TMSU_DEF tm_bool tmsu_equals_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
-                                           const char* b_last);
+TMSU_DEF tm_bool tmsu_equals_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                                const char* b_last);
 
 TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str);
 TMSU_DEF tm_bool tmsu_ends_with(const char* str, const char* find_str);
@@ -277,17 +295,17 @@ TMSU_DEF tm_bool tmsu_starts_with_n(const char* a_first, const char* a_last, con
 TMSU_DEF tm_bool tmsu_ends_with_n(const char* str_first, const char* str_last, const char* find_str_first,
                                   const char* find_str_last);
 
-TMSU_DEF tm_bool tmsu_starts_with_ignore_case(const char* str, const char* find_str);
-TMSU_DEF tm_bool tmsu_ends_with_ignore_case(const char* str, const char* find_str);
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi(const char* str, const char* find_str);
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi(const char* str, const char* find_str);
 
-TMSU_DEF tm_bool tmsu_starts_with_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
-                                                const char* b_last);
-TMSU_DEF tm_bool tmsu_ends_with_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                              const char* find_str_last);
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                                     const char* b_last);
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_n(const char* str_first, const char* str_last,
+                                                   const char* find_str_first, const char* find_str_last);
 
 /* Crt extensions, that are non standard and may not be provided. */
 
-/* Only checks chars from '0' to '9'. Assumes utf8 codepoint. */
+/* Only checks chars from '0' to '9'. */
 TMSU_DEF tm_bool tmsu_isdigit(unsigned c);
 
 TMSU_DEF const char* tmsu_stristr(const char* str, const char* find_str);
@@ -481,7 +499,7 @@ TMSU_DEF const char* tmsu_find_last_n_ex(const char* str_first, const char* str_
     TM_ASSERT(find_str_first <= find_str_last);
 
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
-    if (!find_str_len) return str_first;                                        /* Empty string always matches */
+    if (!find_str_len) return str_first;                                        /* Empty string always matches. */
     if (find_str_len > tmsu_distance_sz(str_first, str_last)) return not_found; /* Not enough room for a match. */
 
     /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
@@ -639,7 +657,7 @@ TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* 
 
 /* Case insensitive */
 
-TMSU_DEF const char* tmsu_find_char_ignore_case(const char* str, char c) {
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi(const char* str, char c) {
     char upper = (char)TM_TOUPPER(TMSU_C2I(c));
     char lower = (char)TM_TOLOWER(TMSU_C2I(c));
     if (upper == lower) {
@@ -647,13 +665,13 @@ TMSU_DEF const char* tmsu_find_char_ignore_case(const char* str, char c) {
     }
     return tmsu_find_char2(str, (char)upper, (char)lower);
 }
-TMSU_DEF const char* tmsu_find_ignore_case(const char* str, const char* find_str) {
+TMSU_DEF const char* tmsu_find_ignore_case_ansi(const char* str, const char* find_str) {
     TM_ASSERT(str);
     TM_ASSERT(find_str);
-    return tmsu_find_ignore_case_n(str, str + TM_STRLEN(str), find_str, find_str + TM_STRLEN(find_str));
+    return tmsu_find_ignore_case_ansi_n(str, str + TM_STRLEN(str), find_str, find_str + TM_STRLEN(find_str));
 }
 
-TMSU_DEF const char* tmsu_find_char_ignore_case_n(const char* str_first, const char* str_last, char c) {
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi_n(const char* str_first, const char* str_last, char c) {
     TM_ASSERT(str_first <= str_last);
 
     size_t len = tmsu_distance_sz(str_first, str_last);
@@ -666,20 +684,20 @@ TMSU_DEF const char* tmsu_find_char_ignore_case_n(const char* str_first, const c
     }
     return tmsu_find_char2_n(str_first, str_last, upper, lower);
 }
-TMSU_DEF const char* tmsu_find_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                             const char* find_str_last) {
+TMSU_DEF const char* tmsu_find_ignore_case_ansi_n(const char* str_first, const char* str_last,
+                                                  const char* find_str_first, const char* find_str_last) {
     TM_ASSERT(str_first <= str_last);
     TM_ASSERT(find_str_first <= find_str_last);
 
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
-    if (!find_str_len) return str_first;                                       /* Empty string always matches */
+    if (!find_str_len) return str_first;                                       /* Empty string always matches. */
     if (find_str_len > tmsu_distance_sz(str_first, str_last)) return str_last; /* Not enough room for a match. */
 
     /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
     str_last -= find_str_len;
     const char* cur = str_first;
-    while ((cur = tmsu_find_char_ignore_case_n(cur, str_last, *find_str_first)) != str_last) {
-        if (tmsu_compare_ignore_case_n(cur, cur + find_str_len, find_str_first, find_str_last) == 0) {
+    while ((cur = tmsu_find_char_ignore_case_ansi_n(cur, str_last, *find_str_first)) != str_last) {
+        if (tmsu_compare_ignore_case_ansi_n(cur, cur + find_str_len, find_str_first, find_str_last) == 0) {
             return cur;
         }
         ++cur;
@@ -876,7 +894,7 @@ TMSU_DEF int tmsu_compare(const char* a, const char* b) {
     return *b - *a;
 #endif
 }
-TMSU_DEF int tmsu_compare_ignore_case(const char* a, const char* b) {
+TMSU_DEF int tmsu_compare_ignore_case_ansi(const char* a, const char* b) {
     TM_ASSERT(a);
     TM_ASSERT(b);
 #ifdef TM_STRICMP
@@ -904,7 +922,7 @@ TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char*
     }
 
     size_t len = (a_len < b_len) ? a_len : b_len;
-    if(len) {
+    if (len) {
         int common_cmp = TM_MEMCMP(a_first, b_first, len);
         if (common_cmp != 0) return common_cmp;
     }
@@ -913,8 +931,8 @@ TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char*
     if (a_len < b_len) return -1;
     return 0;
 }
-TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
-                                        const char* b_last) {
+TMSU_DEF int tmsu_compare_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                             const char* b_last) {
     TM_ASSERT(a_first <= a_last);
     TM_ASSERT(b_first <= b_last);
 
@@ -960,7 +978,8 @@ static int tmsu_human_parse_and_advance(const char** str, const char* last) {
     return result + 256;
 }
 
-TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last) {
+TMSU_DEF int tmsu_human_compare_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                       const char* b_last) {
     TM_ASSERT(a_first <= a_last);
     TM_ASSERT(b_first <= b_last);
 
@@ -991,8 +1010,8 @@ TMSU_DEF tm_bool tmsu_equals_n(const char* a_first, const char* a_last, const ch
     if (a_len != b_len) return TM_FALSE;
     return TM_MEMCMP(a_first, b_first, a_len) == 0;
 }
-TMSU_DEF tm_bool tmsu_equals_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
-                                           const char* b_last) {
+TMSU_DEF tm_bool tmsu_equals_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                                const char* b_last) {
     size_t a_len = tmsu_distance_sz(a_first, a_last);
     size_t b_len = tmsu_distance_sz(b_first, b_last);
     if (a_len != b_len) return TM_FALSE;
@@ -1042,22 +1061,22 @@ TMSU_DEF tm_bool tmsu_ends_with_n(const char* str_first, const char* str_last, c
     return TM_MEMCMP(start, find_str_first, find_str_len) == 0;
 }
 
-TMSU_DEF tm_bool tmsu_starts_with_ignore_case(const char* str, const char* find_str) {
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi(const char* str, const char* find_str) {
     TM_ASSERT(str);
     TM_ASSERT(find_str);
 
     size_t find_str_len = TM_STRLEN(find_str);
     return tmsu_strnicmp(str, find_str, find_str_len) == 0;
 }
-TMSU_DEF tm_bool tmsu_ends_with_ignore_case(const char* str, const char* find_str) {
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi(const char* str, const char* find_str) {
     TM_ASSERT(str);
     TM_ASSERT(find_str);
 
-    return tmsu_ends_with_ignore_case_n(str, str + TM_STRLEN(str), find_str, find_str + TM_STRLEN(find_str));
+    return tmsu_ends_with_ignore_case_ansi_n(str, str + TM_STRLEN(str), find_str, find_str + TM_STRLEN(find_str));
 }
 
-TMSU_DEF tm_bool tmsu_starts_with_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                                const char* find_str_last) {
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_n(const char* str_first, const char* str_last,
+                                                     const char* find_str_first, const char* find_str_last) {
     TM_ASSERT(str_first <= str_last);
     TM_ASSERT(find_str_first <= find_str_last);
 
@@ -1065,10 +1084,10 @@ TMSU_DEF tm_bool tmsu_starts_with_ignore_case_n(const char* str_first, const cha
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
     if (str_len < find_str_len) return TM_FALSE;
 
-    return tmsu_compare_ignore_case_n(str_first, str_first + find_str_len, find_str_first, find_str_last) == 0;
+    return tmsu_compare_ignore_case_ansi_n(str_first, str_first + find_str_len, find_str_first, find_str_last) == 0;
 }
-TMSU_DEF tm_bool tmsu_ends_with_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                              const char* find_str_last) {
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_n(const char* str_first, const char* str_last,
+                                                   const char* find_str_first, const char* find_str_last) {
     TM_ASSERT(str_first <= str_last);
     TM_ASSERT(find_str_first <= find_str_last);
 
@@ -1077,7 +1096,7 @@ TMSU_DEF tm_bool tmsu_ends_with_ignore_case_n(const char* str_first, const char*
     if (str_len < find_str_len) return TM_FALSE;
 
     const char* start = str_last - find_str_len;
-    return tmsu_compare_ignore_case_n(start, str_last, find_str_first, find_str_last) == 0;
+    return tmsu_compare_ignore_case_ansi_n(start, str_last, find_str_first, find_str_last) == 0;
 }
 
 /* Crt extensions */
@@ -1085,7 +1104,7 @@ TMSU_DEF tm_bool tmsu_ends_with_ignore_case_n(const char* str_first, const char*
 TMSU_DEF tm_bool tmsu_isdigit(unsigned c) { return c >= '0' && c <= '9'; }
 
 TMSU_DEF const char* tmsu_stristr(const char* str, const char* find_str) {
-    return tmsu_find_ignore_case(str, find_str);
+    return tmsu_find_ignore_case_ansi(str, find_str);
 }
 TMSU_DEF int tmsu_stricmp(const char* a, const char* b) {
     while (*a && *b) {
@@ -1178,8 +1197,8 @@ const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_la
                                        const char* not_found) {
     return tmsu_find_last_not_of_n_ex(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str), not_found);
 }
-const char* tmsu_find_ignore_case_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
-    return tmsu_find_ignore_case_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
+const char* tmsu_find_ignore_case_ansi_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
+    return tmsu_find_ignore_case_ansi_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
 }
 const char* tmsu_find_first_of_unescaped_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
                                            char escape_char) {
@@ -1191,37 +1210,37 @@ TM_STRING_VIEW tmsu_trim_left(TM_STRING_VIEW str) {
     const char* first = TMSU_SV_BEGIN(str);
     const char* last = TMSU_SV_END(str);
     first = tmsu_trim_left_n(first, last);
-    return TM_STRING_VIEW{first, tmsu_distance(first, last)};
+    return TM_STRING_VIEW_MAKE(first, tmsu_distance_sz(first, last));
 }
 TM_STRING_VIEW tmsu_trim_right(TM_STRING_VIEW str) {
     const char* first = TMSU_SV_BEGIN(str);
     const char* last = TMSU_SV_END(str);
     last = tmsu_trim_right_n(first, last);
-    return TM_STRING_VIEW{first, tmsu_distance(first, last)};
+    return TM_STRING_VIEW_MAKE(first, tmsu_distance_sz(first, last));
 }
 TM_STRING_VIEW tmsu_trim(TM_STRING_VIEW str) {
     const char* first = TMSU_SV_BEGIN(str);
     const char* last = TMSU_SV_END(str);
     first = tmsu_trim_left_n(first, last);
     last = tmsu_trim_right_n(first, last);
-    return TM_STRING_VIEW{first, tmsu_distance(first, last)};
+    return TM_STRING_VIEW_MAKE(first, tmsu_distance_sz(first, last));
 }
 
 int tmsu_compare(TM_STRING_VIEW a, TM_STRING_VIEW b) {
     return tmsu_compare_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
 }
-int tmsu_compare_ignore_case(TM_STRING_VIEW a, TM_STRING_VIEW b) {
-    return tmsu_compare_ignore_case_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
+int tmsu_compare_ignore_case_ansi(TM_STRING_VIEW a, TM_STRING_VIEW b) {
+    return tmsu_compare_ignore_case_ansi_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
 }
-int tmsu_human_compare(TM_STRING_VIEW a, TM_STRING_VIEW b) {
-    return tmsu_human_compare_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
+int tmsu_human_compare_ansi(TM_STRING_VIEW a, TM_STRING_VIEW b) {
+    return tmsu_human_compare_ansi_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
 }
 
 tm_bool tmsu_equals(TM_STRING_VIEW a, TM_STRING_VIEW b) {
     return tmsu_equals_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
 }
-tm_bool tmsu_equals_ignore_case(TM_STRING_VIEW a, TM_STRING_VIEW b) {
-    return tmsu_equals_ignore_case_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
+tm_bool tmsu_equals_ignore_case_ansi(TM_STRING_VIEW a, TM_STRING_VIEW b) {
+    return tmsu_equals_ignore_case_ansi_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
 }
 
 tm_bool tmsu_starts_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
@@ -1230,14 +1249,14 @@ tm_bool tmsu_starts_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
 tm_bool tmsu_ends_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
     return tmsu_ends_with_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
 }
-tm_bool tmsu_starts_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
-    return tmsu_starts_with_ignore_case_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str),
-                                          TMSU_SV_END(find_str));
+tm_bool tmsu_starts_with_ignore_case_ansi(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
+    return tmsu_starts_with_ignore_case_ansi_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str),
+                                                TMSU_SV_END(find_str));
 }
 
-tm_bool tmsu_ends_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
-    return tmsu_ends_with_ignore_case_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str),
-                                        TMSU_SV_END(find_str));
+tm_bool tmsu_ends_with_ignore_case_ansi(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
+    return tmsu_ends_with_ignore_case_ansi_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str),
+                                              TMSU_SV_END(find_str));
 }
 
 tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, TM_STRING_VIEW find_str, tmsu_string_view* out) {

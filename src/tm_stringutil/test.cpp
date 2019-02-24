@@ -5,6 +5,7 @@ using std::string_view;
 #define TM_STRING_VIEW string_view
 #define TM_STRING_VIEW_DATA(str) (str).data()
 #define TM_STRING_VIEW_SIZE(str) ((tm_size_t)(str).size())
+#define TM_STRING_VIEW_MAKE(data, size) string_view{data, (size_t)(size)}
 #endif
 
 #define TM_STRINGUTIL_IMPLEMENTATION

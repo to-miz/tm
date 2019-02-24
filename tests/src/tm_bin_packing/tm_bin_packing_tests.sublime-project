@@ -15,7 +15,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_bin_packing-tests",
+			"cmd": "make tests.tm_bin_packing",
 
 			"windows": {
 				"shell": false,
@@ -33,16 +33,12 @@
 
 			"variants": [
 				{
-					"name": "C build",
-					"cmd": "make tm_bin_packing-c-build"
+					"name": "build tests.tm_bin_packing.c",
+					"cmd": "make tests.tm_bin_packing.c"
 				},
 				{
 					"name": "run tests",
-					"cmd": "make tm_bin_packing-run-tests"
-				},
-				{
-					"name": "run tests (default config only)",
-					"cmd": "make tm_bin_packing-run-tests-default"
+					"cmd": "make tests.tm_bin_packing.run"
 				}
 			]
 		}

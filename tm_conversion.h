@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.9.5 - public domain - https://github.com/to-miz/tm
+tm_conversion.h v0.9.9.6 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -63,23 +63,14 @@ SWITCHES
         TM_STRING_VIEW:
             Define this if you have some sort of string_view class and want overloads of the
             conversion functions for it.
-            Needs TMC_CPP_OVERLOADS, TM_STRING_VIEW_DATA( x ) and TM_STRING_VIEW_SIZE( x ) to be
-            defined to work.
-            Define TMC_STRING_VIEW_NO_CONSTRUCTOR if your stringview can't be constructed from
-            a nullterminated string.
+            Needs TMC_CPP_OVERLOADS, TM_STRING_VIEW_DATA(x), TM_STRING_VIEW_SIZE(x) and
+            TM_STRING_VIEW_MAKE(data, size) to be defined to work.
             Example:
-                // assume we have a string_view class/struct like this: (simplified)
-                struct string_view {
-                    const char* ptr;
-                    size_t sz;
-                    size_t data() { return ptr; }
-                    size_t size() { return sz; }
-                };
-                // then define these so that this library can work with your string_view class
-                #define TMC_CPP_OVERLOADS
-                #define TM_STRING_VIEW string_view
-                #define TM_STRING_VIEW_DATA( str ) ( str ).data()
-                #define TM_STRING_VIEW_SIZE( str ) ( str ).size()
+                #include <string_view>
+                #define TM_STRING_VIEW std::string_view
+                #define TM_STRING_VIEW_DATA(str) (str).data()
+                #define TM_STRING_VIEW_SIZE(str) (str).size()
+                #define TM_STRING_VIEW_MAKE(data, size) std::string_view{(data), (size_t)(size)}
         TMC_CLAMP_ON_RANGE_ERROR
             If defined to 1 output values of scan will be clamped to nearest max/min value when a
             range error is occured. Otherwise output values are untouched.
@@ -105,59 +96,60 @@ ISSUES
     - print_double, print_float need 64 bit arithmetic
 
 HISTORY
-    v0.9.9.5   06.10.18 fixed compilation errors when TMC_CPP_OVERLOADS is defined
-    v0.9.9.4   05.10.18 added shortest flag for floating points
-    v0.9.9.3   24.09.18 removed tm_bool32
-                        removed print format structure
-                        simplified signature of scan and print functions
-                        removed some formatting features that complicated printing functions
-                                                removed complicated base deduction from scanning functions
-                                                removed prefix detection from scanning functions
-                                                removed strnrev dependency
-                        exhaustive testing
-    v0.9.9.2   09.09.18 refactored and simplified preprocessor directives
-                        support for compilation to dynamic library
-    v0.9.9.1e  26.08.18 fixed C99 compilation
-    v0.9.9.1d  25.08.18 added repository link
-    v0.9.9.1c  19.08.18 added TMC_CPP_NO_DEFAULT_FUNCTION_ARGUMENTS and changed some function signatures
-    v0.9.9.1b  13.08.18 documentation changes, added PF_FIXED
-    v0.9.9.1a  13.08.18 typos
-    v0.9.9.1   12.08.18 many small bug fixes and formatting fixes
-                        implemented proper width padding support
-                        some refactoring of underlying code
-    v0.9.9b    11.08.18 removed TMC_CONVENIENCE and TMC_CPP_TEMPLATED, too much boilerplate
-                        moved TMC_CPP_OVERLOADS into own namespace tmc
-                        fixed scan_bool and print_bool not being available in C builds
-    v0.9.9a    10.08.18 changed interface of all conversion functions to return an additional error code
-    v0.9.8.2   22.07.18 fixed C99 compilation
-    v0.9.8.1   22.07.18 changed formatting
-                        fixed some warnings on gcc regarding -Wtype-limits and -Wsign-compare
-    v0.9.8     18.02.17 fixed a bug in print_hex_u32 and print_hex_u64 not being able to print 0
-    v0.9.7     18.01.17 added some more utility overloads
-    v0.9.6a    10.01.17 minor change from static const char* to static const char* const in print_bool
-    v0.9.6     07.11.16 increased print_double max precision from 9 to 14
-    v0.9.5     23.10.16 fixed a buffer underflow bug in print_hex_* and prind_decimal_*
-    v0.9.4c    08.10.16 fixed a buffer underflow bug in print_hex_u*_impl
-    v0.9.4b    07.10.16 typos
-    v0.9.4a    29.09.16 made PrintFormat forward declarable
-    v0.9.4     24.09.16 optimized base 10 and base 16 conversion paths based on the talk
+    v0.9.9.6   14.01.19 Improved TM_STRING_VIEW and tm_errc support.
+    v0.9.9.5   06.10.18 Fixed compilation errors when TMC_CPP_OVERLOADS is defined.
+    v0.9.9.4   05.10.18 Added shortest flag for floating points.
+    v0.9.9.3   24.09.18 Removed tm_bool32.
+                        Removed print format structure.
+                        Simplified signature of scan and print functions.
+                        Removed some formatting features that complicated printing functions.
+                        Removed complicated base deduction from scanning functions.
+                        Removed prefix detection from scanning functions.
+                        Removed strnrev dependency.
+                        Exhaustive testing.
+    v0.9.9.2   09.09.18 Refactored and simplified preprocessor directives.
+                        Support for compilation to dynamic library.
+    v0.9.9.1e  26.08.18 Fixed C99 compilation.
+    v0.9.9.1d  25.08.18 Added repository link.
+    v0.9.9.1c  19.08.18 Added TMC_CPP_NO_DEFAULT_FUNCTION_ARGUMENTS and changed some function signatures.
+    v0.9.9.1b  13.08.18 Documentation changes, added PF_FIXED.
+    v0.9.9.1a  13.08.18 Typos.
+    v0.9.9.1   12.08.18 Many small bug fixes and formatting fixes.
+                        Implemented proper width padding support.
+                        Some refactoring of underlying code.
+    v0.9.9b    11.08.18 Removed TMC_CONVENIENCE and TMC_CPP_TEMPLATED, too much boilerplate.
+                        Moved TMC_CPP_OVERLOADS into own namespace tmc.
+                        Fixed scan_bool and print_bool not being available in C builds.
+    v0.9.9a    10.08.18 Changed interface of all conversion functions to return an additional error code.
+    v0.9.8.2   22.07.18 Fixed C99 compilation.
+    v0.9.8.1   22.07.18 Changed formatting.
+                        Fixed some warnings on gcc regarding -Wtype-limits and -Wsign-compare.
+    v0.9.8     18.02.17 Fixed a bug in print_hex_u32 and print_hex_u64 not being able to print 0.
+    v0.9.7     18.01.17 Added some more utility overloads.
+    v0.9.6a    10.01.17 Minor change from static const char* to static const char* const in print_bool.
+    v0.9.6     07.11.16 Increased print_double max precision from 9 to 14.
+    v0.9.5     23.10.16 Fixed a buffer underflow bug in print_hex_* and prind_decimal_*.
+    v0.9.4c    08.10.16 Fixed a buffer underflow bug in print_hex_u*_impl.
+    v0.9.4b    07.10.16 Typos.
+    v0.9.4a    29.09.16 Made PrintFormat forward declarable.
+    v0.9.4     24.09.16 Optimized base 10 and base 16 conversion paths based on the talk
                         "Three Optimization Tips for C++" by Andrei Alexandrescu.
-                        added print_decimal_* and print_hex_* functions.
-                        renamed PF_PADDING_ZEROES to PF_TRAILING_ZEROES
-                        fixed a bug in print_bool where it would print the wrong string if bool was
-                        printed as "true"/"false" and outputted a nullterminator
-    v0.9.3     30.08.16 added TMC_CPP_OVERLOADS and cpp overloads of functions
-                        added TM_STRING_VIEW for string view support of functions
-                        added TMC_CONVENIENCE and convenience functions
-                        added TMC_CPP_TEMPLATED
-                        fixed compile error when using tm_strnrev
-                        added PURPOSE, WHY, SWITCHES, EXAMPLES
-    v0.9.2     07.08.16 fixed a bug in print_double not being able to print 10 (magnitude calculation
-                        was wrong)
-                        fixed a bug in print_double rounding wrong for 0.99 and precision 1
-    v0.9.1     10.07.16 strncasecmp to strnicmp & print_Reverse to tm_strnrev
-    v0.9a      01.07.16 improved C99 conformity
-    v0.9       23.06.16 initial commit
+                        Added print_decimal_* and print_hex_* functions.
+                        Renamed PF_PADDING_ZEROES to PF_TRAILING_ZEROES.
+                        Fixed a bug in print_bool where it would print the wrong string if bool was.
+                        Printed as "true"/"false" and outputted a nullterminator.
+    v0.9.3     30.08.16 Added TMC_CPP_OVERLOADS and cpp overloads of functions.
+                        Added TM_STRING_VIEW for string view support of functions.
+                        Added TMC_CONVENIENCE and convenience functions.
+                        Added TMC_CPP_TEMPLATED.
+                        Fixed compile error when using tm_strnrev.
+                        Added PURPOSE, WHY, SWITCHES, EXAMPLES.
+    v0.9.2     07.08.16 Fixed a bug in print_double not being able to print 10 (magnitude calculation
+                        was wrong).
+                        Fixed a bug in print_double rounding wrong for 0.99 and precision 1.
+    v0.9.1     10.07.16 Renamed strncasecmp to strnicmp & print_Reverse to tm_strnrev.
+    v0.9a      01.07.16 Improved C99 conformity.
+    v0.9       23.06.16 Initial commit.
 */
 
 /*
@@ -296,6 +288,7 @@ struct string_view {
 #define TM_STRING_VIEW string_view
 #define TM_STRING_VIEW_DATA(str) (str).data()
 #define TM_STRING_VIEW_SIZE(str) (str).size()
+#define TM_STRING_VIEW_MAKE(data, size) string_view((data), (size))
 #include <tm_conversion.h>
 
 #include <cstdio>
@@ -355,7 +348,7 @@ int main() {
 #ifndef _TM_CONVERSION_H_INCLUDED_
 #define _TM_CONVERSION_H_INCLUDED_
 
-#define TMC_VERSION 0x00090905u
+#define TMC_VERSION 0x00090906u
 
 /* Fixed width ints. Include C version so identifiers are in global namespace. */
 #include <stdint.h>
@@ -394,25 +387,39 @@ int main() {
 #ifndef TM_ERRC_DEFINED
     #define TM_ERRC_DEFINED
     enum TM_ERRC_CODES {
-        TM_OK        = 0,   /* same as std::errc() */
-        TM_EOVERFLOW = 75,  /* same as std::errc::value_too_large */
-        TM_ERANGE    = 34,  /* same as std::errc::result_out_of_range */
-        TM_EINVAL    = 22,  /* same as std::errc::invalid_argument */
-    TM_ENOMEM    = 12,  /* same as std::errc::not_enough_memory */
+        TM_OK           = 0,   /* same as std::errc() */
+        TM_ENOENT       = 2,   /* same as std::errc::no_such_file_or_directory */
+        TM_EIO          = 5,   /* same as std::errc::io_error */
+        TM_ENOMEM       = 12,  /* same as std::errc::not_enough_memory */
+        TM_EACCES       = 13,  /* same as std::errc::permission_denied */
+        TM_EBUSY        = 16,  /* same as std::errc::device_or_resource_busy */
+        TM_EEXIST       = 17,  /* same as std::errc::file_exists */
+        TM_EEXDEV       = 18,  /* same as std::errc::cross_device_link */
+        TM_ENODEV       = 19,  /* same as std::errc::no_such_device */
+        TM_EINVAL       = 22,  /* same as std::errc::invalid_argument */
+        TM_EFBIG        = 27,  /* same as std::errc::file_too_large */
+        TM_ENOSPC       = 28,  /* same as std::errc::no_space_on_device */
+        TM_ERANGE       = 34,  /* same as std::errc::result_out_of_range */
+        TM_ENAMETOOLONG = 36,  /* same as std::errc::filename_too_long */
+        TM_ENOTEMPTY    = 39,  /* same as std::errc::directory_not_empty */
+        TM_EOVERFLOW    = 75,  /* same as std::errc::value_too_large */
     };
     typedef int tm_errc;
 #endif
 
-/* C++ string_view support. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA and TM_STRING_VIEW_SIZE.
+/* C++ string_view support. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA, TM_STRING_VIEW_SIZE
+   and TM_STRING_VIEW_MAKE.
    Example:
         #include <string_view>
         #define TM_STRING_VIEW std::string_view
         #define TM_STRING_VIEW_DATA(str) (str).data()
-        #define TM_STRING_VIEW_SIZE(str) (str).size()
+        #define TM_STRING_VIEW_SIZE(str) ((tm_size_t)(str).size())
+        #define TM_STRING_VIEW_MAKE(data, size) std::string_view{(data), (size_t)(size)}
 */
 #ifdef TM_STRING_VIEW
-    #if !defined(TM_STRING_VIEW_DATA) || !defined(TM_STRING_VIEW_SIZE)
-        #error Invalid TM_STRINV_VIEW. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA and TM_STRING_VIEW_SIZE.
+    #if !defined(TM_STRING_VIEW_DATA) || !defined(TM_STRING_VIEW_SIZE) || !defined(TM_STRING_VIEW_MAKE)
+        #error Invalid TM_STRINV_VIEW. If TM_STRING_VIEW is defined, so must be TM_STRING_VIEW_DATA, \
+TM_STRING_VIEW_SIZE and TM_STRING_VIEW_MAKE.
     #endif
 #endif
 
@@ -445,7 +452,9 @@ typedef struct tmc_conv_result_struct {
 /* Helpers to combine two tmc_conv_results */
 static inline tm_errc tmc_combine_errc(tm_errc a, tm_errc b) { return (a == TM_OK) ? b : a; }
 static inline tmc_conv_result tmc_combine_conv_results(tmc_conv_result a, tmc_conv_result b) {
-    tmc_conv_result result = {a.size + b.size, (a.ec == TM_OK) ? b.ec : a.ec};
+    tmc_conv_result result;
+    result.size = a.size + b.size;
+    result.ec = (a.ec == TM_OK) ? b.ec : a.ec;
     return result;
 }
 /* Helper to print strings that returns error codes when trying to print more than maxlen */
@@ -748,6 +757,14 @@ inline tmc_conv_result tmc::scan(TM_STRING_VIEW str, bool* out) {
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#if defined(_MSC_VER) && !defined(__cplusplus)
+    /* Disable warning C4204: nonstandard extension used: non-constant aggregate initializer.
+       Non-constant aggregate initializers are standard C99, which MSVC doesn't support directly
+       so we make use of this extension. */
+    #pragma warning(push)
+    #pragma warning(disable: 4204)
 #endif
 
 #define TMC_CHAR_TO_INT(x) ((int32_t)((uint8_t)x))
@@ -2638,6 +2655,10 @@ TMC_DEF tmc_conv_result print_double(char* dest, tm_size_t maxlen, double value,
 tmc_conv_result print_float(char* dest, tm_size_t maxlen, float value, uint32_t flags, int32_t precision) {
     return print_double(dest, maxlen, (double)value, flags, precision);
 }
+
+#if defined(_MSC_VER) && !defined(__cplusplus)
+#pragma warning(pop)
+#endif
 
 #ifdef __cplusplus
 }

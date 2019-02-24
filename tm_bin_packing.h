@@ -1,5 +1,5 @@
 /*
-tm_bin_packing.h v1.0.6 - public domain - https://github.com/to-miz/tm
+tm_bin_packing.h v1.0.7 - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -103,7 +103,7 @@ SAMPLES
     Writing your own insertion function for specific heuristics depending on your use case:
         BinPackResult myBinPackInsert(BinPack* pack, int width, int height) {
             // Inserts using GUILLOTINE-BSSF-MINAS with flipping allowed.
-            BinPackResult ret = {{0}};
+            BinPackResult ret = {0};
             GuillotineHeuristicResult result = guillotineBestShortSideFit(pack, width, height);
             if (guillotineHeuristicIsValidResult(result.score)) {
                 ret = guillotineInsert(pack, width, height, &result, GuillotineSplitMinimizeArea);
@@ -115,7 +115,7 @@ SAMPLES
 
         BinPackResult myOtherBinPackInsert(BinPack* pack, int width, int height) {
             // inserts using MAXRECTS-BSSF with flipping allowed
-            BinPackResult ret = {{0}};
+            BinPackResult ret = {0};
             MaxRectsHeuristicResult result = maxRectsBestShortSideFit(pack, width, height);
             if (maxRectsHeuristicIsValidResult(result.scores)) {
                 ret = maxRectsInsert(pack, width, height, &result);
@@ -125,7 +125,7 @@ SAMPLES
 
         BinPackResult myStaticInsert(BinPack* pack, int width, int height) {
             // Pack is a non resizable bin pack such that it has an upper limit on how many bins can be inserted.
-            BinPackResult ret = {{0}};
+            BinPackResult ret = {0};
             if (binPackHasSpace(pack)) {
                 GuillotineHeuristicResult result = guillotineBestShortSideFit(pack, width, height);
                 if (guillotineHeuristicIsValidResult(result.score)) {
@@ -194,24 +194,25 @@ SAMPLES
         }
 
 HISTORY
-    v1.0.6  06.10.18 formatting change
-                     added TMBP_VERSION
-                     changed some definitions to use common macros instead
-                     fixed some C99 compilation warnings
-    v1.0.5  28.05.17 added binPackReset
-    v1.0.4a 28.08.18 added repository link
-    v1.0.4  28.05.17 changed how the allocator works
-                     added binPackCreateEx
-    v1.0.3a 27.05.17 fixed a minor signed/unsigned mismatch
-    v1.0.3  16.05.17 changed formatting and growing factor of the allocator (1.5 from 2)
-                     added binPackClear
-    v1.0.2  31.03.17 fixed a bug in maxRectsInsert resulting in too many splits
-    v1.0.1b 29.03.17 changed documentation, fixed a typo, changed allocator functions signature
-    v1.0.1a 07.11.16 added TM_NULL
-    v1.0.1  11.10.16 fixed a bug in batch insertion functions using the wrong index
-    v1.0b   09.10.16 fixed a typo
-    v1.0a   07.10.16 removed using forced unsigned arithmetic when tm_size_t is signed
-    v1.0    20.07.16 initial commit
+    v1.0.7  15.01.19 Fixed some gcc and clang warnings.
+    v1.0.6  06.10.18 Formatting change.
+                     Added TMBP_VERSION.
+                     Changed some definitions to use common macros instead.
+                     Fixed some C99 compilation warnings.
+    v1.0.5  28.05.17 Added binPackReset.
+    v1.0.4a 28.08.18 Added repository link.
+    v1.0.4  28.05.17 Changed how the allocator works.
+                     Added binPackCreateEx.
+    v1.0.3a 27.05.17 Fixed a minor signed/unsigned mismatch.
+    v1.0.3  16.05.17 Changed formatting and growing factor of the allocator (1.5 from 2).
+                     Added binPackClear.
+    v1.0.2  31.03.17 Fixed a bug in maxRectsInsert resulting in too many splits.
+    v1.0.1b 29.03.17 Changed documentation, fixed a typo, changed allocator functions signature.
+    v1.0.1a 07.11.16 Added TM_NULL.
+    v1.0.1  11.10.16 Fixed a bug in batch insertion functions using the wrong index.
+    v1.0b   09.10.16 Fixed a typo.
+    v1.0a   07.10.16 Removed using forced unsigned arithmetic when tm_size_t is signed.
+    v1.0    20.07.16 Initial commit.
 */
 
 /* clang-format off */
@@ -227,7 +228,7 @@ HISTORY
 #ifndef _TM_BIN_PACKING_H_INCLUDED_
 #define _TM_BIN_PACKING_H_INCLUDED_
 
-#define TMBP_VERSION 0x01000600u
+#define TMBP_VERSION 0x01000700u
 
 #include <stdint.h>
 
@@ -539,6 +540,15 @@ inline tm_size_t maxRectsFreeRectsSize(tm_size_t binCount) { return binCount * 5
 
 #ifdef TM_BIN_PACKING_IMPLEMENTATION
 
+#ifndef TM_ASSERT_VALID_SIZE
+    #if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
+        #define TM_ASSERT_VALID_SIZE(x) TM_ASSERT((x) >= 0)
+    #else
+        /* always true if size_t is unsigned */
+        #define TM_ASSERT_VALID_SIZE(x) ((void)0)
+    #endif
+#endif /* !defined(TM_ASSERT_VALID_SIZE) */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -546,8 +556,8 @@ extern "C" {
 static tmbp_rect* tmbp_push(tmbp_rect_array* array, BinPackAllocator* allocator) {
     TM_ASSERT(array);
     TM_ASSERT(array->data);
-    TM_ASSERT(array->size >= 0);
-    TM_ASSERT(array->capacity >= 0);
+    TM_ASSERT_VALID_SIZE(array->size);
+    TM_ASSERT_VALID_SIZE(array->capacity);
     if (array->size >= array->capacity) {
         if (allocator->reallocateFunc) {
             tm_size_t newSize = (tm_size_t)((array->capacity + 1) * 1.5);
@@ -573,7 +583,8 @@ static void tmbp_unstable_erase(tmbp_rect_array* array, tm_size_t index) {
     TM_ASSERT(array->data);
     TM_ASSERT(array->size > 0);
     TM_ASSERT(array->size <= array->capacity);
-    TM_ASSERT(index >= 0 && index < array->size);
+    TM_ASSERT_VALID_SIZE(index);
+    TM_ASSERT(index < array->size);
     /* we assign entry at index to the last element and decrement size
       relative order of elements is not preserved, hence unstable */
     --array->size;
@@ -928,7 +939,7 @@ TMBP_DEF GuillotineHeuristicResult guillotineChoiceNoFlip(BinPack* pack, tmbp_in
 
 static tmbp_rect binPackRectFromPosition(BinPack* pack, tmbp_int width, tmbp_int height, tm_size_t index,
                                          tm_bool flipped) {
-    tmbp_rect rect = {0};
+    tmbp_rect rect = {0, 0, 0, 0};
     tmbp_rect* current = &pack->freeRects.data[index];
     rect.left = current->left;
     rect.top = current->top;
@@ -1008,7 +1019,7 @@ TMBP_DEF BinPackResult guillotineInsert(BinPack* pack, tmbp_int width, tmbp_int 
     TM_ASSERT(choice);
     TM_ASSERT(choice->score != TMBP_INVALID_SCORE);
 
-    BinPackResult ret;
+    BinPackResult ret = {{0, 0, 0, 0}, TM_FALSE, TM_FALSE};
     ret.rect = binPackRectFromPosition(pack, width, height, choice->freeRectIndex, choice->flipped);
     ret.flipped = choice->flipped;
     ret.placed = 1;
@@ -1022,7 +1033,7 @@ TMBP_DEF BinPackResult guillotineInsert(BinPack* pack, tmbp_int width, tmbp_int 
 TMBP_DEF BinPackResult guillotineInsertChoice(BinPack* pack, tmbp_int width, tmbp_int height,
                                               GuillotineFreeRectChoiceHeuristic freeChoice,
                                               GuillotineSplitHeuristic splitChoice, tm_bool canFlip) {
-    BinPackResult ret = {{0}};
+    BinPackResult ret = {{0, 0, 0, 0}, TM_FALSE, TM_FALSE};
     GuillotineHeuristicResult result;
     if (canFlip) {
         result = guillotineChoice(pack, width, height, freeChoice);
@@ -1038,7 +1049,7 @@ TMBP_DEF tm_size_t guillotineInsertBatch(BinPack* pack, BinPackBatchDim* dims, B
                                          tm_size_t count, GuillotineFreeRectChoiceHeuristic freeChoice,
                                          GuillotineSplitHeuristic splitChoice, tm_bool canFlip, tm_bool merge) {
     tm_size_t dimsCount = count;
-    GuillotineHeuristicResult best = {0};
+    GuillotineHeuristicResult best = {0, 0, TM_FALSE};
     while (dimsCount > 0) {
         best.score = TMBP_INVALID_SCORE;
         tm_size_t bestIndex = 0;
@@ -1156,7 +1167,7 @@ static tmbp_int maxRectsContactPointScore(BinPack* pack, tmbp_int left, tmbp_int
 }
 
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestShortSideFit(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1196,7 +1207,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestShortSideFit(BinPack* pack, tmbp_in
     return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBottomLeftRule(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1226,7 +1237,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBottomLeftRule(BinPack* pack, tmbp_int 
     return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestLongSideFit(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1266,7 +1277,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestLongSideFit(BinPack* pack, tmbp_int
     return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestAreaFit(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1304,7 +1315,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestAreaFit(BinPack* pack, tmbp_int wid
     return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsContactPointRule(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1369,7 +1380,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsChoice(BinPack* pack, tmbp_int width, t
 
 /* No flip variants. */
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestShortSideFitNoFlip(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1394,7 +1405,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestShortSideFitNoFlip(BinPack* pack, t
     return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBottomLeftRuleNoFlip(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1414,7 +1425,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBottomLeftRuleNoFlip(BinPack* pack, tmb
     return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestLongSideFitNoFlip(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1439,7 +1450,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestLongSideFitNoFlip(BinPack* pack, tm
     return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsBestAreaFitNoFlip(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1464,7 +1475,7 @@ TMBP_DEF MaxRectsHeuristicResult maxRectsBestAreaFitNoFlip(BinPack* pack, tmbp_i
     return result;
 }
 TMBP_DEF MaxRectsHeuristicResult maxRectsContactPointRuleNoFlip(BinPack* pack, tmbp_int width, tmbp_int height) {
-    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+    MaxRectsHeuristicResult result = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
 
     tmbp_rect* freeRects = pack->freeRects.data;
     tm_size_t freeRectsCount = pack->freeRects.size;
@@ -1611,7 +1622,7 @@ TMBP_DEF BinPackResult maxRectsInsert(BinPack* pack, tmbp_int width, tmbp_int he
 
 TMBP_DEF BinPackResult maxRectsInsertChoice(BinPack* pack, tmbp_int width, tmbp_int height,
                                             MaxRectsFreeRectChoiceHeuristic freeChoice, tm_bool canFlip) {
-    BinPackResult ret = {{0}};
+    BinPackResult ret = {{0, 0, 0, 0}, TM_FALSE, TM_FALSE};
     MaxRectsHeuristicResult result;
     if (canFlip) {
         result = maxRectsChoice(pack, width, height, freeChoice);
@@ -1629,7 +1640,7 @@ TMBP_DEF tm_size_t maxRectsInsertBatch(BinPack* pack, BinPackBatchDim* dims, Bin
                                        tm_size_t count, MaxRectsFreeRectChoiceHeuristic freeChoice, tm_bool canFlip) {
     tm_size_t dimsCount = count;
     while (dimsCount > 0) {
-        MaxRectsHeuristicResult best = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}};
+        MaxRectsHeuristicResult best = {0, {TMBP_INVALID_SCORE, TMBP_INVALID_SCORE}, TM_FALSE};
         tm_size_t bestIndex = 0;
         for (tm_size_t i = 0; i < dimsCount; ++i) {
             MaxRectsHeuristicResult result;

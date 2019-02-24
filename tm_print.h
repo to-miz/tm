@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.9 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.10 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,36 +19,37 @@ ISSUES
     current locale.
 
 HISTORY
-    v0.0.9  02.11.18 moved the fixed size array inside PrintArgList into the variadic template functions
-                     so its size can be deduced from the number of arguments
-    v0.0.8  06.10.18 refactored some common macro blocks into include files
-                     fixed compilation error when TM_STRING_VIEW is defined
-                     added TMP_DEFAULT_FLAGS
-    v0.0.7  02.10.18 refactored into multiple files that get merged
-                     added multiple backends for int and float printing
-                     added a couple more formatting options like o, a and c
-    v0.0.6  25.09.18 reworked many printing functions because of breaking changes to tm_conversion
-    v0.0.5  01.09.18 added MIT license option
-                     refactored fillPrintArgList to not be dependend on preprocessor switches
-                     removed fprinter
-                     tmp_memory_printer can now grow and can use small buffer optimization
-                     removed dependency on fprintf
-    v0.0.4e 25.08.18 added repository link
-    v0.0.4d 10.01.17 minor change from static const char* to static const char* const in print_bool
-    v0.0.4c 23.10.16 added some assertions for bounds checking
-    v0.0.4b 07.10.16 fixed some casting issues when tm_size_t is signed
-    v0.0.4a 29.09.16 fixed a bug where inputting an escaped {{ was resulting in an infinite loop
-    v0.0.4  29.09.16 added signed/unsigned char, short and long handling
-                     fixed compiler errors when compiling with clang
-    v0.0.3  27.09.16 added printing custom types by overloading snprint
-                     added initialFormatting parameter to snprint so that custom printing can
-                     inherit formatting options
-    v0.0.2  26.09.16 changed makeFlags to tmp_type_flags so that it is guaranteed to be a
-                     compile time constant
-                     added string view overloads so that print can accept a string view as the
-                     format parameter
-                     fixed some compiler warnings when tm_size_t is defined as int
-    v0.0.1  24.09.16 initial commit
+    v0.0.10 14.01.19 Fixed msvc compilation errors in most conforming mode with all extensions disabled.
+    v0.0.9  02.11.18 Moved the fixed size array inside PrintArgList into the variadic template functions
+                     so its size can be deduced from the number of arguments.
+    v0.0.8  06.10.18 Refactored some common macro blocks into include files.
+                     Fixed compilation error when TM_STRING_VIEW is defined.
+                     Added TMP_DEFAULT_FLAGS.
+    v0.0.7  02.10.18 Refactored into multiple files that get merged.
+                     Added multiple backends for int and float printing.
+                     Added a couple more formatting options like o, a and c.
+    v0.0.6  25.09.18 Reworked many printing functions because of breaking changes to tm_conversion.
+    v0.0.5  01.09.18 Added MIT license option.
+                     Refactored fillPrintArgList to not be dependend on preprocessor switches.
+                     Removed fprinter.
+                     Tmp_memory_printer can now grow and can use small buffer optimization.
+                     Removed dependency on fprintf.
+    v0.0.4e 25.08.18 Added repository link.
+    v0.0.4d 10.01.17 Minor change from static const char* to static const char* const in print_bool.
+    v0.0.4c 23.10.16 Added some assertions for bounds checking.
+    v0.0.4b 07.10.16 Fixed some casting issues when tm_size_t is signed.
+    v0.0.4a 29.09.16 Fixed a bug where inputting an escaped {{ was resulting in an infinite loop.
+    v0.0.4  29.09.16 Added signed/unsigned char, short and long handling.
+                     Fixed compiler errors when compiling with clang.
+    v0.0.3  27.09.16 Added printing custom types by overloading snprint.
+                     Added initialFormatting parameter to snprint so that custom printing can.
+                     Inherit formatting options.
+    v0.0.2  26.09.16 Changed makeFlags to tmp_type_flags so that it is guaranteed to be a.
+                     Compile time constant.
+                     Added string view overloads so that print can accept a string view as the.
+                     Format parameter.
+                     Fixed some compiler warnings when tm_size_t is defined as int.
+    v0.0.1  24.09.16 Initial commit.
 */
 
 /* This is a generated file, do not modify directly. You can find the generator files in the src directory. */
@@ -161,7 +162,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#define TMP_VERSION 0x00000009u
+#define TMP_VERSION 0x0000000Au
 
 /* assert */
 #ifndef TM_ASSERT
@@ -194,11 +195,24 @@ HISTORY
 #ifndef TM_ERRC_DEFINED
     #define TM_ERRC_DEFINED
     enum TM_ERRC_CODES {
-        TM_OK        = 0,   /* same as std::errc() */
-        TM_EOVERFLOW = 75,  /* same as std::errc::value_too_large */
-        TM_ERANGE    = 34,  /* same as std::errc::result_out_of_range */
-        TM_EINVAL    = 22,  /* same as std::errc::invalid_argument */
-        TM_ENOMEM    = 12,  /* same as std::errc::not_enough_memory */
+        TM_OK           = 0,   /* Same as std::errc() */
+        TM_EPERM        = 1,   /* Same as std::errc::operation_not_permitted */
+        TM_ENOENT       = 2,   /* Same as std::errc::no_such_file_or_directory */
+        TM_EIO          = 5,   /* Same as std::errc::io_error */
+        TM_ENOMEM       = 12,  /* Same as std::errc::not_enough_memory */
+        TM_EACCES       = 13,  /* Same as std::errc::permission_denied */
+        TM_EBUSY        = 16,  /* Same as std::errc::device_or_resource_busy */
+        TM_EEXIST       = 17,  /* Same as std::errc::file_exists */
+        TM_EEXDEV       = 18,  /* Same as std::errc::cross_device_link */
+        TM_ENODEV       = 19,  /* Same as std::errc::no_such_device */
+        TM_EINVAL       = 22,  /* Same as std::errc::invalid_argument */
+        TM_EMFILE       = 24,  /* Same as std::errc::too_many_files_open */
+        TM_EFBIG        = 27,  /* Same as std::errc::file_too_large */
+        TM_ENOSPC       = 28,  /* Same as std::errc::no_space_on_device */
+        TM_ERANGE       = 34,  /* Same as std::errc::result_out_of_range */
+        TM_ENAMETOOLONG = 36,  /* Same as std::errc::filename_too_long */
+        TM_ENOTEMPTY    = 39,  /* Same as std::errc::directory_not_empty */
+        TM_EOVERFLOW    = 75,  /* Same as std::errc::value_too_large */
     };
     typedef int tm_errc;
 #endif
@@ -612,48 +626,11 @@ void fillPrintArgList(PrintArgList* list, TM_STRING_VIEW value, const Types&... 
 }
 #endif
 #ifdef TMP_CUSTOM_PRINTING
-// this looks very confusing, but it checks for the existence of a specific overload of snprint
-// this way we can do a static_assert on whether the overload exists and report an error
-// otherwise
-template <class T>
-class tmp_has_custom_printer {
-    typedef tm_size_t printer_t(char*, tm_size_t, const PrintFormat&, const T&);
-    typedef char no;
-
-    template <class C>
-    static auto test(C c)
-        -> decltype(static_cast<tm_size_t (*)(char*, tm_size_t, const PrintFormat&, const C&)>(&snprint));
-    template <class C>
-    static no test(...);
-
-   public:
-    enum { Value = (sizeof(test<T>(T{})) == sizeof(void*)) };
-};
-
 template <class T, class... Types>
-void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args) {
-    static_assert(tmp_has_custom_printer<T>::Value,
-                  "T is not printable, there is no snprint that takes value of type T");
-    // if the static assert fails, the compiler will also report that there are no overloads of
-    // snprint that accept the argument types. We could get rid of that error by using SFINAE
-    // but that introduces more boilerplate
-
-    // having constexpr if simplifies the error message
-#ifdef TMP_HAS_CONSTEXPR_IF
-    if constexpr (tmp_has_custom_printer<T>::Value)
-#endif
-    {
-        auto custom = &list->args[list->size++].custom;
-        custom->data = &value;
-        custom->customPrint = [](char* buffer, tm_size_t len, const PrintFormat& initialFormatting, const void* data) {
-            return snprint(buffer, len, initialFormatting, *(const T*)data);
-        };
-    }
-    fillPrintArgList(list, args...);
-}
+void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args);
 #else
 template <class T, class... Types>
-void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args) {
+void fillPrintArgList(PrintArgList*, const T&, const Types&...) {
     static_assert(tmp_type_flags<T>::Value != 0,
                   "T is not printable, custom printing is disabled (TMP_CUSTOM_PRINTING not defined)");
     static_assert(tmp_type_flags<T>::Value == 0, "");  // this function is not allowed to be instantiated
@@ -745,6 +722,48 @@ tm_size_t snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintF
     return tmp_snprint(dest, len, format, initialFormatting, argList);
 }
 #endif  // defined( TM_STRING_VIEW )
+
+#ifdef TMP_CUSTOM_PRINTING
+// this looks very confusing, but it checks for the existence of a specific overload of snprint
+// this way we can do a static_assert on whether the overload exists and report an error
+// otherwise
+template <class T>
+class tmp_has_custom_printer {
+    typedef tm_size_t printer_t(char*, tm_size_t, const PrintFormat&, const T&);
+    typedef char no;
+
+    template <class C>
+    static auto test(C c)
+        -> decltype(static_cast<tm_size_t (*)(char*, tm_size_t, const PrintFormat&, const C&)>(&snprint));
+    template <class C>
+    static no test(...);
+
+   public:
+    enum { Value = (sizeof(test<T>(T{})) == sizeof(void*)) };
+};
+
+template <class T, class... Types>
+void fillPrintArgList(PrintArgList* list, const T& value, const Types&... args) {
+    static_assert(tmp_has_custom_printer<T>::Value,
+                  "T is not printable, there is no snprint that takes value of type T");
+    // if the static assert fails, the compiler will also report that there are no overloads of
+    // snprint that accept the argument types. We could get rid of that error by using SFINAE
+    // but that introduces more boilerplate
+
+    // having constexpr if simplifies the error message
+#ifdef TMP_HAS_CONSTEXPR_IF
+    if constexpr (tmp_has_custom_printer<T>::Value)
+#endif
+    {
+        auto custom = &list->args[list->size++].custom;
+        custom->data = &value;
+        custom->customPrint = [](char* buffer, tm_size_t len, const PrintFormat& initialFormatting, const void* data) {
+            return snprint(buffer, len, initialFormatting, *(const T*)data);
+        };
+    }
+    fillPrintArgList(list, args...);
+}
+#endif // defined(TMP_CUSTOM_PRINTING)
 
 #endif  // _TM_PRINT_H_INCLUDED_
 
@@ -1198,21 +1217,6 @@ static PrintFormattedResult tmp_move_printed_value_and_decorate(char* dest, tm_s
     return printResult;
 }
 
-template <class T>
-static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, T value) {
-    TM_ASSERT(dest || maxlen == 0);
-    TM_ASSERT_VALID_SIZE(maxlen);
-
-    if (maxlen <= 0 || (format.width > 0 && (tm_size_t)format.width > maxlen)) {
-        return {maxlen, TM_EOVERFLOW};
-    }
-
-    auto pair = tmp_make_unsigned(value);
-    bool sign = pair.negative || ((format.flags & PrintFlags::Sign) != 0);
-    auto result = tmp_print(dest + sign, maxlen - sign, pair.value, format);
-    return tmp_move_printed_value_and_decorate(dest, maxlen, format, result, pair.negative);
-}
-
 #ifdef TMP_INT_BACKEND_CRT
 static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint32_t value, const PrintFormat& format) {
     TM_ASSERT(!dest || maxlen > 0);
@@ -1515,6 +1519,21 @@ static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, float value,
     return {maxlen, TM_EOVERFLOW};
 }
 #endif  // defined(TMP_FLOAT_BACKEND_CHARCONV)
+
+template <class T>
+static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, T value) {
+    TM_ASSERT(dest || maxlen == 0);
+    TM_ASSERT_VALID_SIZE(maxlen);
+
+    if (maxlen <= 0 || (format.width > 0 && (tm_size_t)format.width > maxlen)) {
+        return {maxlen, TM_EOVERFLOW};
+    }
+
+    auto pair = tmp_make_unsigned(value);
+    bool sign = pair.negative || ((format.flags & PrintFlags::Sign) != 0);
+    auto result = tmp_print(dest + sign, maxlen - sign, pair.value, format);
+    return tmp_move_printed_value_and_decorate(dest, maxlen, format, result, pair.negative);
+}
 
 struct tmp_memory_printer {
     char* data;

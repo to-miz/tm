@@ -16,7 +16,8 @@
 	"settings": {
 		"read_only_files": [
 			"tm_print.h",
-			"tm_cli.h"
+			"tm_cli.h",
+			"tm_file.h"
 		],
 		"read_only_folders": [
 		]
@@ -24,7 +25,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_print-merge",
+			"cmd": "make merge.tm_print",
 
 			"windows": {
 				"shell": false,
@@ -43,15 +44,19 @@
 			"variants": [
 				{
 					"name": "build unmerged",
-					"cmd": "make tm_print-unmerged"
+					"cmd": "make unmerged.tm_print"
 				},
 				{
 					"name": "build tests",
-					"cmd": "make tm_print-tests"
+					"cmd": "make tests.tm_print"
+				},
+				{
+					"name": "run default test",
+					"cmd": "make tests.tm_print.default.run"
 				},
 				{
 					"name": "run tests",
-					"cmd": "make tm_print-run-tests"
+					"cmd": "make tests.tm_print.run"
 				}
 			]
 		}

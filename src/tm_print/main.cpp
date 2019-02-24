@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.9 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.10 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,36 +19,37 @@ ISSUES
     current locale.
 
 HISTORY
-    v0.0.9  02.11.18 moved the fixed size array inside PrintArgList into the variadic template functions
-                     so its size can be deduced from the number of arguments
-    v0.0.8  06.10.18 refactored some common macro blocks into include files
-                     fixed compilation error when TM_STRING_VIEW is defined
-                     added TMP_DEFAULT_FLAGS
-    v0.0.7  02.10.18 refactored into multiple files that get merged
-                     added multiple backends for int and float printing
-                     added a couple more formatting options like o, a and c
-    v0.0.6  25.09.18 reworked many printing functions because of breaking changes to tm_conversion
-    v0.0.5  01.09.18 added MIT license option
-                     refactored fillPrintArgList to not be dependend on preprocessor switches
-                     removed fprinter
-                     tmp_memory_printer can now grow and can use small buffer optimization
-                     removed dependency on fprintf
-    v0.0.4e 25.08.18 added repository link
-    v0.0.4d 10.01.17 minor change from static const char* to static const char* const in print_bool
-    v0.0.4c 23.10.16 added some assertions for bounds checking
-    v0.0.4b 07.10.16 fixed some casting issues when tm_size_t is signed
-    v0.0.4a 29.09.16 fixed a bug where inputting an escaped {{ was resulting in an infinite loop
-    v0.0.4  29.09.16 added signed/unsigned char, short and long handling
-                     fixed compiler errors when compiling with clang
-    v0.0.3  27.09.16 added printing custom types by overloading snprint
-                     added initialFormatting parameter to snprint so that custom printing can
-                     inherit formatting options
-    v0.0.2  26.09.16 changed makeFlags to tmp_type_flags so that it is guaranteed to be a
-                     compile time constant
-                     added string view overloads so that print can accept a string view as the
-                     format parameter
-                     fixed some compiler warnings when tm_size_t is defined as int
-    v0.0.1  24.09.16 initial commit
+    v0.0.10 14.01.19 Fixed msvc compilation errors in most conforming mode with all extensions disabled.
+    v0.0.9  02.11.18 Moved the fixed size array inside PrintArgList into the variadic template functions
+                     so its size can be deduced from the number of arguments.
+    v0.0.8  06.10.18 Refactored some common macro blocks into include files.
+                     Fixed compilation error when TM_STRING_VIEW is defined.
+                     Added TMP_DEFAULT_FLAGS.
+    v0.0.7  02.10.18 Refactored into multiple files that get merged.
+                     Added multiple backends for int and float printing.
+                     Added a couple more formatting options like o, a and c.
+    v0.0.6  25.09.18 Reworked many printing functions because of breaking changes to tm_conversion.
+    v0.0.5  01.09.18 Added MIT license option.
+                     Refactored fillPrintArgList to not be dependend on preprocessor switches.
+                     Removed fprinter.
+                     Tmp_memory_printer can now grow and can use small buffer optimization.
+                     Removed dependency on fprintf.
+    v0.0.4e 25.08.18 Added repository link.
+    v0.0.4d 10.01.17 Minor change from static const char* to static const char* const in print_bool.
+    v0.0.4c 23.10.16 Added some assertions for bounds checking.
+    v0.0.4b 07.10.16 Fixed some casting issues when tm_size_t is signed.
+    v0.0.4a 29.09.16 Fixed a bug where inputting an escaped {{ was resulting in an infinite loop.
+    v0.0.4  29.09.16 Added signed/unsigned char, short and long handling.
+                     Fixed compiler errors when compiling with clang.
+    v0.0.3  27.09.16 Added printing custom types by overloading snprint.
+                     Added initialFormatting parameter to snprint so that custom printing can.
+                     Inherit formatting options.
+    v0.0.2  26.09.16 Changed makeFlags to tmp_type_flags so that it is guaranteed to be a.
+                     Compile time constant.
+                     Added string view overloads so that print can accept a string view as the.
+                     Format parameter.
+                     Fixed some compiler warnings when tm_size_t is defined as int.
+    v0.0.1  24.09.16 Initial commit.
 */
 
 #include "../common/GENERATED_WARNING.inc"
@@ -59,7 +60,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#define TMP_VERSION 0x00000009u
+#define TMP_VERSION 0x0000000Au
 
 #include "dependencies_header.h"
 

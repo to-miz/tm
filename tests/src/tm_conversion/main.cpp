@@ -15,8 +15,9 @@
 #define TM_CONVERSION_IMPLEMENTATION
 #define TMC_CHECKED_WIDTH
 #define TM_STRING_VIEW std::string_view
-#define TM_STRING_VIEW_DATA(x) (x).data()
-#define TM_STRING_VIEW_SIZE(x) ((tm_size_t)(x).size())
+#define TM_STRING_VIEW_DATA(str) (str).data()
+#define TM_STRING_VIEW_SIZE(str) ((tm_size_t)(str).size())
+#define TM_STRING_VIEW_MAKE(data, size) std::string_view{(data), (size_t)(size)}
 #define TMC_CPP_OVERLOADS
 #include <tm_conversion.h>
 

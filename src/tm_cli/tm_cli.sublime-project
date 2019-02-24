@@ -24,7 +24,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_cli-merge",
+			"cmd": "make merge.tm_cli",
 
 			"windows": {
 				"shell": false,
@@ -43,15 +43,19 @@
 			"variants": [
 				{
 					"name": "build unmerged",
-					"cmd": "make tm_cli-unmerged"
+					"cmd": "make unmerged.tm_cli"
+				},
+				{
+					"name": "build unmerged c",
+					"cmd": "make unmerged.tm_cli.c"
 				},
 				{
 					"name": "build tests",
-					"cmd": "make tm_cli-tests"
+					"cmd": "make tests.tm_cli"
 				},
 				{
 					"name": "run tests",
-					"cmd": "make tm_cli-run-tests"
+					"cmd": "make tests.tm_cli.run"
 				}
 			]
 		}

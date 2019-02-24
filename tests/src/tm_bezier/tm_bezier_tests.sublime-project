@@ -15,7 +15,7 @@
 	"build_systems": [
 		{
 			"name": "make",
-			"cmd": "make tm_bezier-tests",
+			"cmd": "make tests.tm_bezier",
 
 			"windows": {
 				"shell": false,
@@ -33,16 +33,12 @@
 
 			"variants": [
 				{
-					"name": "C build",
-					"cmd": "make tm_bezier-c-build"
+					"name": "build tests.tm_bezier.c",
+					"cmd": "make tests.tm_bezier.c"
 				},
 				{
 					"name": "run tests",
-					"cmd": "make tm_bezier-run-tests"
-				},
-				{
-					"name": "run tests (default config only)",
-					"cmd": "make tm_bezier-run-tests-default"
+					"cmd": "make tests.tm_bezier.run"
 				}
 			]
 		}

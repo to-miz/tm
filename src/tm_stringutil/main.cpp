@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.3 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.3.1 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -20,11 +20,12 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
-    v0.3   15.10.18 Added more string_view overloads.
-    v0.2   14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
-                    Added tmsu_equals.
-                    Fixed MSVC warning about unreachable code.
-    v0.1   07.10.18 Initial commit.
+    v0.3.1  15.01.19 Fixed some warnings in msvc with signed size_t and string_view.
+    v0.3    15.10.18 Added more string_view overloads.
+    v0.2    14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
+                     Added tmsu_equals.
+                     Fixed MSVC warning about unreachable code.
+    v0.1    07.10.18 Initial commit.
 */
 
 #include "../common/GENERATED_WARNING.inc"
@@ -101,16 +102,18 @@ HISTORY
 extern "C" {
 #endif
 
+#include "../common/tm_string_view.inc"
+
 /*
-Use the C++ string_view type if it is available. This will pull out any string_view returning function out of C-linkage,
-since they cannot be defined in C. If C interop is needed, #undef TM_STRING_VIEW before including this file, so both
-C and C++ use the same data types.
+Use the C++ string_view type if it is available. This will pull out any string_view returning function
+out of C-linkage, since they cannot be defined in C. If C interop is needed, #undef TM_STRING_VIEW before
+including this file, so both C and C++ use the same data types.
 */
 #if defined(TM_STRING_VIEW) && defined(__cplusplus)
     typedef TM_STRING_VIEW tmsu_string_view;
     #define TMSU_STRING_VIEW_DATA(x) TM_STRING_VIEW_DATA(x)
     #define TMSU_STRING_VIEW_SIZE(x) TM_STRING_VIEW_SIZE(x)
-    #define TMSU_STRING_VIEW_MAKE(str, size) TM_STRING_VIEW{(str), (size)}
+    #define TMSU_STRING_VIEW_MAKE(str, size) TM_STRING_VIEW_MAKE((str), (size))
 #else
     typedef struct {
         const char* data;
@@ -118,7 +121,7 @@ C and C++ use the same data types.
     } tmsu_string_view;
     #define TMSU_STRING_VIEW_DATA(x) (x).data
     #define TMSU_STRING_VIEW_SIZE(x) (x).size
-    #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, size)
+    #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, (tm_size_t)(size))
 #endif
 
 /* clang-format on */
@@ -173,10 +176,10 @@ TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* 
 TMSU_DEF const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
                                                 const char* find_str_last, const char* not_found);
 
-/* Ignores case for ascii characters. */
-TMSU_DEF const char* tmsu_find_char_ignore_case_n(const char* str_first, const char* str_last, char c);
-TMSU_DEF const char* tmsu_find_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                             const char* find_str_last);
+/* Ignores case for ansi characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi_n(const char* str_first, const char* str_last, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_ansi_n(const char* str_first, const char* str_last,
+                                                  const char* find_str_first, const char* find_str_last);
 
 /*
 Find functions that allow escaping of the character to look for. Useful for parsing.
@@ -190,9 +193,9 @@ TMSU_DEF const char* tmsu_find_first_of_unescaped_n(const char* str_first, const
                                                     const char* find_str_first, const char* find_str_last,
                                                     char escape_char);
 
-/* Ignores case for ascii characters. */
-TMSU_DEF const char* tmsu_find_char_ignore_case(const char* str, char c);
-TMSU_DEF const char* tmsu_find_ignore_case(const char* str, const char* find_str);
+/* Ignores case for ansi characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi(const char* str, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_ansi(const char* str, const char* find_str);
 
 typedef struct {
     const char* current;
@@ -233,19 +236,20 @@ TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
 
 /* Lexicographical comparisons. */
 TMSU_DEF int tmsu_compare(const char* a, const char* b);
-TMSU_DEF int tmsu_compare_ignore_case(const char* a, const char* b);
+TMSU_DEF int tmsu_compare_ignore_case_ansi(const char* a, const char* b);
 
 TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
-TMSU_DEF int tmsu_compare_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
-                                        const char* b_last);
+TMSU_DEF int tmsu_compare_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                             const char* b_last);
 
 /* String comparison for humans. See http://stereopsis.com/strcmp4humans.html. */
-TMSU_DEF int tmsu_human_compare_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
+TMSU_DEF int tmsu_human_compare_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                       const char* b_last);
 
 /* Equality check, faster than lexicographical compare, since we can check lengths first. */
 TMSU_DEF tm_bool tmsu_equals_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
-TMSU_DEF tm_bool tmsu_equals_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
-                                           const char* b_last);
+TMSU_DEF tm_bool tmsu_equals_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                                const char* b_last);
 
 TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str);
 TMSU_DEF tm_bool tmsu_ends_with(const char* str, const char* find_str);
@@ -254,17 +258,17 @@ TMSU_DEF tm_bool tmsu_starts_with_n(const char* a_first, const char* a_last, con
 TMSU_DEF tm_bool tmsu_ends_with_n(const char* str_first, const char* str_last, const char* find_str_first,
                                   const char* find_str_last);
 
-TMSU_DEF tm_bool tmsu_starts_with_ignore_case(const char* str, const char* find_str);
-TMSU_DEF tm_bool tmsu_ends_with_ignore_case(const char* str, const char* find_str);
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi(const char* str, const char* find_str);
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi(const char* str, const char* find_str);
 
-TMSU_DEF tm_bool tmsu_starts_with_ignore_case_n(const char* a_first, const char* a_last, const char* b_first,
-                                                const char* b_last);
-TMSU_DEF tm_bool tmsu_ends_with_ignore_case_n(const char* str_first, const char* str_last, const char* find_str_first,
-                                              const char* find_str_last);
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
+                                                     const char* b_last);
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_n(const char* str_first, const char* str_last,
+                                                   const char* find_str_first, const char* find_str_last);
 
 /* Crt extensions, that are non standard and may not be provided. */
 
-/* Only checks chars from '0' to '9'. Assumes utf8 codepoint. */
+/* Only checks chars from '0' to '9'. */
 TMSU_DEF tm_bool tmsu_isdigit(unsigned c);
 
 TMSU_DEF const char* tmsu_stristr(const char* str, const char* find_str);
