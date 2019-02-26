@@ -1,5 +1,5 @@
 /*
-tm_json.h v0.2.2 - public domain - https://github.com/to-miz/tm
+tm_json.h v0.2.4 - public domain - https://github.com/to-miz/tm
 written by Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -16,11 +16,12 @@ USAGE
     See SWITCHES for more options.
 
 PURPOSE
-    A validating utf8 json parser, that is extensible using a lot of different flags.
+    A Utf-8 json parser, that is extensible using a lot of different flags.
     Can be used as both a simple and lightweight non validating parser, as well as a strict
     validating parser. Using the functions with the Ex extension, you can make the parser
     accept Json5 files.
-    If you want to use this parser with non utf8 input, convert your input to utf8 first.
+    The parser only works with and expects valid Utf-8 encoded input. Utf-8 encoding is
+    not validated by the parser.
 
 DOCUMENTATION
     Nil Object:
@@ -101,16 +102,24 @@ SWITCHES
             on your platform.
 
 ISSUES
-    - \u isn't implemented in strings, it will just be ignored currently
+    - No Utf-8 encoding validation of input data.
+      Not really an issue but out of scope of this library, since the parsing functions expect
+      valid Utf-8 encoded input. Validation should be done before parsing, for instance by using
+      tm_unicode.h.
     - Mismatched brackets will be reported as JERR_UNEXPECTED_EOF instead of JERR_MISMATCHED_BRACKETS
       when using jsonMakeDocument, because jsonSkipCurrent skips until eof on mismatched brackets.
-    - missing documentation and example usage code.
-    - Json objects aren't implemented as dictionaries/hashmaps, instead they use linear lookup
-      json objects should be turned into hashmaps manually when applicable.
+    - Missing documentation and example usage code.
+    - Json objects aren't implemented as dictionaries/hashmaps, instead they use linear lookup.
+      Json objects should be turned into hashmaps manually when applicable.
     - Fallback string conversion is based on <strlib.h> and thus locale dependent.
-      Workaround is not changing the LC_NUMERIC locale from the default "C" locale.
+      Workaround is not changing the LC_NUMERIC locale from the default "C" locale
+      or not using the fallback string conversion routines at all (see SWITCHES and TMJ_TO_INT).
 
 HISTORY
+    v0.2.4  25.02.19  Implemented Unicode escape sequences.
+                      Fixed a bug with unescaped string copying.
+                      Fixed signed size_t compilation warnings.
+    v0.2.3  24.02.19  Fixed a bug with string escaping. Escaped quotation marks weren't detected properly.
     v0.2.2  15.01.19  Changed signature of conversion functions to use sized integer types like int32_t.
     v0.2.1  14.01.19  Fixed some compilation errors when both TM_SIGNED_SIZE_T and TM_STRING_VIEW
                       are defined.
@@ -440,9 +449,9 @@ typedef enum {
     JERR_UNEXPECTED_EOF,
     JERR_ILLFORMED_STRING,
     JERR_MISMATCHED_BRACKETS,
-    JERR_OUT_OF_CONTEXT_STACK_MEMORY,  // not enough contextStackMemory to parse a given json file,
+    JERR_OUT_OF_CONTEXT_STACK_MEMORY,  // Not enough contextStackMemory to parse a given json file,
                                        // occurs if there are more alternating context (going from
-                                       // { to [ and back) switches than memory
+                                       // { to [ and back) switches than memory.
     JERR_NO_ROOT,
     JERR_OUT_OF_MEMORY,
     JERR_INTERNAL_ERROR
@@ -489,16 +498,16 @@ typedef struct {
 inline JsonStringView jsonGetString(JsonReader* reader) { return reader->current; }
 inline JsonValueType jsonGetValueType(JsonReader* reader) { return reader->valueType; }
 
-// initializes and returns a JsonReader.
+// Initializes and returns a JsonReader.
 // params:
-//  data: the utf8 json file contents
-//  size: size of data in bytes
+//  data: The Utf-8 json file contents. Must be a valid Utf-8 encoded string.
+//  size: Size of data in bytes.
 //  contextStackMemory:
-//      the stack memory the reader uses for bookkeeping. Only needed if you use jsonNextToken or
+//      The stack memory the reader uses for bookkeeping. Only needed if you use jsonNextToken or
 //      jsonNextTokenEx. If you plan to use the implicit versions (jsonNextTokenImplicit or
 //      jsonNextTokenImplicitEx), this can be NULL.
-//  contextStackSize: element count of contextStackMemory.
-//  flags: parsing flags used when parsing. See enum JsonReaderFlags for all valid flags.
+//  contextStackSize: Element count of contextStackMemory.
+//  flags: Parsing flags used when parsing. See enum JsonReaderFlags for all valid flags.
 TMJ_DEF JsonReader jsonMakeReader(const char* data, tm_size_t size, JsonContextEntry* contextStackMemory,
                                   tm_size_t contextStackSize, unsigned int flags);
 
@@ -832,9 +841,7 @@ inline double JsonValueStruct::getDouble(double def) const { return jsonGetDoubl
 inline bool JsonValueStruct::getBool(bool def) const { return jsonGetBool(this, def); }
 #ifndef TMJ_NO_INT64
 inline int64_t JsonValueStruct::getInt64(int64_t def) const { return jsonGetInt64(this, def); }
-inline uint64_t JsonValueStruct::getUInt64(uint64_t def) const {
-    return jsonGetUInt64(this, def);
-}
+inline uint64_t JsonValueStruct::getUInt64(uint64_t def) const { return jsonGetUInt64(this, def); }
 #endif /* !defined(TMJ_NO_INT64) */
 #endif /* defined(__cplusplus) */
 
@@ -1143,54 +1150,210 @@ static void setError(JsonReader* reader, JsonErrorType error) {
     reader->current.data = reader->data;
     reader->current.size = 1;
 }
+
+#define TMJ_MAX_UTF32 0x10FFFFu
+#define TMJ_LEAD_SURROGATE_MIN 0xD800u
+#define TMJ_LEAD_SURROGATE_MAX 0xDBFFu
+#define TMJ_TRAILING_SURROGATE_MIN 0xDC00u
+#define TMJ_TRAILING_SURROGATE_MAX 0xDFFFu
+#define TMJ_SURROGATE_OFFSET (0x10000u - (0xD800u << 10u) - 0xDC00u)
+
+static tm_bool tmj_is_valid_codepoint(uint32_t codepoint) {
+    return codepoint <= TMJ_MAX_UTF32 && (codepoint < TMJ_LEAD_SURROGATE_MIN || codepoint > TMJ_TRAILING_SURROGATE_MAX);
+}
+
+static tm_size_t tmj_get_codepoint(const char* first, tm_size_t remaining, uint32_t* codepoint) {
+    tm_size_t starting_size = remaining;
+
+    TM_ASSERT(codepoint);
+    if (remaining < 4) return 0;
+    if (!TM_ISXDIGIT((unsigned char)first[0]) || !TM_ISXDIGIT((unsigned char)first[1]) ||
+        !TM_ISXDIGIT((unsigned char)first[2]) || !TM_ISXDIGIT((unsigned char)first[3])) {
+        return 0;
+    }
+    uint32_t lead = 0xFFFFFFFFu;
+    TMJ_TO_UINT(first, first + 4, &lead, 16);
+    if (lead == 0xFFFFFFFFu) return 0;
+    first += 4;
+    remaining -= 4;
+
+    if (lead >= TMJ_LEAD_SURROGATE_MIN && lead <= TMJ_LEAD_SURROGATE_MAX) {
+        if (remaining < 6) return 0;
+        if (*first != '\\' || *(first + 1) != 'u') return 0;
+        first += 2;
+        remaining -= 2;
+        if (!TM_ISXDIGIT((unsigned char)first[0]) || !TM_ISXDIGIT((unsigned char)first[1]) ||
+            !TM_ISXDIGIT((unsigned char)first[2]) || !TM_ISXDIGIT((unsigned char)first[3])) {
+            return 0;
+        }
+        uint32_t trail = 0xFFFFFFFFu;
+        TMJ_TO_UINT(first, first + 4, &trail, 16);
+        if (trail == 0xFFFFFFFFu) return 0;
+        first += 4;
+        remaining -= 4;
+
+        if (trail >= TMJ_TRAILING_SURROGATE_MIN && trail <= TMJ_TRAILING_SURROGATE_MAX) {
+            *codepoint = (lead << 10) + trail + TMJ_SURROGATE_OFFSET;
+        } else {
+            return 0;
+        }
+    } else {
+        *codepoint = lead;
+    }
+    if (!tmj_is_valid_codepoint(*codepoint)) return 0;
+
+    TM_ASSERT(starting_size > remaining);
+    tm_size_t advance = starting_size - remaining;
+    TM_ASSERT(advance == 4 || advance == 10);
+    return advance;
+}
+static tm_size_t tmj_utf8_encode(uint32_t codepoint, char* out, tm_size_t out_len) {
+    TM_ASSERT(out || out_len == 0);
+    TM_ASSERT(tmj_is_valid_codepoint(codepoint));
+
+    if (codepoint < 0x80) {
+        /* 1 byte sequence */
+        if (out_len < 1) return 1;
+        out[0] = (char)(codepoint);
+        return 1;
+    } else if (codepoint < 0x800) {
+        /* 2 byte sequence 110xxxxx 10xxxxxx */
+        if (out_len < 2) return 2;
+        out[0] = (char)(0xC0 | (uint8_t)(codepoint >> 6));
+        out[1] = (char)(0x80 | (uint8_t)(codepoint & 0x3F));
+        return 2;
+    } else if (codepoint < 0x10000) {
+        /* 3 byte sequence 1110xxxx 10xxxxxx 10xxxxxx */
+        if (out_len < 3) return 3;
+        out[0] = (char)(0xE0 | (uint8_t)(codepoint >> 12));
+        out[1] = (char)(0x80 | ((uint8_t)(codepoint >> 6) & 0x3F));
+        out[2] = (char)(0x80 | ((uint8_t)(codepoint & 0x3F)));
+        return 3;
+    } else {
+        /* 4 byte sequence 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx */
+        if (out_len < 4) return 4;
+        out[0] = (char)(0xF0 | ((uint8_t)(codepoint >> 18) & 0x7));
+        out[1] = (char)(0x80 | ((uint8_t)(codepoint >> 12) & 0x3F));
+        out[2] = (char)(0x80 | ((uint8_t)(codepoint >> 6) & 0x3F));
+        out[3] = (char)(0x80 | ((uint8_t)(codepoint & 0x3F)));
+        return 4;
+    }
+}
+#undef TMJ_MAX_UTF32
+#undef TMJ_LEAD_SURROGATE_MIN
+#undef TMJ_LEAD_SURROGATE_MAX
+#undef TMJ_TRAILING_SURROGATE_MIN
+#undef TMJ_TRAILING_SURROGATE_MAX
+#undef TMJ_SURROGATE_OFFSET
+
+
+static tm_bool tmj_is_char_unescaped(const char* first, const char* last) {
+    /* Count how many backslashes precede last. */
+    const char* pos = last;
+    while (pos > first && *(pos - 1) == '\\') --pos;
+    TM_ASSERT(last >= pos);
+    size_t preceding_escape_chars_count = (size_t)(last - pos);
+    /* If there are even number of backslashes before last, they all escaped each other. */
+    return (preceding_escape_chars_count & 1) == 0;
+}
+
+static tm_bool tmj_is_valid_json_string(const char* first, tm_size_t size) {
+    /* Validate that \u is always followed by four hexadecimal digits. */
+    const char* start = first;
+    const char* p = TM_NULL;
+    while ((p = (const char*)TM_MEMCHR(first, '\\', size)) != TM_NULL) {
+        size -= (tm_size_t)(p - first + 1);
+        if (size) {
+            first = p + 1;
+
+            if (*first == 'u') {
+                ++first;
+                --size;
+
+                if (!tmj_is_char_unescaped(start, first - 1)) {
+                    uint32_t codepoint = 0;
+                    tm_size_t advance = tmj_get_codepoint(first, size, &codepoint);
+                    if (advance <= 0) return TM_FALSE;
+                    first += advance;
+                    size -= advance;
+                }
+            }
+        }
+    }
+    return TM_TRUE;
+}
+
+static const char* tmj_find_char_unescaped(const char* first, tm_size_t size, char c) {
+    TM_ASSERT(first || size == 0);
+
+    if (size <= 0) return TM_NULL;
+
+    const char* str = first;
+    const char* last = first + size;
+    if (*str == c) return str;
+    for (;;) {
+        ++str;
+        str = (const char*)TM_MEMCHR(str, (unsigned char)c, (size_t)(last - str));
+        if (!str) return TM_NULL;
+        if (tmj_is_char_unescaped(first, str)) return str;
+    }
+}
+
 static tm_bool readQuotedString(JsonReader* reader) {
-    int quote = (unsigned char)reader->data[0];
+    char quote = reader->data[0];
     TM_ASSERT(quote == '\'' || quote == '"');
     const char* start = reader->data;
     ++reader->data;
     --reader->size;
     reader->current.data = reader->data;
     reader->current.size = 0;
+
     // TODO: profile to see which is faster, memchr twice over the string or go byte by byte once
-    const char* p;
-    while ((p = (const char*)TM_MEMCHR(reader->data, quote, reader->size)) != TM_NULL) {
+    const char* p = tmj_find_char_unescaped(reader->data, reader->size, quote);
+    if (p) {
+        reader->size -= (tm_size_t)(p + 1 - reader->data);
         reader->data = p + 1;
-        if (*(p - 1) != '\\') {
-            // unescaped quotation mark, we found the string
-            reader->current.size = (tm_size_t)(reader->data - reader->current.data - 1);
-            if (reader->flags & JSON_READER_ESCAPED_MULTILINE_STRINGS) {
-                const char* last = reader->current.data;
-                tm_size_t size = reader->current.size;
-                while ((p = (const char*)TM_MEMCHR(last, '\n', size)) != TM_NULL) {
-                    if (p == reader->current.data || (*(p - 1) != '\\')) {
-                        reader->errorType = JERR_ILLFORMED_STRING;
-                        reader->current.data = p;
-                        reader->current.size = 1;
-                        return TM_FALSE;
-                    }
-                    reader->column = 0;
-                    ++reader->line;
-                    size -= (tm_size_t)(p - last + 1);
-                    last = p + 1;
-                }
-                reader->column = size;
-            } else {
-                if ((p = (const char*)TM_MEMCHR(reader->current.data, '\n', reader->current.size)) != TM_NULL) {
+        if (reader->size <= 0) {
+            setError(reader, JERR_UNEXPECTED_EOF);
+            return TM_FALSE;
+        }
+        // Unescaped quotation mark, we found the string.
+        reader->current.size = (tm_size_t)(reader->data - reader->current.data - 1);
+        if (reader->flags & JSON_READER_ESCAPED_MULTILINE_STRINGS) {
+            const char* last = reader->current.data;
+            tm_size_t size = reader->current.size;
+            while ((p = (const char*)TM_MEMCHR(last, '\n', size)) != TM_NULL) {
+                if (p == reader->current.data || tmj_is_char_unescaped(last, p)) {
                     reader->errorType = JERR_ILLFORMED_STRING;
                     reader->current.data = p;
                     reader->current.size = 1;
                     return TM_FALSE;
                 }
-                reader->column += reader->current.size + 1;
+                reader->column = 0;
+                ++reader->line;
+                size -= (tm_size_t)(p - last + 1);
+                last = p + 1;
             }
-            reader->size -= reader->current.size + 1;
-            if (reader->size <= 0) {
-                setError(reader, JERR_UNEXPECTED_EOF);
+            reader->column = size;
+        } else {
+            /* No newlines in a quoted strings. */
+            if ((p = (const char*)TM_MEMCHR(reader->current.data, '\n', reader->current.size)) != TM_NULL) {
+                reader->errorType = JERR_ILLFORMED_STRING;
+                reader->current.data = p;
+                reader->current.size = 1;
                 return TM_FALSE;
             }
-            return TM_TRUE;
+            reader->column += reader->current.size + 1;
         }
+        if (!tmj_is_valid_json_string(reader->current.data, reader->current.size)) {
+            reader->errorType = JERR_ILLFORMED_STRING;
+            reader->current.data = p;
+            reader->current.size = 1;
+            return TM_FALSE;
+        }
+        return TM_TRUE;
     }
+
     // reached eof without reading a string
     reader->errorType = JERR_UNEXPECTED_EOF;
     reader->data += reader->size;
@@ -2239,73 +2402,82 @@ TMJ_DEF JsonReader jsonMakeReader(const char* data, tm_size_t size, JsonContextE
 tm_size_t jsonCopyUnescapedString(JsonStringView str, char* buffer, tm_size_t size) {
     if (!str.data || str.size <= 0 || size <= 0) return 0;
     TM_ASSERT(buffer);
-    tm_size_t sz = TM_MIN(size, str.size);
-    const char* p = str.data;
-    const char* next = TM_NULL;
-    const char* start = buffer;
-    while ((next = (const char*)TM_MEMCHR(p, '\\', sz)) != TM_NULL) {
-        TM_MEMCPY(buffer, p, next - p);
-        buffer += next - p;
-        sz -= (tm_size_t)(next - p + 2);
-        p = next + 2;
-        switch (*(next + 1)) {
+    const char* first = str.data;
+    const char* last = str.data + str.size;
+    const char* cur = first;
+    char* buffer_start = buffer;
+    tm_size_t buffer_remaining = size;
+
+    while ((cur = (const char*)TM_MEMCHR(first, (unsigned char)'\\', (size_t)(last - first))) != TM_NULL) {
+        if (buffer_remaining <= 0) break;
+
+        tm_size_t range = (tm_size_t)(cur - first);
+        if (range > buffer_remaining) range = buffer_remaining;
+        TM_MEMCPY(buffer, first, range * sizeof(char));
+        buffer += range;
+        buffer_remaining -= range;
+        first = cur + 1;
+        if (first == last || first + 1 == last) break;
+        ++first;
+        switch (*(cur + 1)) {
             case '\n': {
                 // escaped multiline string, ignore newline
                 continue;
             }
             case 'b': {
-                buffer[0] = '\b';
+                *buffer++ = '\b';
                 break;
             }
             case 'f': {
-                buffer[0] = '\f';
+                *buffer++ = '\f';
                 break;
             }
             case 'n': {
-                buffer[0] = '\n';
+                *buffer++ = '\n';
                 break;
             }
             case 'r': {
-                buffer[0] = '\r';
+                *buffer++ = '\r';
                 break;
             }
             case 't': {
-                buffer[0] = '\t';
+                *buffer++ = '\t';
                 break;
             }
             case 'u': {
-                // TODO: use utf16 to convert to utf8
-                if (sz < 4) {
-                    sz = 0;
-                } else {
-                    sz -= 4;
-                    p += 4;
-                }
-                continue;
+                tm_size_t remaining = (tm_size_t)(last - first);
+                if (remaining < 4) return (tm_size_t)(buffer - buffer_start);
+
+                uint32_t codepoint = 0;
+                tm_size_t advance = tmj_get_codepoint(first, remaining, &codepoint);
+                if (advance <= 0) return (tm_size_t)(buffer - buffer_start);
+
+                tm_size_t written = tmj_utf8_encode(codepoint, buffer, buffer_remaining);
+                if (written > buffer_remaining) return (tm_size_t)(buffer - buffer_start);
+
+                buffer += written;
+                buffer_remaining -= written;
+                first += advance;
+                break;
             }
             default: {
-                // default behavior, just copy char after the escape as it is
-                buffer[0] = *(next + 1);
+                // Default behavior, just copy char after the escape as it is.
+                *buffer++ = *(cur + 1);
                 break;
             }
         }
-        ++buffer;
     }
-    if (sz) {
-        TM_MEMCPY(buffer, p, sz);
-        buffer += sz;
+    if (first != last && buffer_remaining > 0) {
+        tm_size_t range = (tm_size_t)(last - first);
+        if (range > buffer_remaining) range = buffer_remaining;
+        TM_MEMCPY(buffer, first, range * sizeof(char));
+        buffer += range;
+        buffer_remaining -= range;
     }
-    tm_size_t result = (tm_size_t)(buffer - start);
-    if (result < size) {
-        // make resulting string nullterminated
-        buffer[result] = 0;
-    }
-    return result;
+    return (tm_size_t)(buffer - buffer_start);
 }
 tm_size_t jsonCopyConcatenatedString(JsonStringView str, char* buffer, tm_size_t size) {
-    if (!str.data || str.size <= 1 || size <= 0) {
-        return 0;
-    }
+    if (!str.data || str.size <= 1 || size <= 0) return 0;
     char quot = str.data[0];
     ++str.data;
     --str.size;
@@ -2319,7 +2491,7 @@ tm_size_t jsonCopyConcatenatedString(JsonStringView str, char* buffer, tm_size_t
         sz -= (tm_size_t)(next - p + 1);
         if (add) {
             tm_bool skip = TM_FALSE;
-            if (next > p && *(next - 1) == '\\') {
+            if (next > p && !tmj_is_char_unescaped(p, next)) {
                 // include escaped quotation when copying unescaped string
                 ++next;
                 skip = TM_TRUE;

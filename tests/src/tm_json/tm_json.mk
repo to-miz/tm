@@ -1,4 +1,4 @@
-tests.tm_json.deps := tests/src/tm_json/main.cpp ${unmerged.tm_json.out} ${unmerged.tm_json.c.out}
+tests.tm_json.deps := tm_json.h tests/src/tm_json/main.cpp ${unmerged.tm_json.out} ${unmerged.tm_json.c.out}
 
 tests.tm_json.c.out := ${build_dir}tests.tm_json.c${exe_ext}
 tests.tm_json.default.out := ${build_dir}tests.tm_json.default${exe_ext}

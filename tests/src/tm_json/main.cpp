@@ -1,4 +1,4 @@
-﻿#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
 #include <iterator>
@@ -384,21 +384,101 @@ TEST_CASE("keywords") {
     CHECK(isnan(obj["NAN"].getFloat()));
 }
 
-TEST_CASE("strings") {
-    const char* json = R"(["Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello"])";
-    const char* comp = "Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello";
-
-    const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
+bool check_json(const char* json, uint32_t flags) {
     AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
     auto& doc = pool.document;
-    REQUIRE(doc.error.type == JSON_OK);
-
-    CHECK(str_equal(doc.root.getArray()[0].getString(), comp));
+    return doc.error.type == JSON_OK;
 }
 
-TEST_CASE("unicode" * doctest::should_fail(true)) {
+AllocatedDocument json_doc(const char* json, uint32_t flags) {
+    return jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
+}
+
+TEST_CASE("strings") {
+    SUBCASE("escapes") {
+        {
+            const char* json = R"(["Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello"])";
+            const char* comp = "Teststring \"\\\"\r\n\t\f\\n\\\n\\\\n Hello";
+
+            const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
+            AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
+            auto& doc = pool.document;
+            REQUIRE(doc.error.type == JSON_OK);
+
+            CHECK(str_equal(doc.root.getArray()[0].getString(), comp));
+        }
+        REQUIRE(check_json(R"(["Teststring\\"])", JSON_READER_STRICT) == true);
+        const char* raw = R"(["Teststring\"])";
+        REQUIRE(check_json(raw, JSON_READER_STRICT) == false);
+    }
+
+    SUBCASE("unicode escape") {
+        REQUIRE(check_json(R"(["Invalid string \updog"])", JSON_READER_STRICT) == false);
+        REQUIRE(check_json(R"(["Valid string \\updog"])", JSON_READER_STRICT) == true);
+        REQUIRE(check_json(R"(["Invalid string \u"])", JSON_READER_STRICT) == false);
+        REQUIRE(check_json(R"(["Valid string \\u"])", JSON_READER_STRICT) == true);
+    }
+
+    SUBCASE("escaped multiline") {
+        REQUIRE(check_json("[\"Valid string \\\nescaped newline\"]", JSON_READER_ESCAPED_MULTILINE_STRINGS) == true);
+        REQUIRE(check_json("[\"Invalid string \nunescaped newline\"]", JSON_READER_ESCAPED_MULTILINE_STRINGS) == false);
+        REQUIRE(check_json("[\"No newline\"]", JSON_READER_ESCAPED_MULTILINE_STRINGS) == true);
+        REQUIRE(check_json("[\"Escaped at the end \\\n\"]", JSON_READER_ESCAPED_MULTILINE_STRINGS) == true);
+        REQUIRE(check_json("[\"Invalid \\\\\n\"]", JSON_READER_ESCAPED_MULTILINE_STRINGS) == false);
+    }
+
+    SUBCASE("concatenated strings") {
+        const uint32_t flags = JSON_READER_CONCATENATED_STRINGS | JSON_READER_CONCATENATED_STRINGS_IN_ARRAYS;
+
+        REQUIRE(check_json(R"(["Valid string" invalid "another valid string"])", flags) == false);
+
+        // With escaped quotation marks
+        // Repeated assignments to json are workaround for MSVC raw string parsing when escape sequences are present.
+        const char* json = R"(["Valid string\"" \" "another \"valid string"])";
+        REQUIRE(check_json(json, flags) == false);
+        json = R"(["Valid string\\\" "another \"valid string"])";
+        REQUIRE(check_json(json, flags) == false);
+        json = R"(["Valid string\\"" "another \"valid string"])";
+        REQUIRE(check_json(json, flags) == false);
+
+        // With newlines
+        json = R"(["Valid string\"" \"
+                   "another \"valid string"])";
+        REQUIRE(check_json(json, flags) == false);
+        json = R"(["Valid string\\\"
+                   "another \"valid string"])";
+        REQUIRE(check_json(json, flags) == false);
+        json = R"(["Valid string\\""
+                   "another \"valid string"])";
+        REQUIRE(check_json(json, flags) == false);
+
+        auto check_and_compare = [&](const char* json, const char* cmp) {
+            auto pool = json_doc(json, flags);
+            REQUIRE(pool.document.error.type == JSON_OK);
+            REQUIRE(str_equal(pool.document.root.getArray()[0].getString(), cmp));
+        };
+
+        check_and_compare(R"(["Valid string""another valid string"])", "Valid stringanother valid string");
+        check_and_compare(R"(["Valid string""another valid string""another another"])",
+                          "Valid stringanother valid stringanother another");
+
+        // With escaped quotation marks
+        check_and_compare(R"(["Valid string\""  "another \"valid string"])", R"(Valid string"another "valid string)");
+
+        // With newlines
+        check_and_compare(R"(["Valid string\""
+                               "another \"valid string"])",
+                          R"(Valid string"another "valid string)");
+        check_and_compare(R"(["Valid string\\"
+                               "another \"valid string"])",
+                          R"(Valid string\another "valid string)");
+    }
+}
+
+TEST_CASE("unicode") {
     const char* json = R"({
-        "copyright_symbol": "\u00A9"
+        "copyright_symbol": "\u00A9",
+        "Utf-16 surrogate pair": "\uD800\uDD40"
     })";
 
     const uint32_t flags = JSON_READER_EXTENDED_FLOATS | JSON_READER_IGNORE_CASE_KEYWORDS;
@@ -409,7 +489,46 @@ TEST_CASE("unicode" * doctest::should_fail(true)) {
     auto root = doc.root.getObject();
     REQUIRE(root);
 
-    CHECK(str_equal(root["copyright_symbol"].getString(), u8"©"));
+    // COPYRIGHT SIGN "©"
+    CHECK(str_equal(root["copyright_symbol"].getString(), "\xC2\xA9"));
+
+    // GREEK ACROPHONIC ATTIC ONE QUARTER "𐅀"
+    CHECK(str_equal(root["Utf-16 surrogate pair"].getString(), "\xF0\x90\x85\x80"));
+
+    // Unpaired surrogate pairs.
+    // Repeated assignments to json are workaround for MSVC raw string parsing when escape sequences are present.
+    json = R"(["Unpaired surrogate pair \uD800"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["Unpaired surrogate pair \uDD40"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["Unpaired surrogate pair \uDD40\uD800"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["Unpaired surrogate pair \uD800\uD800"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["Unpaired surrogate pair \uD800\uD800"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+
+    json = R"(["\uD800 Unpaired surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["\uDD40 Unpaired surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["\uDD40\uD800 Unpaired surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["\uD800\uD800 Unpaired surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["\uD800\uD800 Unpaired surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+
+    json = R"(["Unpaired \uD800 surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["Unpaired \uDD40 surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["Unpaired \uDD40\uD800 surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["Unpaired \uD800\uD800 surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
+    json = R"(["Unpaired \uD800\uD800 surrogate pair"])";
+    REQUIRE(check_json(json, JSON_READER_STRICT) == false);
 }
 
 TEST_CASE("operator[]") {
