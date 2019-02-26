@@ -5,6 +5,10 @@
 #define VERSION_MINOR ((VERSION >> 8u) & 0xFFu)
 #define VERSION_PATCH (VERSION & 0xFFu)
 
+#ifdef _MSC_VER
+#pragma warning(disable : 4702)  // unreachable code
+#endif
+
 #include <cassert>
 #include <cstdio>
 #include <cstdint>
@@ -1452,9 +1456,9 @@ struct unique_ucd {
     int32_t add_ucd_entry(const ucd_entry& entry) { return add_unique_ucd_entry(&entries, entry); }
 
     static void add_to_multistage_table_impl(vector<int32_t>* stage_one, vector<ucd_block>* stage_two,
-                                             uint32_t codepoint, int32_t entry_index, int32_t block_size) {
-        auto stage_one_index = codepoint / block_size;
-        auto stage_two_index = codepoint % block_size;
+                                             uint32_t codepoint, int32_t entry_index, int32_t stage_two_block_size) {
+        auto stage_one_index = codepoint / stage_two_block_size;
+        auto stage_two_index = codepoint % stage_two_block_size;
         if (stage_one_index >= stage_one->size()) {
             stage_one->resize(stage_one_index + 1, -1);
         }
@@ -1523,7 +1527,7 @@ struct unique_ucd {
             if (current.references > 0) {
                 assert(current.redirect_index < 0);
                 pruned_stage_two.push_back(current);
-                current.redirect_index = (pruned_stage_two.size() - 1);
+                current.redirect_index = (int32_t)(pruned_stage_two.size() - 1);
             }
         }
 
@@ -1544,7 +1548,7 @@ struct unique_ucd {
         int32_t default_block_pos = 0;
         if (flags & generate_flags_prune_stage_two) {
             pruned_stage_two_start = prune_trivial_blocks(stage_one, stage_two);
-            default_block_pos = pruned_stage_two_start;
+            default_block_pos = (int32_t)pruned_stage_two_start;
         }
 
         if (flags & generate_flags_prune_stage_one) {

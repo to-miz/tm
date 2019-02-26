@@ -60,7 +60,7 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     }
 
     if (result.ec == TM_OK) {
-        result.contents.size = TMU_STRLEN(result.contents.data);
+        result.contents.size = (tm_size_t)TMU_STRLEN(result.contents.data);
 
         /* Pad by extra_size and room for trailing '/'. */
         tm_size_t new_size = result.contents.size + extra_size + 1;

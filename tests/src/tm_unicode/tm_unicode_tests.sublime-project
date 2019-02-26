@@ -54,6 +54,10 @@
           "cmd": "make tests.tm_unicode.default.run"
         },
         {
+          "name": "run signed_size_t tests",
+          "cmd": "make tests.tm_unicode.signed_size_t.run"
+        },
+        {
           "name": "run windows tests",
           "cmd": "make tests.tm_unicode.windows.run"
         },

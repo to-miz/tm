@@ -57,11 +57,13 @@ static tm_bool tmu_to_platform_path(const char* path, tmu_platform_path* out) {
     return TM_TRUE;
 }
 
+#if defined(TM_STRING_VIEW) && defined(__cplusplus)
 static tm_bool tmu_to_platform_path_n(const char* path, tm_size_t size, tmu_platform_path* out) {
     if (!tmu_to_platform_path_internal(tmu_utf8_make_stream_n(path, size), out)) return TM_FALSE;
     tmu_translate_path_delims(out->path);
     return TM_TRUE;
 }
+#endif
 
 TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) {
     TM_UNREFERENCED_PARAM(extra_size);

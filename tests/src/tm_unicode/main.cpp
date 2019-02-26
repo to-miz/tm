@@ -117,16 +117,16 @@ const uint8_t utf16be_bom[] = {0xFE, 0xFF, 0x00, 0x74, 0x00, 0x65, 0x00, 0x73, 0
 TEST_CASE("convert raw bytes") {
     allocation_guard alloc_guard;
 
-    auto do_test = [](const void* in, tm_size_t in_len, tmu_encoding encoding) {
+    auto do_test = [](const void* in, size_t in_len, tmu_encoding encoding) {
         const tm_size_t buffer_len = 1024;
         char buffer[1024];
 
-        auto overflow = tmu_utf8_convert_from_bytes(in, in_len, encoding, tmu_validate_error,
+        auto overflow = tmu_utf8_convert_from_bytes(in, (tm_size_t)in_len, encoding, tmu_validate_error,
                                                     /*replace_str=*/nullptr, /*replace_str_len=*/0,
                                                     /*nullterminate=*/false, /*out=*/nullptr, /*out_len=*/0);
         REQUIRE(overflow.ec == TM_ERANGE);
 
-        auto success = tmu_utf8_convert_from_bytes(in, in_len, encoding, tmu_validate_error,
+        auto success = tmu_utf8_convert_from_bytes(in, (tm_size_t)in_len, encoding, tmu_validate_error,
                                                    /*replace_str=*/nullptr, /*replace_str_len=*/0,
                                                    /*nullterminate=*/false, buffer, buffer_len);
         REQUIRE(success.ec == TM_OK);

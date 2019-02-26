@@ -319,7 +319,7 @@ static tmu_write_file_result tmu_write_file_ex_t(const WCHAR* filename, const vo
 
     tmu_write_file_result result = {0, TM_OK};
 
-    int filename_len = lstrlenW(filename);
+    tm_size_t filename_len = (tm_size_t)lstrlenW(filename);
     tm_size_t dir_len = tmu_get_path_len_internal(filename, filename_len);
     if (flags & tmu_create_directory_tree) {
         tm_errc ec = tmu_create_directory_internal(filename, dir_len);
@@ -331,7 +331,7 @@ static tmu_write_file_result tmu_write_file_ex_t(const WCHAR* filename, const vo
 
     WCHAR* temp_file = TM_NULL;
     WCHAR temp_file_buffer[MAX_PATH];
-    const int temp_file_len = filename_len + 9;
+    const tm_size_t temp_file_len = filename_len + 9;
 
     /* Limitation of GetTempFileNameW, dir_len cannot be bigger than MAX_PATH - 14. */
     if (dir_len < MAX_PATH - 14) {

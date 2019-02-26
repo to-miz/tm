@@ -13,9 +13,10 @@
 	#endif
 #endif
 
-#if defined(_WIN32) || defined(TMU_TESTING_MSVC_CRT) || defined(TMU_USE_WINDOWS_H)
-    typedef tmu_char16 tmu_tchar;
-#else
-    typedef char tmu_tchar;
+#if !defined (TMU_TESTING_TCHAR_DEFINED)
+	#if (defined(_WIN32) || defined(TMU_TESTING_MSVC_CRT) || defined(TMU_USE_WINDOWS_H))
+	    typedef tmu_char16 tmu_tchar;
+	#else
+	    typedef char tmu_tchar;
+	#endif
 #endif
-

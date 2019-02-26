@@ -145,6 +145,7 @@ tmu_utf8_command_line_from_utf16_managed(tmu_char16 const* const* utf16_args, in
 /*
 Winapi only extension, get command line directly without supplying the Utf-16 arguments.
 Result must still be destroyed using tmu_utf8_destroy_command_line.
+Requires to link against Shell32.lib.
 */
 TMU_DEF tmu_utf8_command_line_managed_result tmu_utf8_winapi_get_command_line_managed();
 #endif

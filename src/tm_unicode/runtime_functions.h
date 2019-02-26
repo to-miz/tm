@@ -80,7 +80,7 @@
 	        const char* b = (const char*)second;
 
 	        while (size) {
-	            int diff = (int)*first++ - (int)*second++;
+	            int diff = (int)*a++ - (int)*b++;
 	            if (diff != 0) return (diff < 0) ? -1 : 1;
 	            --size;
 	        }

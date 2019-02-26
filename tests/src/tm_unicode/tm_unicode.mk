@@ -53,6 +53,7 @@ ${tests.tm_unicode.default.c.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
 	${hide}$(call c_compile_and_link, tests/src/tm_unicode/main.c, $@, , USE_TESTS_UCD)
 
+${tests.tm_unicode.windows.c.out}: LINK_LIBS.cl := Shell32.lib
 ${tests.tm_unicode.windows.c.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
 	${hide}$(call c_compile_and_link, tests/src/tm_unicode/main.c, $@,, USE_WINDOWS_H)
@@ -102,6 +103,10 @@ tests.tm_unicode.run: ${tests.tm_unicode.all_config_deps}
 tests.tm_unicode.default.run: ${tests.tm_unicode.default.out}
 	${hide}echo Running Test: ${tests.tm_unicode.default.out}
 	${hide}${tests.tm_unicode.default.out}
+
+tests.tm_unicode.signed_size_t.run: ${tests.tm_unicode.signed_size_t.out}
+	${hide}echo Running Test: ${tests.tm_unicode.signed_size_t.out}
+	${hide}${tests.tm_unicode.signed_size_t.out}
 
 tests.tm_unicode.windows.run: ${tests.tm_unicode.windows.out}
 	${hide}echo Running Test: ${tests.tm_unicode.windows.out}

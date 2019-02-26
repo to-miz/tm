@@ -205,7 +205,7 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
     }
     size_t grapheme_break_transitions_size = 0;
     if (flags & generate_flags_grapheme_break) {
-        grapheme_break_transitions_size = sizeof(grapheme_break_transitions);
+        grapheme_break_transitions_size = sizeof(grapheme_break_transitions) / sizeof(grapheme_break_transitions[0][0]);
     }
 
     auto ucd_entry_size = ucd.min_sizes.ucd_entry_size(flags);
@@ -408,6 +408,7 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
 
     // Generate grapheme break transition table.
     if (flags & generate_flags_grapheme_break) {
+        assert(grapheme_break_transitions_size > 0);
         fprintf(f,
                 "/*\nGrapheme cluster break transition table.\n"
                 "The grapheme cluster break rules are embedded in a 16x16 state machine\n"
@@ -418,7 +419,6 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
                 "break is found.\n"
                 "See https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules\n"
                 "for more information.\n*/\n");
-        size_t grapheme_break_transitions_size = sizeof(grapheme_break_transitions) / sizeof(uint8_t);
         fprintf(f,
                 "/* Unicode grapheme cluster break transition table: %zu bytes. */\n"
                 "static const size_t %sgrapheme_break_transitions_size = %zu;\n"
@@ -473,8 +473,8 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
             vector<range_map_entry> ranges;
             vector<outlier> outliers;
 
-            size_t current = pruned_stage_one_size;
-            size_t count = ucd.stage_one.size();
+            int32_t current = (int32_t)pruned_stage_one_size;
+            int32_t count = (int32_t)ucd.stage_one.size();
             while (current < count) {
                 int32_t first = current;
                 int32_t last = first + 1;

@@ -10,8 +10,8 @@ TMU_DEF tm_bool tmu_grow_by(struct tmu_contents_struct* contents, tm_size_t amou
 #if defined(_MSC_VER) || defined(TMU_TESTING_MSVC_CRT)
 
 #if defined(TMU_USE_CRT)
-static FILE* tmu_fopen_t(const tmu_char16* filename, const tmu_char16* mode) { return _wfopen(filename, mode); }
-static FILE* tmu_freopen_t(const tmu_char16* filename, const tmu_char16* mode, FILE* current) {
+static FILE* tmu_fopen_t(const tmu_tchar* filename, const tmu_tchar* mode) { return _wfopen(filename, mode); }
+static FILE* tmu_freopen_t(const tmu_tchar* filename, const tmu_tchar* mode, FILE* current) {
     return _wfreopen(filename, mode, current);
 }
 #endif /* defined(TMU_USE_CRT) */

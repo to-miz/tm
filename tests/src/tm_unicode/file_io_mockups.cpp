@@ -1,5 +1,8 @@
 // Cleanup global macros.
 // clang-format off
+#ifdef _MSC_VER
+    #undef _MSC_VER
+#endif
 #ifdef errno
 	#undef errno
 #endif
@@ -34,6 +37,9 @@
 #endif
 // clang-format on
 
+#define TMU_TESTING_CHAR16_DEFINED
+typedef uint16_t tmu_char16;
+
 #if !defined(USE_WINDOWS_H) && !defined(USE_MSVC_CRT)
 
 typedef char tchar;
@@ -51,7 +57,20 @@ const char path_delim = '/';
 #endif
 
 typedef uint16_t tchar;
+
+// Clang doesn't like keyword macros, so we disable the warning here.
+// We knowingly redefine wchar_t to a different type for mock purposes.
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wkeyword-macro"
+#endif
+
 #define wchar_t uint16_t
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #define WCHAR uint16_t
 typedef std::vector<uint16_t> tstring;
 const char path_delim = '\\';
@@ -63,14 +82,17 @@ std::vector<uint16_t> convert_path(const char* str) {
         /* Assuming ascii. */
         TM_ASSERT(str[i] >= 0);
         if (str[i] == '/') {
-        	result[i] = (uint16_t)'\\';
+            result[i] = (uint16_t)'\\';
         } else {
-	        result[i] = (uint16_t)str[i];
+            result[i] = (uint16_t)str[i];
         }
     }
     return result;
 }
 #endif /* !defined(USE_WINDOWS_H) && !defined(USE_MSVC_CRT) */
+
+#define TMU_TESTING_TCHAR_DEFINED
+typedef tchar tmu_tchar;
 
 size_t test_strlen(const char* str) { return strlen(str); }
 size_t test_strlen(const uint16_t* str) {

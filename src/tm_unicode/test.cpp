@@ -15,6 +15,12 @@
 #include <windows.h>
 #endif
 
+#if 0
+#define TM_SIZE_T_DEFINED
+#define TM_SIZE_T_IS_SIGNED 1
+typedef int tm_size_t;
+#endif
+
 #define TMU_USE_STL
 #define TM_UNICODE_IMPLEMENTATION
 #include "main.cpp"

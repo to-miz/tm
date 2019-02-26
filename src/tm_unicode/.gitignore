@@ -1,2 +1,3 @@
-generated/
+generated/*
+!generated/keep.txt
 data/

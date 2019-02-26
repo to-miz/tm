@@ -6,10 +6,14 @@ typedef const void* test_handle;
 #define DWORD uint32_t
 #define HANDLE test_handle
 #define BOOL bool
+
+/* Undef all windows definitions */
+#include "windows_undefs.h"
+
 #define CopyMemory memcpy
 #define MoveMemory memmove
-
 #define MAX_PATH 260
+
 
 #define INVALID_HANDLE_VALUE ((void*)3007)
 const void* test_valid_handle = ((void*)1);
@@ -266,7 +270,7 @@ bool test_ReadFile(HANDLE handle, void* dest, DWORD bytes_to_read, DWORD* bytes_
     if (win_mock.test_fail(fail_ReadFile)) return false;
 
     auto remaining = mock.file.read_contents_size - mock.file.bytes_read;
-    if (bytes_to_read > remaining * sizeof(char)) bytes_to_read = remaining * sizeof(char);
+    if (bytes_to_read > remaining * sizeof(char)) bytes_to_read = (DWORD)(remaining * sizeof(char));
     if (bytes_to_read) {
         memcpy(dest, mock.file.read_contents + mock.file.bytes_read, bytes_to_read);
         mock.file.bytes_read += bytes_to_read;
@@ -326,7 +330,7 @@ bool test_WriteFile(HANDLE handle, const void* buffer, DWORD buffer_len, DWORD* 
 
     DWORD bytes_to_write = buffer_len;
     size_t remaining = std::size(mock.file.write_contents) - mock.file.bytes_written;
-    if (bytes_to_write > remaining * sizeof(char)) bytes_to_write = remaining * sizeof(char);
+    if (bytes_to_write > remaining * sizeof(char)) bytes_to_write = (DWORD)(remaining * sizeof(char));
     if (bytes_to_write) {
         memcpy(mock.file.write_contents + mock.file.bytes_written, buffer, bytes_to_write);
         mock.file.bytes_written += bytes_to_write;
@@ -373,10 +377,10 @@ uint32_t test_GetTempFileNameW(const tchar* path, const tchar* prefix, uint32_t 
     // Dumb int to string.
     for (auto i = 0; i < 3; ++i) {
         if (unique <= 9) {
-            *out++ = unique + '0';
+            *out++ = (tchar)(unique + '0');
             break;
         } else if (unique >= 10 && unique <= 36) {
-            *out++ = unique + 'A';
+            *out++ = (tchar)(unique + 'A');
             break;
         } else {
             *out++ = 'Z';

@@ -1336,7 +1336,9 @@ static void tmu_transform_output_append_codepoint(uint32_t codepoint, tmu_transf
 #if TMU_UCD_HAS_SIMPLE_CASE
 TMU_DEF tmu_transform_result tmu_utf8_to_upper_simple(const char* str, tm_size_t str_len, char* out,
                                                       tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
@@ -1351,7 +1353,9 @@ TMU_DEF tmu_transform_result tmu_utf8_to_upper_simple(const char* str, tm_size_t
 }
 TMU_DEF tmu_transform_result tmu_utf8_to_title_simple(const char* str, tm_size_t str_len, char* out,
                                                       tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
@@ -1366,7 +1370,9 @@ TMU_DEF tmu_transform_result tmu_utf8_to_title_simple(const char* str, tm_size_t
 }
 TMU_DEF tmu_transform_result tmu_utf8_to_lower_simple(const char* str, tm_size_t str_len, char* out,
                                                       tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
@@ -1384,7 +1390,9 @@ TMU_DEF tmu_transform_result tmu_utf8_to_lower_simple(const char* str, tm_size_t
 #if TMU_UCD_HAS_SIMPLE_CASE_FOLD
 TMU_DEF tmu_transform_result tmu_utf8_to_case_fold_simple(const char* str, tm_size_t str_len, char* out,
                                                           tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
@@ -1517,7 +1525,9 @@ TMU_DEF int tmu_utf8_human_compare_simple(const char* a, tm_size_t a_len, const 
 #if TMU_UCD_HAS_SIMPLE_CASE_TOGGLE
 TMU_DEF tmu_transform_result tmu_utf8_toggle_case_simple(const char* str, tm_size_t str_len, char* out,
                                                          tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     tmu_transform_result result = {0, TM_OK};
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
@@ -1535,7 +1545,9 @@ TMU_DEF tmu_transform_result tmu_utf8_toggle_case_simple(const char* str, tm_siz
 
 #if TMU_UCD_HAS_FULL_CASE
 TMU_DEF tmu_transform_result tmu_utf8_to_upper(const char* str, tm_size_t str_len, char* out, tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     tmu_transform_result result = {0, TM_OK};
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
@@ -1558,7 +1570,9 @@ TMU_DEF tmu_transform_result tmu_utf8_to_upper(const char* str, tm_size_t str_le
     return out_stream.result;
 }
 TMU_DEF tmu_transform_result tmu_utf8_to_title(const char* str, tm_size_t str_len, char* out, tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     tmu_transform_result result = {0, TM_OK};
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
@@ -1581,7 +1595,9 @@ TMU_DEF tmu_transform_result tmu_utf8_to_title(const char* str, tm_size_t str_le
     return out_stream.result;
 }
 TMU_DEF tmu_transform_result tmu_utf8_to_lower(const char* str, tm_size_t str_len, char* out, tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     tmu_transform_result result = {0, TM_OK};
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
@@ -1607,7 +1623,9 @@ TMU_DEF tmu_transform_result tmu_utf8_to_lower(const char* str, tm_size_t str_le
 
 #if TMU_UCD_HAS_FULL_CASE_FOLD
 TMU_DEF tmu_transform_result tmu_utf8_to_case_fold(const char* str, tm_size_t str_len, char* out, tm_size_t out_len) {
-    tmu_transform_output_stream out_stream = {out, 0, out_len, {0, TM_OK}};
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
