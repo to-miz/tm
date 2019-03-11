@@ -15,6 +15,12 @@ VERBOSE   := false
 
 # Set up declarations used for all supported platforms and compilers.
 
+# Directories
+
+build_dir   := ${BUILD_DIR}/${BUILD}/
+debug_dir   := ${BUILD_DIR}/debug/
+release_dir := ${BUILD_DIR}/release/
+
 # Extensions depending on platform.
 ifeq (${OS},Windows_NT)
 	os := windows
@@ -28,6 +34,11 @@ ifeq (${OS},Windows_NT)
 	endif
 
 	mkdir_cmd = mkdir $(subst /,\,${1}) 2>nul
+
+	# Turn paths seperators to Windows path seperators.
+	build_dir   := $(subst /,\,${build_dir})
+	debug_dir   := $(subst /,\,${debug_dir})
+	release_dir := $(subst /,\,${release_dir})
 else
 	os := linux
 	exe_ext := .out
@@ -41,12 +52,6 @@ else
 
 	mkdir_cmd = mkdir -p ${1}
 endif
-
-# Directories
-
-build_dir   := ${BUILD_DIR}/${BUILD}/
-debug_dir   := ${BUILD_DIR}/debug/
-release_dir := ${BUILD_DIR}/release/
 
 # Create build dirs.
 $(shell $(call mkdir_cmd, ${debug_dir}))
