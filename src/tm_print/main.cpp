@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.10 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.12 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,6 +19,13 @@ ISSUES
     current locale.
 
 HISTORY
+    v0.0.12 10.03.19 Added char* specializations (non-const), fixing not being able to print raw char* strings.
+    v0.0.11 09.03.19 Added tmp_parse_print_format for parsing the PrintFormat structure from other sources.
+                     Added FILE* printing overloads for supplying an initial PrintFormat to be
+                     used in printing.
+                     Removed some unused code inside tmp_print_impl.
+                     Elevated some internal print format flags to the public interface.
+                     Removed TMP_NO_STDIO, fully replaced by TMP_NO_CRT_FILE_PRINTING.
     v0.0.10 14.01.19 Fixed msvc compilation errors in most conforming mode with all extensions disabled.
     v0.0.9  02.11.18 Moved the fixed size array inside PrintArgList into the variadic template functions
                      so its size can be deduced from the number of arguments.
@@ -60,7 +67,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#define TMP_VERSION 0x0000000Au
+#define TMP_VERSION 0x0000000Cu
 
 #include "dependencies_header.h"
 
@@ -82,10 +89,21 @@ enum Values : unsigned int {
     Lowercase = (1u << 6u),
     Sign = (1u << 7u),
     Char = (1u << 8u),
+    LeftJustify = (1u << 9u),
+    PrependHex = (1u << 10u),
+    PrependBinary = (1u << 11u),
+    PrependOctal = (1u << 12u),
+    EmitDecimalPoint = (1u << 13u),
+    PadWithSpaces = (1u << 14u),
+    // PoundSpecified = (1u << 15u),
+    // WidthSpecified = (1u << 16u),
+    // PrecisionSpecified = (1u << 17u),
 
+    // Misc.
     Default = TMP_DEFAULT_FLAGS,
 
-    Count = 9,
+    Count = 18,
+    ClearMask = ((1u << 9u) - 1),
     General = Fixed | Scientific
 };
 }
@@ -171,11 +189,13 @@ struct PrintArgList {
 // define TMP_NO_CRT_FILE_PRINTING if you don't need printing to stdout or to FILE* handles
 // clang-format off
 #ifndef TMP_NO_CRT_FILE_PRINTING
-    TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintArgList& args);
+    TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintFormat& initialFormatting,
+                              const PrintArgList& args);
     #ifdef TM_STRING_VIEW
-        TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintArgList& args);
+        TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
+                                  const PrintArgList& args);
     #endif  // TM_STRING_VIEW
-#endif  // TMP_NO_STDIO
+#endif  // TMP_NO_CRT_FILE_PRINTING
 // clang-format on
 
 TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
@@ -184,6 +204,9 @@ TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, con
 TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
                               const PrintArgList& args);
 #endif
+
+TMP_DEF tm_size_t tmp_parse_print_format(const char* format_specifiers, tm_size_t format_specifiers_len,
+                                         PrintFormat* out);
 
 #include "variadic_machinery.h"
 

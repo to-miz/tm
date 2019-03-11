@@ -76,7 +76,7 @@ static PrintFormattedResult print_formatted_unsigned(char* dest, tm_size_t maxle
 
     tm_size_t padding = 0;
     auto flags = format.flags;
-    if (flags & FormatSpecifierFlags::LeftJustify) {
+    if (flags & PrintFlags::LeftJustify) {
         padding = sizes.decorated - sizes.digits;
     } else {
         padding = sizes.size - sizes.digits;

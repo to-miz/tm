@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.10 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.12 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,6 +19,13 @@ ISSUES
     current locale.
 
 HISTORY
+    v0.0.12 10.03.19 Added char* specializations (non-const), fixing not being able to print raw char* strings.
+    v0.0.11 09.03.19 Added tmp_parse_print_format for parsing the PrintFormat structure from other sources.
+                     Added FILE* printing overloads for supplying an initial PrintFormat to be
+                     used in printing.
+                     Removed some unused code inside tmp_print_impl.
+                     Elevated some internal print format flags to the public interface.
+                     Removed TMP_NO_STDIO, fully replaced by TMP_NO_CRT_FILE_PRINTING.
     v0.0.10 14.01.19 Fixed msvc compilation errors in most conforming mode with all extensions disabled.
     v0.0.9  02.11.18 Moved the fixed size array inside PrintArgList into the variadic template functions
                      so its size can be deduced from the number of arguments.
@@ -162,7 +169,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#define TMP_VERSION 0x0000000Au
+#define TMP_VERSION 0x0000000Cu
 
 /* assert */
 #ifndef TM_ASSERT
@@ -235,10 +242,21 @@ enum Values : unsigned int {
     Lowercase = (1u << 6u),
     Sign = (1u << 7u),
     Char = (1u << 8u),
+    LeftJustify = (1u << 9u),
+    PrependHex = (1u << 10u),
+    PrependBinary = (1u << 11u),
+    PrependOctal = (1u << 12u),
+    EmitDecimalPoint = (1u << 13u),
+    PadWithSpaces = (1u << 14u),
+    // PoundSpecified = (1u << 15u),
+    // WidthSpecified = (1u << 16u),
+    // PrecisionSpecified = (1u << 17u),
 
+    // Misc.
     Default = TMP_DEFAULT_FLAGS,
 
-    Count = 9,
+    Count = 18,
+    ClearMask = ((1u << 9u) - 1),
     General = Fixed | Scientific
 };
 }
@@ -324,11 +342,13 @@ struct PrintArgList {
 // define TMP_NO_CRT_FILE_PRINTING if you don't need printing to stdout or to FILE* handles
 // clang-format off
 #ifndef TMP_NO_CRT_FILE_PRINTING
-    TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintArgList& args);
+    TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintFormat& initialFormatting,
+                              const PrintArgList& args);
     #ifdef TM_STRING_VIEW
-        TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintArgList& args);
+        TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
+                                  const PrintArgList& args);
     #endif  // TM_STRING_VIEW
-#endif  // TMP_NO_STDIO
+#endif  // TMP_NO_CRT_FILE_PRINTING
 // clang-format on
 
 TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
@@ -337,6 +357,9 @@ TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, con
 TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
                               const PrintArgList& args);
 #endif
+
+TMP_DEF tm_size_t tmp_parse_print_format(const char* format_specifiers, tm_size_t format_specifiers_len,
+                                         PrintFormat* out);
 
 template <class... Types>
 struct tmp_type_flags;
@@ -513,6 +536,10 @@ template <class... Types>
 struct tmp_type_flags<const char*, Types...> {
     enum : uint64_t { Value = PrintType::String | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
 };
+template <class... Types>
+struct tmp_type_flags<char*, Types...> {
+    enum : uint64_t { Value = PrintType::String | (tmp_type_flags<Types...>::Value << PrintType::Bits) };
+};
 #ifdef TM_STRING_VIEW
 template <class... Types>
 struct tmp_type_flags<TM_STRING_VIEW, Types...> {
@@ -616,6 +643,11 @@ void fillPrintArgList(PrintArgList* list, const char* value, const Types&... arg
     list->args[list->size++].s = value;
     fillPrintArgList(list, args...);
 }
+template <class... Types>
+void fillPrintArgList(PrintArgList* list, char* value, const Types&... args) {
+    list->args[list->size++].s = value;
+    fillPrintArgList(list, args...);
+}
 #ifdef TM_STRING_VIEW
 template <class... Types>
 void fillPrintArgList(PrintArgList* list, TM_STRING_VIEW value, const Types&... args) {
@@ -647,14 +679,14 @@ void makePrintArgList(PrintArgList* list, size_t capacity, const Types&... args)
     TM_ASSERT(list->size == capacity);
 }
 
-#ifndef TMP_NO_STDIO
+#ifndef TMP_NO_CRT_FILE_PRINTING
 template <class... Types>
 tm_errc print(const char* format, const Types&... args) {
     static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
     PrintValue values[sizeof...(args)];
     PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
     makePrintArgList(&argList, sizeof...(args), args...);
-    return tmp_print(stdout, format, argList);
+    return tmp_print(stdout, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
 tm_errc print(FILE* out, const char* format, const Types&... args) {
@@ -662,7 +694,23 @@ tm_errc print(FILE* out, const char* format, const Types&... args) {
     PrintValue values[sizeof...(args)];
     PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
     makePrintArgList(&argList, sizeof...(args), args...);
-    return tmp_print(out, format, argList);
+    return tmp_print(out, format, defaultPrintFormat(), argList);
+}
+template <class... Types>
+tm_errc print(const char* format, const PrintFormat& initialFormatting, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
+    PrintValue values[sizeof...(args)];
+    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
+    makePrintArgList(&argList, sizeof...(args), args...);
+    return tmp_print(stdout, format, initialFormatting, argList);
+}
+template <class... Types>
+tm_errc print(FILE* out, const char* format, const PrintFormat& initialFormatting, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
+    PrintValue values[sizeof...(args)];
+    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
+    makePrintArgList(&argList, sizeof...(args), args...);
+    return tmp_print(out, format, initialFormatting, argList);
 }
 // impl
 
@@ -673,7 +721,7 @@ tm_errc print(TM_STRING_VIEW format, const Types&... args) {
     PrintValue values[sizeof...(args)];
     PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
     makePrintArgList(&argList, sizeof...(args), args...);
-    return tmp_print(stdout, format, argList);
+    return tmp_print(stdout, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
 tm_errc print(FILE* out, TM_STRING_VIEW format, const Types&... args) {
@@ -681,10 +729,26 @@ tm_errc print(FILE* out, TM_STRING_VIEW format, const Types&... args) {
     PrintValue values[sizeof...(args)];
     PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
     makePrintArgList(&argList, sizeof...(args), args...);
-    return tmp_print(out, format, argList);
+    return tmp_print(out, format, defaultPrintFormat(), argList);
+}
+template <class... Types>
+tm_errc print(TM_STRING_VIEW format, const PrintFormat& initialFormatting, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
+    PrintValue values[sizeof...(args)];
+    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
+    makePrintArgList(&argList, sizeof...(args), args...);
+    return tmp_print(stdout, format, initialFormatting, argList);
+}
+template <class... Types>
+tm_errc print(FILE* out, TM_STRING_VIEW format, const PrintFormat& initialFormatting, const Types&... args) {
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
+    PrintValue values[sizeof...(args)];
+    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
+    makePrintArgList(&argList, sizeof...(args), args...);
+    return tmp_print(out, format, initialFormatting, argList);
 }
 #endif  // defined( TM_STRING_VIEW )
-#endif  // TMP_NO_STDIO
+#endif  // TMP_NO_CRT_FILE_PRINTING
 
 template <class... Types>
 tm_size_t snprint(char* dest, tm_size_t len, const char* format, const Types&... args) {
@@ -833,192 +897,22 @@ struct PrintSizes {
 #endif
 // clang-format on
 
-namespace FormatSpecifierFlags {
-enum Values : unsigned int {
-    LeftJustify = (1u << 8u),
-    PoundSpecified = (1u << 9u),
-    PrependHex = (1u << 10u),
-    PrependBinary = (1u << 11u),
-    PrependOctal = (1u << 12u),
-    EmitDecimalPoint = (1u << 13u),
-    IndexSpecified = (1u << 14u),
-    WidthSpecified = (1u << 15u),
-    PrecisionSpecified = (1u << 16u),
-    PadWithSpaces = (1u << 17u),
-};
-}
-
-static unsigned int tmp_parse_format_specifiers(const char* p, tm_size_t len, PrintFormat* format,
-                                                uint32_t* currentIndex) {
-    unsigned int result = 0;
-    if (len != 0) {
-        auto end = p + len;
-        // parse what is inside {}
-
-        auto scan_index_result = scan_u32_n(p, (tm_size_t)(end - p), currentIndex, 10);
-        if (scan_index_result.ec == TM_OK) {
-            p += scan_index_result.size;
-            result |= FormatSpecifierFlags::IndexSpecified;
-        }
-        if (*p == ':') {
-            ++p;
-            // custom formatting was defined, so we reject the initial formatting
-            *format = defaultPrintFormat();
-        }
-        // parse flags
-        {
-            // pad with spaces by default
-            format->flags |= FormatSpecifierFlags::PadWithSpaces;
-
-            bool parseFlags = true;
-            do {
-                switch (*p) {
-                    case '-': {
-                        result |= FormatSpecifierFlags::LeftJustify;
-                        ++p;
-                        break;
-                    }
-                    case '+': {
-                        format->flags |= PrintFlags::Sign;
-                        ++p;
-                        break;
-                    }
-                    case ' ': {
-                        format->flags |= FormatSpecifierFlags::PadWithSpaces;
-                        ++p;
-                        break;
-                    }
-                    case '#': {
-                        result |= FormatSpecifierFlags::PoundSpecified;
-                        ++p;
-                        break;
-                    }
-                    case '0': {
-                        format->flags &= ~FormatSpecifierFlags::PadWithSpaces;
-                        ++p;
-                        break;
-                    }
-                    default: {
-                        parseFlags = false;
-                        break;
-                    }
-                }
-            } while (parseFlags);
-        }
-
-        // parse width
-        unsigned width = 0;
-        auto scan_width_result = scan_u32_n(p, (tm_size_t)(end - p), &width, 10);
-        if (scan_width_result.ec == TM_OK) {
-            p += scan_width_result.size;
-            result |= FormatSpecifierFlags::WidthSpecified;
-        }
-        format->width = (int)width;
-
-        // parse precision
-        if (*p == '.') {
-            ++p;
-            unsigned precision = 0;
-            auto scan_precision_result = scan_u32_n(p, (tm_size_t)(end - p), &precision, 10);
-            if (scan_precision_result.ec == TM_OK) {
-                p += scan_precision_result.size;
-                result |= FormatSpecifierFlags::PrecisionSpecified;
-            }
-            format->precision = (int)precision;
-        }
-
-        switch (*p) {
-            case 'x': {
-                format->flags |= PrintFlags::Lowercase;
-                format->base = 16;
-                if (result & FormatSpecifierFlags::PoundSpecified) {
-                    result |= FormatSpecifierFlags::PrependHex;
-                }
-                break;
-            }
-            case 'X': {
-                format->base = 16;
-                if (result & FormatSpecifierFlags::PoundSpecified) {
-                    result |= FormatSpecifierFlags::PrependHex;
-                }
-                break;
-            }
-            case 'o': {
-                format->base = 8;
-                if (result & FormatSpecifierFlags::PoundSpecified) {
-                    result |= FormatSpecifierFlags::PrependOctal;
-                }
-                break;
-            }
-            case 'b': {
-                format->flags |= PrintFlags::Lowercase;
-                format->base = 2;
-                if (result & FormatSpecifierFlags::PoundSpecified) {
-                    result |= FormatSpecifierFlags::PrependBinary;
-                }
-                break;
-            }
-            case 'B': {
-                format->base = 2;
-                if (result & FormatSpecifierFlags::PoundSpecified) {
-                    result |= FormatSpecifierFlags::PrependBinary;
-                }
-                break;
-            }
-            case 'c': {
-                format->flags |= PrintFlags::Char;
-                break;
-            }
-
-            // floating point
-            case 'e': {
-                format->flags |= PrintFlags::Lowercase;
-                format->flags |= PrintFlags::Scientific;
-                break;
-            }
-            case 'E': {
-                format->flags |= PrintFlags::Scientific;
-                break;
-            }
-            case 'f': {
-                format->flags |= PrintFlags::TrailingZeroes | PrintFlags::Fixed;
-                break;
-            }
-            case 'g': {
-                format->flags |= PrintFlags::Lowercase;
-                format->flags |= PrintFlags::General;
-                format->flags |= PrintFlags::Shortest;
-                break;
-            }
-            case 'G': {
-                format->flags |= PrintFlags::General;
-                format->flags |= PrintFlags::Shortest;
-                break;
-            }
-            case 'a': {
-                format->flags |= PrintFlags::Lowercase;
-                format->flags |= PrintFlags::Hex;
-                if (result & FormatSpecifierFlags::PoundSpecified) {
-                    result |= FormatSpecifierFlags::PrependHex;
-                }
-                break;
-            }
-            case 'A': {
-                format->flags |= PrintFlags::Hex;
-                if (result & FormatSpecifierFlags::PoundSpecified) {
-                    result |= FormatSpecifierFlags::PrependHex;
-                }
-                break;
-            }
-
-            // non printf
-            case 'n': {
-                result |= PrintFlags::BoolAsNumber;
-                break;
-            }
-        }
+static bool tmp_parse_format_specifiers(const char* p, tm_size_t len, PrintFormat* format, uint32_t* currentIndex) {
+    if (len <= 0) return false;
+    bool index_specified = false;
+    const char* end = p + len;
+    auto scan_index_result = scan_u32_n(p, (tm_size_t)(end - p), currentIndex, 10);
+    if (scan_index_result.ec == TM_OK) {
+        p += scan_index_result.size;
+        index_specified = true;
     }
-    return result;
+
+    if (p < end && *p == ':') {
+        ++p;
+        tmp_parse_print_format(p, (tm_size_t)(end - p), format);
+    }
+
+    return index_specified;
 }
 
 // TODO: this could be done better with dependency to type_traits
@@ -1070,7 +964,7 @@ static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const 
 
     if (width > 0 && (tm_size_t)width > str_len) {
         tm_size_t padding = (tm_size_t)width - str_len;
-        if (!(format.flags & FormatSpecifierFlags::LeftJustify)) {
+        if (!(format.flags & PrintFlags::LeftJustify)) {
             TM_ASSERT(padding <= remaining);
             TM_MEMSET(dest, ' ', (size_t)padding);
             dest += padding;
@@ -1112,10 +1006,10 @@ static tm_size_t tmp_get_decorated_size(tm_size_t digits, const PrintFormat& for
     if (negative || (format.flags & PrintFlags::Sign)) {
         ++result;
     }
-    if ((format.flags & FormatSpecifierFlags::PrependHex) || (format.flags & FormatSpecifierFlags::PrependBinary)) {
+    if ((format.flags & PrintFlags::PrependHex) || (format.flags & PrintFlags::PrependBinary)) {
         result += 2;
     }
-    if (format.flags & FormatSpecifierFlags::PrependOctal) {
+    if (format.flags & PrintFlags::PrependOctal) {
         result += 1;
     }
     return result;
@@ -1133,16 +1027,16 @@ static void tmp_print_decoration(char* dest, tm_size_t maxlen, const PrintSizes&
 
     // padding
     if (format.width > 0 && sizes.size <= (tm_size_t)format.width) {
-        if (!(flags & FormatSpecifierFlags::LeftJustify)) {
+        if (!(flags & PrintFlags::LeftJustify)) {
             auto padding = (tm_size_t)format.width - sizes.decorated;
             TM_ASSERT(padding <= maxlen);
-            if (flags & FormatSpecifierFlags::PadWithSpaces) {
+            if (flags & PrintFlags::PadWithSpaces) {
                 decorate_pos = dest + padding;
             } else {
                 TM_ASSERT(sizes.decorated >= sizes.digits);
                 dest += sizes.decorated - sizes.digits;
             }
-            TM_MEMSET(dest, (flags & FormatSpecifierFlags::PadWithSpaces) ? ' ' : '0', padding);
+            TM_MEMSET(dest, (flags & PrintFlags::PadWithSpaces) ? ' ' : '0', padding);
             dest += padding;
             remaining -= padding;
         } else {
@@ -1165,15 +1059,15 @@ static void tmp_print_decoration(char* dest, tm_size_t maxlen, const PrintSizes&
         --remaining;
     }
 
-    if (flags & FormatSpecifierFlags::PrependHex) {
+    if (flags & PrintFlags::PrependHex) {
         *decorate_pos++ = '0';
         *decorate_pos++ = (flags & PrintFlags::Lowercase) ? 'x' : 'X';
         remaining -= 2;
-    } else if (flags & FormatSpecifierFlags::PrependBinary) {
+    } else if (flags & PrintFlags::PrependBinary) {
         *decorate_pos++ = '0';
         *decorate_pos++ = (flags & PrintFlags::Lowercase) ? 'b' : 'B';
         remaining -= 2;
-    } else if (flags & FormatSpecifierFlags::PrependOctal) {
+    } else if (flags & PrintFlags::PrependOctal) {
         *decorate_pos++ = '0';
         --remaining;
     }
@@ -1200,7 +1094,7 @@ static PrintFormattedResult tmp_move_printed_value_and_decorate(char* dest, tm_s
     TM_ASSERT(sizes.decorated >= sizes.digits);
 
     tm_size_t digits_pos = 0;
-    if (width <= 0 || (format.flags & FormatSpecifierFlags::LeftJustify)) {
+    if (width <= 0 || (format.flags & PrintFlags::LeftJustify)) {
         digits_pos = sizes.decorated - sizes.digits;
     } else {
         digits_pos = sizes.size - sizes.digits;
@@ -1335,7 +1229,7 @@ static PrintFormattedResult print_formatted_unsigned(char* dest, tm_size_t maxle
 
     tm_size_t padding = 0;
     auto flags = format.flags;
-    if (flags & FormatSpecifierFlags::LeftJustify) {
+    if (flags & PrintFlags::LeftJustify) {
         padding = sizes.decorated - sizes.digits;
     } else {
         padding = sizes.size - sizes.digits;
@@ -1739,8 +1633,8 @@ static const char* tmp_find(const char* first, const char* last, char c) {
 
 static void tmp_print_impl(const char* format, size_t formatLen, const PrintFormat& initialFormatting,
                            const PrintArgList& args, tmp_memory_printer& printout) {
-    // sanitize flags
-    uint32_t format_flags = initialFormatting.flags & ((1u << PrintFlags::Count) - 1);
+    // Sanitize flags
+    uint32_t formatFlags = initialFormatting.flags & ((1u << PrintFlags::Count) - 1);
 
     const char* formatFirst = format;
     const char* formatLast = format + formatLen;
@@ -1765,13 +1659,12 @@ static void tmp_print_impl(const char* format, size_t formatLen, const PrintForm
         }
 
         PrintFormat printFormat = initialFormatting;
-        printFormat.flags = format_flags;
+        printFormat.flags = formatFlags;
         auto currentIndex = index;
         auto current = flags & PrintType::Mask;
-        auto formatFlags = tmp_parse_format_specifiers(p, (tm_size_t)(next - p), &printFormat, &currentIndex);
-        printFormat.flags |= formatFlags;
+        bool index_specified = tmp_parse_format_specifiers(p, (tm_size_t)(next - p), &printFormat, &currentIndex);
 
-        if (!(formatFlags & FormatSpecifierFlags::IndexSpecified)) {
+        if (index_specified) {
             ++index;
             flags >>= PrintType::Bits;
         } else {
@@ -1780,15 +1673,6 @@ static void tmp_print_impl(const char* format, size_t formatLen, const PrintForm
         formatFirst = next + 1;
 
         TM_ASSERT(currentIndex < args.size);
-        if ((formatFlags & FormatSpecifierFlags::PrecisionSpecified) &&
-            (current == PrintType::Int32 || current == PrintType::UInt32 || current == PrintType::Int64 ||
-             current == PrintType::UInt64)) {
-            if (formatFlags & FormatSpecifierFlags::WidthSpecified) {
-                printFormat.width = TM_MIN(printFormat.precision, printFormat.width);
-            } else {
-                printFormat.width = printFormat.precision;
-            }
-        }
         if (!printout((int)current, args.args[currentIndex], printFormat)) return;
     }
     if (formatFirst < formatLast) {
@@ -1798,21 +1682,186 @@ static void tmp_print_impl(const char* format, size_t formatLen, const PrintForm
 
 }  // anonymous namespace
 
+TMP_DEF tm_size_t tmp_parse_print_format(const char* format_specifiers, tm_size_t format_specifiers_len,
+                                         PrintFormat* out) {
+    TM_ASSERT(format_specifiers || format_specifiers_len == 0);
+    TM_ASSERT(out);
+    TM_ASSERT_VALID_SIZE(format_specifiers_len);
+
+    *out = defaultPrintFormat();
+    unsigned int flags = PrintFlags::Default;
+
+    // Pad with spaces by default.
+    flags |= PrintFlags::PadWithSpaces;
+
+    const char* p = format_specifiers;
+    const char* last = p + format_specifiers_len;
+
+    bool pound_specified = false;
+
+    for (bool parseFlags = true; p < last && parseFlags;) {
+        switch (*p) {
+            case '-': {
+                flags |= PrintFlags::LeftJustify;
+                ++p;
+                break;
+            }
+            case '+': {
+                flags |= PrintFlags::Sign;
+                ++p;
+                break;
+            }
+            case ' ': {
+                flags |= PrintFlags::PadWithSpaces;
+                ++p;
+                break;
+            }
+            case '#': {
+                pound_specified = true;
+                ++p;
+                break;
+            }
+            case '0': {
+                flags &= ~PrintFlags::PadWithSpaces;
+                ++p;
+                break;
+            }
+            default: {
+                parseFlags = false;
+                break;
+            }
+        }
+    }
+
+    // Parse width.
+    unsigned width = out->width;
+    auto scan_width_result = scan_u32_n(p, (tm_size_t)(last - p), &width, 10);
+    if (scan_width_result.ec == TM_OK) p += scan_width_result.size;
+    out->width = (int)width;
+
+    // Parse precision.
+    if (p < last && *p == '.') {
+        ++p;
+        unsigned precision = out->precision;
+        auto scan_precision_result = scan_u32_n(p, (tm_size_t)(last - p), &precision, 10);
+        if (scan_precision_result.ec == TM_OK) p += scan_precision_result.size;
+        out->precision = (int)precision;
+    }
+
+    if (p < last) {
+        switch (*p) {
+            case 'x': {
+                flags |= PrintFlags::Lowercase;
+                out->base = 16;
+                if (pound_specified) flags |= PrintFlags::PrependHex;
+                ++p;
+                break;
+            }
+            case 'X': {
+                out->base = 16;
+                if (pound_specified) flags |= PrintFlags::PrependHex;
+                ++p;
+                break;
+            }
+            case 'o': {
+                out->base = 8;
+                if (pound_specified) flags |= PrintFlags::PrependOctal;
+                ++p;
+                break;
+            }
+            case 'b': {
+                flags |= PrintFlags::Lowercase;
+                out->base = 2;
+                if (pound_specified) flags |= PrintFlags::PrependBinary;
+                ++p;
+                break;
+            }
+            case 'B': {
+                out->base = 2;
+                if (pound_specified) flags |= PrintFlags::PrependBinary;
+                ++p;
+                break;
+            }
+            case 'c': {
+                flags |= PrintFlags::Char;
+                ++p;
+                break;
+            }
+
+            // floating point
+            case 'e': {
+                flags |= PrintFlags::Lowercase;
+                flags |= PrintFlags::Scientific;
+                ++p;
+                break;
+            }
+            case 'E': {
+                flags |= PrintFlags::Scientific;
+                ++p;
+                break;
+            }
+            case 'f': {
+                flags |= PrintFlags::TrailingZeroes | PrintFlags::Fixed;
+                ++p;
+                break;
+            }
+            case 'g': {
+                flags |= PrintFlags::Lowercase;
+                flags |= PrintFlags::General;
+                flags |= PrintFlags::Shortest;
+                ++p;
+                break;
+            }
+            case 'G': {
+                flags |= PrintFlags::General;
+                flags |= PrintFlags::Shortest;
+                ++p;
+                break;
+            }
+            case 'a': {
+                flags |= PrintFlags::Lowercase;
+                flags |= PrintFlags::Hex;
+                if (pound_specified) flags |= PrintFlags::PrependHex;
+                ++p;
+                break;
+            }
+            case 'A': {
+                flags |= PrintFlags::Hex;
+                if (pound_specified) flags |= PrintFlags::PrependHex;
+                ++p;
+                break;
+            }
+
+            // Non printf.
+            case 'n': {
+                flags |= PrintFlags::BoolAsNumber;
+                ++p;
+                break;
+            }
+        }
+    }
+
+    out->flags = flags;
+    return (tm_size_t)(p - format_specifiers);
+}
+
 #ifndef TMP_NO_CRT_FILE_PRINTING
-TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintArgList& args) {
+TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintFormat& initialFormatting,
+                          const PrintArgList& args) {
     char sbo[TMP_SBO_SIZE];
     tmp_memory_printer printer = {sbo, 0, TMP_SBO_SIZE, true, false};
 
-    tmp_print_impl(format, TM_STRLEN(format), defaultPrintFormat(), args, printer);
+    tmp_print_impl(format, TM_STRLEN(format), initialFormatting, args, printer);
     fwrite(printer.data, sizeof(char), printer.size, out);
     return printer.ec;
 }
 #ifdef TM_STRING_VIEW
-TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintArgList& args) {
+TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
+                          const PrintArgList& args) {
     char sbo[TMP_SBO_SIZE];
     tmp_memory_printer printer = {sbo, 0, TMP_SBO_SIZE, true, false};
 
-    tmp_print_impl(TM_STRING_VIEW_DATA(format), TM_STRING_VIEW_SIZE(format), defaultPrintFormat(), args, printer);
+    tmp_print_impl(TM_STRING_VIEW_DATA(format), TM_STRING_VIEW_SIZE(format), initialFormatting, args, printer);
     fwrite(printer.data, sizeof(char), printer.size, out);
     return printer.ec;
 }
