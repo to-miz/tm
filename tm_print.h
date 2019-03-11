@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.12 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.13 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -19,6 +19,7 @@ ISSUES
     current locale.
 
 HISTORY
+    v0.0.13 11.03.19 Fixed printing with specified index.
     v0.0.12 10.03.19 Added char* specializations (non-const), fixing not being able to print raw char* strings.
     v0.0.11 09.03.19 Added tmp_parse_print_format for parsing the PrintFormat structure from other sources.
                      Added FILE* printing overloads for supplying an initial PrintFormat to be
@@ -169,7 +170,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_
 #define _TM_PRINT_H_INCLUDED_
 
-#define TMP_VERSION 0x0000000Cu
+#define TMP_VERSION 0x0000000Du
 
 /* assert */
 #ifndef TM_ASSERT
@@ -1664,7 +1665,7 @@ static void tmp_print_impl(const char* format, size_t formatLen, const PrintForm
         auto current = flags & PrintType::Mask;
         bool index_specified = tmp_parse_format_specifiers(p, (tm_size_t)(next - p), &printFormat, &currentIndex);
 
-        if (index_specified) {
+        if (!index_specified) {
             ++index;
             flags >>= PrintType::Bits;
         } else {

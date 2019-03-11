@@ -346,7 +346,7 @@ static void tmp_print_impl(const char* format, size_t formatLen, const PrintForm
         auto current = flags & PrintType::Mask;
         bool index_specified = tmp_parse_format_specifiers(p, (tm_size_t)(next - p), &printFormat, &currentIndex);
 
-        if (index_specified) {
+        if (!index_specified) {
             ++index;
             flags >>= PrintType::Bits;
         } else {
