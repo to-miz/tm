@@ -45,7 +45,7 @@ WHY
           In C this is not possible with the strto_ family of functions without inspecting errno or
           inspecting the string before passing it into the strto_ functions.
           See examples for how to use default values with this library.
-        - Proper error codes without global errno or exceptions
+        - Proper error codes without global errno or exceptions.
         - C++17 has from/to_chars functions that serve almost the same purpose as this library.
           For those the roundtrip guarantee only holds if the value is printed/scanned using the same
           implementation. You can see this library as a pre C++17 from/to_chars implementation, but
@@ -387,22 +387,24 @@ int main() {
 #ifndef TM_ERRC_DEFINED
     #define TM_ERRC_DEFINED
     enum TM_ERRC_CODES {
-        TM_OK           = 0,   /* same as std::errc() */
-        TM_ENOENT       = 2,   /* same as std::errc::no_such_file_or_directory */
-        TM_EIO          = 5,   /* same as std::errc::io_error */
-        TM_ENOMEM       = 12,  /* same as std::errc::not_enough_memory */
-        TM_EACCES       = 13,  /* same as std::errc::permission_denied */
-        TM_EBUSY        = 16,  /* same as std::errc::device_or_resource_busy */
-        TM_EEXIST       = 17,  /* same as std::errc::file_exists */
-        TM_EEXDEV       = 18,  /* same as std::errc::cross_device_link */
-        TM_ENODEV       = 19,  /* same as std::errc::no_such_device */
-        TM_EINVAL       = 22,  /* same as std::errc::invalid_argument */
-        TM_EFBIG        = 27,  /* same as std::errc::file_too_large */
-        TM_ENOSPC       = 28,  /* same as std::errc::no_space_on_device */
-        TM_ERANGE       = 34,  /* same as std::errc::result_out_of_range */
-        TM_ENAMETOOLONG = 36,  /* same as std::errc::filename_too_long */
-        TM_ENOTEMPTY    = 39,  /* same as std::errc::directory_not_empty */
-        TM_EOVERFLOW    = 75,  /* same as std::errc::value_too_large */
+        TM_OK           = 0,   /* Same as std::errc() */
+        TM_EPERM        = 1,   /* Same as std::errc::operation_not_permitted */
+        TM_ENOENT       = 2,   /* Same as std::errc::no_such_file_or_directory */
+        TM_EIO          = 5,   /* Same as std::errc::io_error */
+        TM_ENOMEM       = 12,  /* Same as std::errc::not_enough_memory */
+        TM_EACCES       = 13,  /* Same as std::errc::permission_denied */
+        TM_EBUSY        = 16,  /* Same as std::errc::device_or_resource_busy */
+        TM_EEXIST       = 17,  /* Same as std::errc::file_exists */
+        TM_EEXDEV       = 18,  /* Same as std::errc::cross_device_link */
+        TM_ENODEV       = 19,  /* Same as std::errc::no_such_device */
+        TM_EINVAL       = 22,  /* Same as std::errc::invalid_argument */
+        TM_EMFILE       = 24,  /* Same as std::errc::too_many_files_open */
+        TM_EFBIG        = 27,  /* Same as std::errc::file_too_large */
+        TM_ENOSPC       = 28,  /* Same as std::errc::no_space_on_device */
+        TM_ERANGE       = 34,  /* Same as std::errc::result_out_of_range */
+        TM_ENAMETOOLONG = 36,  /* Same as std::errc::filename_too_long */
+        TM_ENOTEMPTY    = 39,  /* Same as std::errc::directory_not_empty */
+        TM_EOVERFLOW    = 75,  /* Same as std::errc::value_too_large */
     };
     typedef int tm_errc;
 #endif
@@ -870,7 +872,7 @@ TMC_DEF tmc_conv_result scan_i32(const char* nullterminated, int32_t* out, int32
 TMC_DEF tmc_conv_result scan_i32_n(const char* str, tm_size_t len, int32_t* out, int32_t base) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(len);
-    TM_ASSERT(str || len <= 0);
+    TM_ASSERT(str || len == 0);
 
     typedef uint32_t utype;
     typedef int32_t stype;
@@ -1006,7 +1008,7 @@ TMC_DEF tmc_conv_result scan_u32(const char* nullterminated, uint32_t* out, int3
 TMC_DEF tmc_conv_result scan_u32_n(const char* str, tm_size_t len, uint32_t* out, int32_t base) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(len);
-    TM_ASSERT(str || len <= 0);
+    TM_ASSERT(str || len == 0);
 
     typedef uint32_t utype;
     const utype UMAX_VAL = UINT32_MAX;
@@ -1140,7 +1142,7 @@ TMC_DEF tmc_conv_result scan_i64(const char* nullterminated, int64_t* out, int32
 TMC_DEF tmc_conv_result scan_i64_n(const char* str, tm_size_t len, int64_t* out, int32_t base) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(len);
-    TM_ASSERT(str || len <= 0);
+    TM_ASSERT(str || len == 0);
 
     typedef uint64_t utype;
     typedef int64_t stype;
@@ -1276,7 +1278,7 @@ TMC_DEF tmc_conv_result scan_u64(const char* nullterminated, uint64_t* out, int3
 TMC_DEF tmc_conv_result scan_u64_n(const char* str, tm_size_t len, uint64_t* out, int32_t base) {
     TM_ASSERT(base >= 2 && base <= 36);
     TM_ASSERT_VALID_SIZE(len);
-    TM_ASSERT(str || len <= 0);
+    TM_ASSERT(str || len == 0);
 
     typedef uint64_t utype;
     const utype UMAX_VAL = UINT64_MAX;
@@ -1586,7 +1588,7 @@ TMC_DEF tmc_conv_result scan_double_n(const char* str, tm_size_t len, double* ou
     (void)flags;
 
     TM_ASSERT_VALID_SIZE(len);
-    TM_ASSERT(str || len <= 0);
+    TM_ASSERT(str || len == 0);
 
     tmc_conv_result result = {0, TM_EINVAL};
 
@@ -1782,7 +1784,7 @@ TMC_DEF tmc_conv_result scan_bool(const char* nullterminated, tm_bool* out) {
 }
 TMC_DEF tmc_conv_result scan_bool_n(const char* str, tm_size_t len, tm_bool* out) {
     TM_ASSERT_VALID_SIZE(len);
-    TM_ASSERT(str || len <= 0);
+    TM_ASSERT(str || len == 0);
 
     tmc_conv_result result = {0, TM_EINVAL};
     if (len <= 0) {
