@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.1 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.1.2 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -67,6 +67,7 @@ ISSUES
     - tmu_atomic_write not implemented yet for CRT backend.
 
 HISTORY
+    v0.1.2  10.03.19 Fixed unused function warning when compiling with TMU_NO_UCD.
     v0.1.1  25.02.19 Fixed MSVC compilation errors.
     v0.1.0  24.02.19 Initial commit of the complete rewrite.
 */

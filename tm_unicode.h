@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.1 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.1.2 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -67,6 +67,7 @@ ISSUES
     - tmu_atomic_write not implemented yet for CRT backend.
 
 HISTORY
+    v0.1.2  10.03.19 Fixed unused function warning when compiling with TMU_NO_UCD.
     v0.1.1  25.02.19 Fixed MSVC compilation errors.
     v0.1.0  24.02.19 Initial commit of the complete rewrite.
 */
@@ -4570,6 +4571,8 @@ TMU_DEF tm_size_t tmu_utf8_count_codepoints_stream(tmu_utf8_stream stream) {
     return result;
 }
 
+#if defined(TMU_UCD_HAS_CASE_INFO)
+
 #if TMU_UCD_HAS_CATEGORY
 TMU_DEF tm_bool tmu_is_control(uint32_t codepoint) {
     return tmu_ucd_get_category(codepoint) == tmu_ucd_category_control;
@@ -5097,6 +5100,7 @@ TMU_DEF int tmu_utf8_human_compare(const char* a, tm_size_t a_len, const char* b
 }
 #endif /* TMU_UCD_HAS_FULL_CASE_FOLD */
 
+#endif /* defined(TMU_UCD_HAS_CASE_INFO) */
 
 #if !defined(TMU_NO_FILE_IO)
 

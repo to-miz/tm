@@ -1266,6 +1266,8 @@ TMU_DEF tm_size_t tmu_utf8_count_codepoints_stream(tmu_utf8_stream stream) {
     return result;
 }
 
+#if defined(TMU_UCD_HAS_CASE_INFO)
+
 #if TMU_UCD_HAS_CATEGORY
 TMU_DEF tm_bool tmu_is_control(uint32_t codepoint) {
     return tmu_ucd_get_category(codepoint) == tmu_ucd_category_control;
@@ -1792,3 +1794,5 @@ TMU_DEF int tmu_utf8_human_compare(const char* a, tm_size_t a_len, const char* b
     return b_is_empty - a_is_empty;
 }
 #endif /* TMU_UCD_HAS_FULL_CASE_FOLD */
+
+#endif /* defined(TMU_UCD_HAS_CASE_INFO) */
