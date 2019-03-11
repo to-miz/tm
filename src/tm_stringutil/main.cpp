@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.3.1 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.3.3 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -20,6 +20,10 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
+    v0.3.3  06.03.19 Added optional defines for TM_STRCSPN and TM_STRSPN to make use
+                     of CRT if it is present.
+                     Fixed a C compilation error due to use of auto.
+    v0.3.2  03.03.19 Fixed a bug in tmsu_find_last_not_of_n_ex and tmsu_trim_right_n.
     v0.3.1  15.01.19 Fixed some warnings in msvc with signed size_t and string_view.
     v0.3    15.10.18 Added more string_view overloads.
     v0.2    14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
@@ -65,6 +69,12 @@ HISTORY
             #ifdef WIN32
                 #define TM_STRICMP _stricmp
             #endif
+        #endif
+        #ifndef TM_STRCSPN
+            #define TM_STRCSPN strcspn
+        #endif
+        #ifndef TM_STRSPN
+            #define TM_STRSPN strspn
         #endif
     #endif
 

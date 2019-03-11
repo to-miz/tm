@@ -95,3 +95,80 @@ TEST_CASE("Test ordering") {
     test_ordering(tmsu_compare_ignore_case_ansi_n, strcasecmp, "cAT", "Cat");
     test_ordering(tmsu_compare_ignore_case_ansi_n, strcasecmp, "10", "2");
 }
+
+TEST_CASE("trim") {
+    auto trim = [](std::string_view str) {
+        auto trimmed_left = tmsu_trim_left_n(str.data(), str.data() + str.size());
+        auto trimmed_right = tmsu_trim_right_n(str.data(), str.data() + str.size());
+        if (trimmed_left > trimmed_right) trimmed_left = trimmed_right;
+        return std::string_view{trimmed_left, (size_t)(trimmed_right - trimmed_left)};
+    };
+    std::string_view test = "    asdasdasd    \n\t   ";
+    std::string_view already_trimmed = "asdasdasd";
+    CHECK(trim(test) == already_trimmed);
+    CHECK(trim(already_trimmed) == already_trimmed);
+
+    CHECK(trim("") == "");
+    CHECK(trim("a") == "a");
+    CHECK(trim("   ") == "");
+    CHECK(trim("   \n    ") == "");
+    CHECK(trim("asd") == "asd");
+    CHECK(trim("asd    ") == "asd");
+    CHECK(trim("   asd") == "asd");
+    CHECK(trim("   asd   ") == "asd");
+
+    SUBCASE("trim right") {
+        auto trim_right = [](std::string_view str) {
+            auto first = str.data();
+            auto last = tmsu_trim_right_n(str.data(), str.data() + str.size());
+            return std::string_view{first, (size_t)(last - first)};
+        };
+
+        CHECK(trim_right("\n") == "");
+        CHECK(trim_right("\na") == "\na");
+        CHECK(trim_right("a") == "a");
+        CHECK(trim_right("  a") == "  a");
+        CHECK(trim_right("  a  ") == "  a");
+        CHECK(trim_right("    ") == "");
+    }
+}
+
+TEST_CASE("find last not of") {
+    auto find_last_not_of = [](const char* first, const char* last, std::string_view find_str, const char* not_found) {
+        return tmsu_find_last_not_of_n_ex(first, last, find_str.data(), find_str.data() + find_str.size(), not_found);
+    };
+
+    std::string_view test = "aaaaaaac";
+    auto first = test.data();
+    auto last = test.data() + test.size();
+
+    CHECK(find_last_not_of(first, last, "def", last) == last - 1);
+    CHECK(find_last_not_of(first, last, "def", first) == last - 1);
+
+    CHECK(find_last_not_of(first, first, "def", first) == first);
+    CHECK(find_last_not_of(first, first, "def", last) == last);
+
+    CHECK(find_last_not_of(first, last, "ac", last) == last);
+    CHECK(find_last_not_of(first, last, "ac", first) == first);
+    CHECK(find_last_not_of(first, first, "ac", first) == first);
+    CHECK(find_last_not_of(first, first, "ac", last) == last);
+
+    CHECK(find_last_not_of(first, last, "ac", nullptr) == nullptr);
+    CHECK(find_last_not_of(first, last, "ac", nullptr) == nullptr);
+    CHECK(find_last_not_of(first, first, "ac", nullptr) == nullptr);
+    CHECK(find_last_not_of(first, first, "ac", nullptr) == nullptr);
+
+    test = "aaaaaaacaaaaa";
+    first = test.data();
+    last = test.data() + test.size();
+
+    CHECK(find_last_not_of(first, last, "a", last) == first + 7);
+
+    test = "a";
+    first = test.data();
+    last = test.data() + test.size();
+
+    CHECK(find_last_not_of(first, last, "b", last) == first);
+    CHECK(find_last_not_of(first, last, "b", first) == first);
+    CHECK(find_last_not_of(first, last, "b", nullptr) == first);
+}

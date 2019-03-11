@@ -177,20 +177,27 @@ TMSU_DEF const char* tmsu_find_last(const char* str, const char* find_str) {
 TMSU_DEF const char* tmsu_find_first_not_of(const char* str, const char* find_str) {
     TM_ASSERT(str);
     TM_ASSERT(find_str);
+#ifdef TM_STRSPN
+    return str + TM_STRSPN(str, find_str);
+#else
     while (*str && TM_STRCHR(find_str, TMSU_C2I(*str))) {
         ++str;
     }
     return str;
+#endif
 }
 
 TMSU_DEF const char* tmsu_find_first_of(const char* str, const char* find_str) {
     TM_ASSERT(str);
     TM_ASSERT(find_str);
-
+#ifdef TM_STRCSPN
+    return str + TM_STRCSPN(str, find_str);
+#else
     while (*str && TM_STRCHR(find_str, TMSU_C2I(*str)) == TM_NULL) {
         ++str;
     }
     return str;
+#endif
 }
 
 TMSU_DEF const char* tmsu_find_last_not_of(const char* str, const char* find_str) {
@@ -237,28 +244,24 @@ TMSU_DEF const char* tmsu_find_first_not_of_n(const char* str_first, const char*
 
 TMSU_DEF const char* tmsu_find_last_of_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
                                             const char* find_str_last, const char* not_found) {
-    if (str_first == str_last) {
-        return not_found;
-    }
-    --str_last;
+    if (str_first == str_last) return not_found;
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
-    while (str_last != str_first && TM_MEMCHR(find_str_first, TMSU_C2I(*str_last), find_str_len) == TM_NULL) {
+    while (str_last != str_first && TM_MEMCHR(find_str_first, TMSU_C2I(*(str_last - 1)), find_str_len) == TM_NULL) {
         --str_last;
     }
-    return not_found;
+    if (str_first == str_last) return not_found;
+    return str_last - 1;
 }
 
 TMSU_DEF const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
                                                 const char* find_str_last, const char* not_found) {
-    if (str_first == str_last) {
-        return not_found;
-    }
-    --str_last;
+    if (str_first == str_last) return not_found;
     size_t find_str_len = tmsu_distance_sz(find_str_first, find_str_last);
-    while (str_last != str_first && TM_MEMCHR(find_str_first, TMSU_C2I(*str_last), find_str_len)) {
+    while (str_last != str_first && TM_MEMCHR(find_str_first, TMSU_C2I(*(str_last - 1)), find_str_len)) {
         --str_last;
     }
-    return not_found;
+    if (str_first == str_last) return not_found;
+    return str_last - 1;
 }
 
 TMSU_DEF const char* tmsu_find_last_of_n(const char* str_first, const char* str_last, const char* find_str_first,
@@ -492,7 +495,16 @@ TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last) {
     return tmsu_find_first_not_of_n(first, last, TMSU_WHITESPACE, TMSU_WHITESPACE + TMSU_WHITESPACE_COUNT);
 }
 TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last) {
-    return tmsu_find_last_not_of_n_ex(first, last, TMSU_WHITESPACE, TMSU_WHITESPACE + TMSU_WHITESPACE_COUNT, first);
+    const char* result =
+        tmsu_find_last_not_of_n_ex(first, last, TMSU_WHITESPACE, TMSU_WHITESPACE + TMSU_WHITESPACE_COUNT, TM_NULL);
+    if (result == TM_NULL) {
+        /* No non whitespace found, point to first. */
+        result = first;
+    } else {
+        /* Result points to non whitespace character, advance past it. */
+        ++result;
+    }
+    return result;
 }
 
 /* Comparisons */

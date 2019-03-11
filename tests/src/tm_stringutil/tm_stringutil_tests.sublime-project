@@ -46,6 +46,10 @@
 					"cmd": "make tests.tm_stringutil.c"
 				},
 				{
+					"name": "run default tests",
+					"cmd": "make tests.tm_stringutil.default.run"
+				},
+				{
 					"name": "run tests",
 					"cmd": "make tests.tm_stringutil.run"
 				}

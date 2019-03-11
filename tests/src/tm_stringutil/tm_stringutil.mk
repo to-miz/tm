@@ -29,6 +29,10 @@ ${tests.tm_stringutil.signed_size_t.out}: ${tests.tm_stringutil.deps}
 
 tests.tm_stringutil: ${tests.tm_stringutil.all_config_deps}
 
+tests.tm_stringutil.default.run: ${tests.tm_stringutil.default.out}
+	${hide}echo Running Test: ${tests.tm_stringutil.default.out}.
+	${hide}${tests.tm_stringutil.default.out}
+
 tests.tm_stringutil.run: ${tests.tm_stringutil.all_config_deps}
 	${hide}echo Running Test: ${tests.tm_stringutil.default.out}.
 	${hide}${tests.tm_stringutil.default.out}
