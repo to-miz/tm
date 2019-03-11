@@ -34,11 +34,11 @@
 			"variants": [
 				{
 					"name": "run tests",
-					"cmd": "make tests.tm_conversion.run"
+					"cmd": "make tests.tm_conversion.slow.run"
 				},
 				{
 					"name": "run tests fast",
-					"cmd": "make tests.tm_conversion.fast.run"
+					"cmd": "make tests.tm_conversion.run"
 				}
 			]
 		}

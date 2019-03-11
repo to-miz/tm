@@ -6,6 +6,7 @@
 #include <cstring>
 #include <exception>
 #include <string>
+#include <cinttypes>
 
 #include <assert_throws.h>
 #include <assert_throws.cpp>
@@ -585,7 +586,7 @@ bool test_roundtrip(PrintFunc print_func, ScanFunc scan_func, ValueType min_val,
     print_test(0, 1000, steps);
     print_test(0, 10000, steps);
     print_test(min_val, max_val, steps);
-    printf("mismatches: close: %d; bad: %d; total tests: %zu\n", closeMismatchCount, mismatchCount - closeMismatchCount,
+    printf("mismatches: close: %d; bad: %d; total tests: %llu.\n", closeMismatchCount, mismatchCount - closeMismatchCount,
            totalTests);
 
     return mismatchCount - closeMismatchCount == 0;
