@@ -1,5 +1,5 @@
 /*
-tm_cli.h v0.2.1 - public domain - https://github.com/to-miz/tm
+tm_cli.h v0.2.2 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -18,6 +18,7 @@ PURPOSE
     loading config files, preprocessing and parsing the same commandline with differing options.
 
 HISTORY
+    v0.2.2  10.02.19 Changed const-ness of argv parameters since it was too lenient.
     v0.2.1  03.02.19 Made short options optional if a long name is available.
                      Added error checking for valid options. Options with no shortor long names will
                      produce errors now.
@@ -157,7 +158,7 @@ typedef struct tmcli_parser_settings_struct {
 
 typedef struct tmcli_parser_struct {
     int argc;
-    tmcli_tchar const** argv;
+    tmcli_tchar const* const* argv;
     const tmcli_option* options;
     tm_size_t options_count;
 
@@ -177,7 +178,7 @@ TMCLI_DEF tmcli_parser_settings tmcli_default_parser_settings();
 Creates a cli parser from argc and argv from the main function.
 The resulting cli parser uses the default settings returned by tmcli_default_parser_settings.
 */
-TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, tmcli_tchar const** argv, const tmcli_option* options,
+TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, tmcli_tchar const* const* argv, const tmcli_option* options,
                                          tm_size_t options_count);
 
 /*
@@ -187,7 +188,7 @@ To call this function from arguments from main directly, you would have to call 
     tmcli_make_parser_ex(argv[0], argc - 1, argv + 1, ...)
 See implementation of tmcli_make_parser for how to call this function from argc/argv you get from main.
 */
-TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const tmcli_tchar* program_name, int argc, tmcli_tchar const** argv,
+TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const tmcli_tchar* program_name, int argc, tmcli_tchar const* const* argv,
                                             const tmcli_option* options, tm_size_t options_count,
                                             tmcli_parser_settings settings);
 

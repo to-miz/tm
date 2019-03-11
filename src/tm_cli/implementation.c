@@ -113,7 +113,7 @@ TMCLI_DEF tmcli_parser_settings tmcli_default_parser_settings() {
     return result;
 }
 
-TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const tmcli_tchar* program_name, int argc, tmcli_tchar const** argv,
+TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const tmcli_tchar* program_name, int argc, tmcli_tchar const* const* argv,
                                             const tmcli_option* options, tm_size_t options_count,
                                             tmcli_parser_settings settings) {
     TM_ASSERT(options_count <= 128);
@@ -149,7 +149,7 @@ TMCLI_DEF tmcli_parser tmcli_make_parser_ex(const tmcli_tchar* program_name, int
 #pragma GCC diagnostic pop
 #endif
 
-TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, tmcli_tchar const** argv, const tmcli_option* options,
+TMCLI_DEF tmcli_parser tmcli_make_parser(int argc, tmcli_tchar const* const* argv, const tmcli_option* options,
                                          tm_size_t options_count) {
     TM_ASSERT(argc > 0);
     /* Skip first argument in argv, since it's just the program name. */
