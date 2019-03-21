@@ -1,4 +1,5 @@
-/* This file was generated using tools/unicode_gen. Do not modify by hand. */
+/* This file was generated using tools/unicode_gen from
+   https://github.com/to-miz/tm. Do not modify by hand. */
 #ifdef __cplusplus
 extern "C" {
 #endif

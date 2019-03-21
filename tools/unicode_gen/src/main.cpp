@@ -1984,9 +1984,9 @@ void generate_tables(const vector<data_entry> data_entries, unique_ucd* out) {
             size_t unpruned_size = out->entries.size() * ucd_entry_size +
                                    out->stage_one.size() * (out->min_sizes.stage_one.size / 8) +
                                    out->stage_two.size() * block_size * (out->min_sizes.stage_two.size / 8);
-            double overall_size_kilobytes = unpruned_size / 1024.0;
+            double unpruned_overall_size_kilobytes = unpruned_size / 1024.0;
             FPRINTF(stdout, TEXT("(Unpruned it would be %zu bytes (%.2f kilobytes).\n"), unpruned_size,
-                    overall_size_kilobytes);
+                    unpruned_overall_size_kilobytes);
         }
         FPRINTF(stdout, TEXT("\n"));
     }

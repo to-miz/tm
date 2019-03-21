@@ -1,4 +1,5 @@
-/* This file was generated using tools/unicode_gen. Do not modify by hand.
+/* This file was generated using tools/unicode_gen from
+   https://github.com/to-miz/tm. Do not modify by hand.
    Around 233846 bytes (228.37 kilobytes) of data for lookup tables
    are generated. */
 
@@ -6909,7 +6910,7 @@ static const uint8_t tmu_grapheme_break_transitions[256] = {
 };
 
 static uint16_t tmu_get_stage_one_value_internal(uint32_t index) {
-    TM_ASSERT(index < 8704);
+    if (index >= 8704) return 0;
     return tmu_ucd_stage_one[index];
 }
 

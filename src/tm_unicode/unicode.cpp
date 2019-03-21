@@ -1300,7 +1300,7 @@ TMU_DEF int tmu_utf8_width(tmu_utf8_stream stream) {
     int result = 0;
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
-        result += tmu_get_ucd_width(codepoint);
+        result += tmu_ucd_get_width(codepoint);
     }
     return result;
 }

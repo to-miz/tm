@@ -14,7 +14,7 @@ tm_json.h | C++ and C99 json parsing library that can do both json reading and p
 tm_polygon.h | Triangulation and clipping of polygons. Clipping supports union, difference and substraction. | C99/C++ | v1.1
 tm_print.h | Lightweight typesafe variadic print and snprint using C++11 and variadic templates. | C++11 | v0.0.12
 tm_stringutil.h | String utility functions, from matching, comparison to tokenizing. | C99/C++ | v0.3.3
-tm_unicode.h | A Utf-8 everywhere library with Utf-8/Utf-16 conversion, caseless comparison and system call wrappers for cross platform windows/linux Utf-8 support. | C99/C++ | v0.1.2
+tm_unicode.h | A Utf-8 everywhere library with Utf-8/Utf-16 conversion, caseless comparison and system call wrappers for cross platform windows/linux Utf-8 support. | C99/C++ | v0.1.3
 tm_utility.h | Utility and convenience functions, mainly for my personal use. | C++11 | v1.1.5
 
 These libraries follow the same guidelines as [stb](https://github.com/nothings/stb).

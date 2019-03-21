@@ -1,11 +1,16 @@
-static const char* get_type_from_size(ucd_min_sizes::pair pair) {
+struct static_string {
+    char data[100];
+    size_t size;
+};
+static static_string get_type_from_size(ucd_min_sizes::pair pair) {
     assert(pair.size > 0);
-    static char buffer[100];
-    auto written = snprintf(buffer, 100, "%sint%d_t", (pair.is_signed) ? "" : "u", pair.size);
-    assert(written > 0 && written < 100);
-    if (written <= 0 || written >= 100) fatal_error("Internal error.");
-    buffer[written] = 0;
-    return buffer;
+    static_string result = {};
+    auto written = snprintf(result.data, std::size(result.data), "%sint%d_t", (pair.is_signed) ? "" : "u", pair.size);
+    assert(written > 0 && (size_t)written < std::size(result.data));
+    if (written <= 0 || (size_t)written >= std::size(result.data)) fatal_error("Internal error.");
+    result.data[written] = 0;
+    result.size = (size_t)written;
+    return result;
 }
 
 void generate_multistage_table_based(const unique_ucd& ucd, size_t pruned_stage_one_size, const char* prefix, FILE* f) {
@@ -47,12 +52,15 @@ void generate_multistage_table_based(const unique_ucd& ucd, size_t pruned_stage_
     size_t stage_one_size = ucd.stage_one.size();
     if (flags & generate_flags_prune_stage_one) stage_one_size = pruned_stage_one_size;
 
+    auto stage_one_type = get_type_from_size(ucd.min_sizes.stage_one);
+    auto stage_two_type = get_type_from_size(ucd.min_sizes.stage_two);
+
     fprintf(f,
             "/* Unicode data stage one: %zu bytes. */\n"
             "static const size_t %sucd_stage_one_size = %zu;\n"
             "static const %s %sucd_stage_one[%zu] = {\n",
             stage_one_size * (ucd.min_sizes.stage_one.size / 8), prefix, stage_one_size,
-            get_type_from_size(ucd.min_sizes.stage_one), prefix, stage_one_size);
+            stage_one_type.data, prefix, stage_one_size);
     print_block(f, ucd.stage_one.data(), stage_one_size, /*last*/true);
     fprintf(f, "};\n\n");
 
@@ -68,7 +76,7 @@ void generate_multistage_table_based(const unique_ucd& ucd, size_t pruned_stage_
             "static const size_t %sucd_stage_two_size = %zu;\n"
             "static const %s %sucd_stage_two[%zu] = {\n",
             stage_two_size * (ucd.min_sizes.stage_two.size / 8), prefix, block_size, prefix, ucd.stage_two.size(),
-            prefix, stage_two_size, get_type_from_size(ucd.min_sizes.stage_two), prefix, stage_two_size);
+            prefix, stage_two_size, stage_two_type.data, prefix, stage_two_size);
     {
         size_t block_index = 0;
         for (auto& block : ucd.stage_two) {
@@ -214,7 +222,8 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
                           grapheme_break_transitions_size + stage_one_size * (ucd.min_sizes.stage_one.size / 8) +
                           stage_two_size * (ucd.min_sizes.stage_two.size / 8);
     fprintf(f,
-            "/* This file was generated using tools/unicode_gen. Do not modify by hand.\n"
+            "/* This file was generated using tools/unicode_gen from\n"
+            "   https://github.com/to-miz/tm. Do not modify by hand.\n"
             "   Around %zu bytes (%.2f kilobytes) of data for lookup tables\n"
             "   are generated. */\n\n"
             "#ifdef __cplusplus\n"
@@ -240,6 +249,9 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
         }
     };
 
+    auto stage_one_type = get_type_from_size(ucd.min_sizes.stage_one);
+    auto stage_two_type = get_type_from_size(ucd.min_sizes.stage_two);
+
     if (ucd.min_sizes.all_arrays.size > 0) {
         fprintf(f, "/* Codepoint runs: %zu bytes. */\n", codepoints_count * (ucd.min_sizes.all_arrays.size / 8));
 
@@ -258,10 +270,11 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
             fprintf(f, "static const size_t %scompatibility_offset = %zu;\n", prefix, compatibility_offset);
         }
 
+        auto all_arrays_type = get_type_from_size(ucd.min_sizes.all_arrays);
         fprintf(f,
                 "static const size_t %scodepoint_runs_size = %zu;\n"
                 "static const %s %scodepoint_runs[%zu] = {\n",
-                prefix, codepoints_count, get_type_from_size(ucd.min_sizes.all_arrays), prefix, codepoints_count);
+                prefix, codepoints_count, all_arrays_type.data, prefix, codepoints_count);
         bool first = true;
         if ((flags & generate_flags_full_case) || (flags & generate_flags_full_case_toggle)) {
             print_runs(f, "Full uppercase entries.", ucd.full_upper, first);
@@ -293,40 +306,53 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
         fprintf(f, "    uint8_t bits1;\n");
     }
     if (flags & generate_flags_full_case) {
-        fprintf(f, "    %s full_upper_index;\n", get_type_from_size(ucd.min_sizes.full_upper_index));
-        fprintf(f, "    %s full_title_index;\n", get_type_from_size(ucd.min_sizes.full_title_index));
-        fprintf(f, "    %s full_lower_index;\n", get_type_from_size(ucd.min_sizes.full_lower_index));
+        auto full_upper_index_type = get_type_from_size(ucd.min_sizes.full_upper_index);
+        auto full_title_index_type = get_type_from_size(ucd.min_sizes.full_title_index);
+        auto full_lower_index_type = get_type_from_size(ucd.min_sizes.full_lower_index);
+        fprintf(f, "    %s full_upper_index;\n", full_upper_index_type.data);
+        fprintf(f, "    %s full_title_index;\n", full_title_index_type.data);
+        fprintf(f, "    %s full_lower_index;\n", full_lower_index_type.data);
     }
     if (flags & generate_flags_full_case_toggle) {
-        fprintf(f, "    %s full_case_toggle_index;\n", get_type_from_size(ucd.min_sizes.full_case_toggle_index));
+        auto full_case_toggle_index_type = get_type_from_size(ucd.min_sizes.full_case_toggle_index);
+        fprintf(f, "    %s full_case_toggle_index;\n", full_case_toggle_index_type.data);
     }
     if (flags & generate_flags_full_case_fold) {
-        fprintf(f, "    %s full_case_fold_index;\n", get_type_from_size(ucd.min_sizes.full_case_fold_index));
+        auto full_case_fold_index_type = get_type_from_size(ucd.min_sizes.full_case_fold_index);
+        fprintf(f, "    %s full_case_fold_index;\n", full_case_fold_index_type.data);
     }
     if ((flags & generate_flags_canonical) && ucd.min_sizes.canonical_index.size) {
-        fprintf(f, "    %s canonical_index;\n", get_type_from_size(ucd.min_sizes.canonical_index));
+        auto canonical_index_type = get_type_from_size(ucd.min_sizes.canonical_index);
+        fprintf(f, "    %s canonical_index;\n", canonical_index_type.data);
     }
     if ((flags & generate_flags_compatibility) && ucd.min_sizes.compatibility_index.size) {
-        fprintf(f, "    %s compatibility_index;\n", get_type_from_size(ucd.min_sizes.compatibility_index));
+        auto compatibility_index_type = get_type_from_size(ucd.min_sizes.compatibility_index);
+        fprintf(f, "    %s compatibility_index;\n", compatibility_index_type.data);
     }
 
     if (flags & generate_flags_simple_case) {
-        fprintf(f, "    %s simple_upper_offset;\n", get_type_from_size(ucd.min_sizes.simple_upper_offset));
-        fprintf(f, "    %s simple_title_offset;\n", get_type_from_size(ucd.min_sizes.simple_title_offset));
-        fprintf(f, "    %s simple_lower_offset;\n", get_type_from_size(ucd.min_sizes.simple_lower_offset));
+        auto simple_upper_offset_type = get_type_from_size(ucd.min_sizes.simple_upper_offset);
+        auto simple_title_offset_type = get_type_from_size(ucd.min_sizes.simple_title_offset);
+        auto simple_lower_offset_type = get_type_from_size(ucd.min_sizes.simple_lower_offset);
+        fprintf(f, "    %s simple_upper_offset;\n", simple_upper_offset_type.data);
+        fprintf(f, "    %s simple_title_offset;\n", simple_title_offset_type.data);
+        fprintf(f, "    %s simple_lower_offset;\n", simple_lower_offset_type.data);
     }
     if (flags & generate_flags_simple_case_toggle) {
-        fprintf(f, "    %s simple_case_toggle_offset;\n", get_type_from_size(ucd.min_sizes.simple_case_toggle_offset));
+        auto simple_case_toggle_offset_type = get_type_from_size(ucd.min_sizes.simple_case_toggle_offset);
+        fprintf(f, "    %s simple_case_toggle_offset;\n", simple_case_toggle_offset_type.data);
     }
     if (flags & generate_flags_simple_case_fold) {
-        fprintf(f, "    %s simple_case_fold_offset;\n", get_type_from_size(ucd.min_sizes.simple_case_fold_offset));
+        auto simple_case_fold_offset_type = get_type_from_size(ucd.min_sizes.simple_case_fold_offset);
+        fprintf(f, "    %s simple_case_fold_offset;\n", simple_case_fold_offset_type.data);
     }
     if (flags & generate_flags_canonical) {
-        fprintf(f, "    %s simple_canonical_offset;\n", get_type_from_size(ucd.min_sizes.simple_canonical_offset));
+        auto simple_canonical_offset_type = get_type_from_size(ucd.min_sizes.simple_canonical_offset);
+        fprintf(f, "    %s simple_canonical_offset;\n", simple_canonical_offset_type.data);
     }
     if (flags & generate_flags_compatibility) {
-        fprintf(f, "    %s simple_compatibility_offset;\n",
-                get_type_from_size(ucd.min_sizes.simple_compatibility_offset));
+        auto simple_compatibility_offset_type = get_type_from_size(ucd.min_sizes.simple_compatibility_offset);
+        fprintf(f, "    %s simple_compatibility_offset;\n", simple_compatibility_offset_type.data);
     }
     fprintf(f, "} %sucd_internal;\n\n", prefix);
 
@@ -437,8 +463,7 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
     }
 
     // Generate stage one accessor function.
-    fprintf(f, "static %s %sget_stage_one_value_internal(uint32_t index) {\n",
-            get_type_from_size(ucd.min_sizes.stage_one), prefix);
+    fprintf(f, "static %s %sget_stage_one_value_internal(uint32_t index) {\n", stage_one_type.data, prefix);
     bool all_are_default = true;
     for (size_t i = pruned_stage_one_size, count = ucd.stage_one.size(); i < count; i++) {
         if (ucd.stage_one[i] != default_block_pos) {
@@ -551,7 +576,7 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
     fprintf(f,
             "static %s %sget_stage_two_value_internal(uint32_t block_index,\n"
             "                uint32_t offset) {\n",
-            get_type_from_size(ucd.min_sizes.stage_two), prefix);
+            stage_two_type.data, prefix);
     if (assert_name) {
         fprintf(f,
                 "    %s(block_index < %sucd_stage_two_blocks_count);\n"
@@ -656,8 +681,7 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
             "    %s block_index = %sget_stage_one_value_internal(stage_one_index);\n"
             "    %s entry_index =\n"
             "        %sget_stage_two_value_internal(block_index, stage_two_index);\n\n",
-            block_size, block_size, get_type_from_size(ucd.min_sizes.stage_one), prefix,
-            get_type_from_size(ucd.min_sizes.stage_two), prefix);
+            block_size, block_size, stage_one_type.data, prefix, stage_two_type.data, prefix);
 
     if (assert_name) fprintf(f, "    %s(entry_index < %sucd_entries_size);\n", assert_name, prefix);
     fprintf(f, "    return &%sucd_entries[entry_index];\n}\n\n", prefix);
@@ -780,7 +804,9 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
 }
 
 void generate_header_file(const ucd_min_sizes& min_sizes, uint32_t flags, const option_strings& strings, FILE* f) {
-    fprintf(f, "/* This file was generated using tools/unicode_gen. Do not modify by hand. */\n");
+    fprintf(f,
+            "/* This file was generated using tools/unicode_gen from\n"
+            "   https://github.com/to-miz/tm. Do not modify by hand. */\n");
 
     auto uppercase_prefix = strings.uppercase_prefix;
     auto prefix = strings.prefix;
@@ -850,17 +876,17 @@ void generate_header_file(const ucd_min_sizes& min_sizes, uint32_t flags, const 
     if (flags & generate_flags_simple_case_toggle) fprintf(f, "    uint32_t simple_case_toggle;\n");
     if (min_sizes.all_arrays.size > 0) {
         auto type = get_type_from_size(min_sizes.all_arrays);
-        if (flags & generate_flags_canonical) fprintf(f, "    const %s* full_canonical;\n", type);
-        if (flags & generate_flags_compatibility) fprintf(f, "    const %s* full_compatibility;\n", type);
+        if (flags & generate_flags_canonical) fprintf(f, "    const %s* full_canonical;\n", type.data);
+        if (flags & generate_flags_compatibility) fprintf(f, "    const %s* full_compatibility;\n", type.data);
         if (flags & generate_flags_full_case) {
             fprintf(f,
                     "    const %s* full_upper;\n"
                     "    const %s* full_title;\n"
                     "    const %s* full_lower;\n",
-                    type, type, type);
+                    type.data, type.data, type.data);
         }
-        if (flags & generate_flags_full_case_fold) fprintf(f, "    const %s* full_case_fold;\n", type);
-        if (flags & generate_flags_full_case_toggle) fprintf(f, "    const %s* full_case_toggle;\n", type);
+        if (flags & generate_flags_full_case_fold) fprintf(f, "    const %s* full_case_fold;\n", type.data);
+        if (flags & generate_flags_full_case_toggle) fprintf(f, "    const %s* full_case_toggle;\n", type.data);
     }
     fprintf(f, "} %sucd_entry;\n\n", prefix);
 

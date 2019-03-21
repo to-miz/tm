@@ -97,6 +97,8 @@ void print_cli_command_error(const tchar* command, const tchar* app) {
     TEXT("                                simple_case\n")                                                       \
     TEXT("                                simple_case_fold\n")                                                  \
     TEXT("                                simple_case_toggle\n")                                                \
+    TEXT("                                prune_stage_one\n")                                                   \
+    TEXT("                                prune_stage_two\n")                                                   \
     TEXT("                                handle_invalid_codepoints\n")                                         \
     TEXT("                                default\n")
 
@@ -292,10 +294,13 @@ bool to_generate_flags(const tchar* str, uint32_t* out) {
 
     // Mask out all the flags that are in the array above.
     *out = ((*out) & (~generate_flags_named_flags_mask));
-    for (const tchar* p = str; *p; p++) {
-        if (*p == TEXT(',')) {
+    for (const tchar* p = str;; p++) {
+        if (*p == TEXT(',') || *p == 0) {
             auto str_len = (size_t)(p - str);
-            if (!str_len) continue;
+            if (!str_len) {
+                if (*p == 0) break;
+                continue;
+            }
 
             bool found = false;
             for (size_t i = 0, count = size(generate_flags_enum_pairs); i < count; i++) {
@@ -309,7 +314,7 @@ bool to_generate_flags(const tchar* str, uint32_t* out) {
                 }
             }
             if (!found) return false;
-
+            if (*p == 0) break;
             str = p + 1;
         }
     }

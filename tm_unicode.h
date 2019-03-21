@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.2 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.1.3 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -67,6 +67,7 @@ ISSUES
     - tmu_atomic_write not implemented yet for CRT backend.
 
 HISTORY
+    v0.1.3  21.03.19 Fixed tmu_get_ucd_width being used instead of tmu_ucd_get_width.
     v0.1.2  10.03.19 Fixed unused function warning when compiling with TMU_NO_UCD.
     v0.1.1  25.02.19 Fixed MSVC compilation errors.
     v0.1.0  24.02.19 Initial commit of the complete rewrite.
@@ -179,7 +180,8 @@ TM_STRING_VIEW_SIZE and TM_STRING_VIEW_MAKE.
 /* Unicode handling. */
 #if !defined(TMU_NO_UCD)
 #define TMU_UCD_DEF TMU_DEF
-/* This file was generated using tools/unicode_gen. Do not modify by hand. */
+/* This file was generated using tools/unicode_gen from
+   https://github.com/to-miz/tm. Do not modify by hand. */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -818,7 +820,8 @@ TMU_DEF std::vector<char> tmu_read_file_as_utf8_to_vector(TM_STRING_VIEW filenam
 
 #if !defined(TMU_NO_UCD)
 #define TMU_UCD_DEF TMU_DEF
-/* This file was generated using tools/unicode_gen. Do not modify by hand.
+/* This file was generated using tools/unicode_gen from
+   https://github.com/to-miz/tm. Do not modify by hand.
    Around 29937 bytes (29.24 kilobytes) of data for lookup tables
    are generated. */
 
@@ -3048,7 +3051,7 @@ static const uint8_t tmu_grapheme_break_transitions[256] = {
 };
 
 static uint8_t tmu_get_stage_one_value_internal(uint32_t index) {
-    TM_ASSERT(index < 8704);
+    if (index >= 8704) return 198;
     if (index < 1025) return tmu_ucd_stage_one[index];
     switch (index) {
         case 1357: return 239;
@@ -4605,7 +4608,7 @@ TMU_DEF int tmu_utf8_width(tmu_utf8_stream stream) {
     int result = 0;
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
-        result += tmu_get_ucd_width(codepoint);
+        result += tmu_ucd_get_width(codepoint);
     }
     return result;
 }
