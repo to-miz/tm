@@ -280,6 +280,10 @@ TMU_DEF tmu_transform_result tmu_utf8_to_title(const char* str, tm_size_t str_le
 TMU_DEF tmu_transform_result tmu_utf8_to_lower(const char* str, tm_size_t str_len, char* out, tm_size_t out_len);
 #endif /* TMU_UCD_HAS_FULL_CASE */
 
+#if TMU_UCD_HAS_FULL_CASE_TOGGLE
+TMU_DEF tmu_transform_result tmu_utf8_toggle_case(const char* str, tm_size_t str_len, char* out, tm_size_t out_len);
+#endif /* TMU_UCD_HAS_SIMPLE_CASE_TOGGLE */
+
 #if TMU_UCD_HAS_FULL_CASE_FOLD
 TMU_DEF tmu_transform_result tmu_utf8_to_case_fold(const char* str, tm_size_t str_len, char* out, tm_size_t out_len);
 TMU_DEF tm_bool tmu_utf8_equals_ignore_case(const char* a, tm_size_t a_len, const char* b, tm_size_t b_len);

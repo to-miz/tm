@@ -60,11 +60,11 @@ ${tests.tm_unicode.windows.c.out}: ${tests.tm_unicode.deps}
 
 ${tests.tm_unicode.default.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@)
+	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_TESTS_UCD)
 
 ${tests.tm_unicode.signed_size_t.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_SIGNED_SIZE_T)
+	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_SIGNED_SIZE_T USE_TESTS_UCD)
 
 ${tests.tm_unicode.msvc_crt.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.

@@ -1531,7 +1531,6 @@ TMU_DEF tmu_transform_result tmu_utf8_toggle_case_simple(const char* str, tm_siz
     out_stream.data = out;
     out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
-    tmu_transform_result result = {0, TM_OK};
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
         const tmu_ucd_internal* internal = tmu_get_ucd_internal(codepoint);
@@ -1551,7 +1550,6 @@ TMU_DEF tmu_transform_result tmu_utf8_to_upper(const char* str, tm_size_t str_le
     out_stream.data = out;
     out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
-    tmu_transform_result result = {0, TM_OK};
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
         const tmu_ucd_internal* internal = tmu_get_ucd_internal(codepoint);
@@ -1576,7 +1574,6 @@ TMU_DEF tmu_transform_result tmu_utf8_to_title(const char* str, tm_size_t str_le
     out_stream.data = out;
     out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
-    tmu_transform_result result = {0, TM_OK};
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
         const tmu_ucd_internal* internal = tmu_get_ucd_internal(codepoint);
@@ -1601,7 +1598,6 @@ TMU_DEF tmu_transform_result tmu_utf8_to_lower(const char* str, tm_size_t str_le
     out_stream.data = out;
     out_stream.capacity = out_len;
     tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
-    tmu_transform_result result = {0, TM_OK};
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
         const tmu_ucd_internal* internal = tmu_get_ucd_internal(codepoint);
@@ -1622,6 +1618,33 @@ TMU_DEF tmu_transform_result tmu_utf8_to_lower(const char* str, tm_size_t str_le
     return out_stream.result;
 }
 #endif /* TMU_UCD_HAS_FULL_CASE */
+
+#if TMU_UCD_HAS_FULL_CASE_TOGGLE
+TMU_DEF tmu_transform_result tmu_utf8_toggle_case(const char* str, tm_size_t str_len, char* out, tm_size_t out_len) {
+    tmu_transform_output_stream out_stream = {TM_NULL, 0, 0, {0, TM_OK}};
+    out_stream.data = out;
+    out_stream.capacity = out_len;
+    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, str_len);
+    uint32_t codepoint = TMU_INVALID_CODEPOINT;
+    while (tmu_utf8_extract(&stream, &codepoint)) {
+        const tmu_ucd_internal* internal = tmu_get_ucd_internal(codepoint);
+        if (internal->full_case_toggle_index) {
+            const uint16_t* full = tmu_codepoint_runs + internal->full_case_toggle_index;
+            while (*full) {
+                tmu_transform_output_append_codepoint(*full, &out_stream);
+                ++full;
+            }
+        } else {
+            uint32_t transformed = codepoint + internal->simple_case_toggle_offset;
+            tmu_transform_output_append_codepoint(transformed, &out_stream);
+        }
+    }
+    if (out_stream.result.ec == TM_OK && stream.cur != stream.end) {
+        out_stream.result.ec = TM_EINVAL;
+    }
+    return out_stream.result;
+}
+#endif /* TMU_UCD_HAS_FULL_CASE_TOGGLE */
 
 #if TMU_UCD_HAS_FULL_CASE_FOLD
 TMU_DEF tmu_transform_result tmu_utf8_to_case_fold(const char* str, tm_size_t str_len, char* out, tm_size_t out_len) {

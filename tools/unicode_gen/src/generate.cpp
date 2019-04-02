@@ -198,9 +198,9 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
     size_t pruned_stage_one_size = ucd.pruned_stage_one_size;
 
     size_t full_upper_offset = 0;
-    size_t full_title_offset = full_upper_offset + count_codepoints(ucd.full_upper);
-    size_t full_lower_offset = full_title_offset + count_codepoints(ucd.full_title);
-    size_t full_case_fold_offset = full_lower_offset + count_codepoints(ucd.full_lower);
+    size_t full_lower_offset = full_upper_offset + count_codepoints(ucd.full_upper);
+    size_t full_title_offset = full_lower_offset + count_codepoints(ucd.full_lower);
+    size_t full_case_fold_offset = full_title_offset + count_codepoints(ucd.full_title);
     size_t canonical_offset = full_case_fold_offset + count_codepoints(ucd.full_case_fold);
     size_t compatibility_offset = canonical_offset + count_codepoints(ucd.canonical);
     size_t codepoints_count = compatibility_offset + count_codepoints(ucd.compatibility);
@@ -233,6 +233,8 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
 
     // Generate full uppercase, titlecase, lowercase, canonical and compatibility mapping array.
     auto print_runs = [](FILE* f, const char* name, const vector<codepoint_run>& runs, bool first) {
+        if (runs.size() <= 1) return;
+
         fprintf(f, "%s    /* %s */", (first) ? "" : ",\n\n", name);
         for (size_t run_index = 0, runs_count = runs.size(); run_index < runs_count; run_index++) {
             auto& run = runs[run_index];
@@ -257,8 +259,8 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
 
         if ((flags & generate_flags_full_case) || (flags & generate_flags_full_case_toggle)) {
             fprintf(f, "static const size_t %sfull_upper_offset = %zu;\n", prefix, full_upper_offset);
-            fprintf(f, "static const size_t %sfull_title_offset = %zu;\n", prefix, full_title_offset);
             fprintf(f, "static const size_t %sfull_lower_offset = %zu;\n", prefix, full_lower_offset);
+            fprintf(f, "static const size_t %sfull_title_offset = %zu;\n", prefix, full_title_offset);
         }
         if (flags & generate_flags_full_case_fold) {
             fprintf(f, "static const size_t %sfull_case_fold_offset = %zu;\n", prefix, full_case_fold_offset);
@@ -279,8 +281,8 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
         if ((flags & generate_flags_full_case) || (flags & generate_flags_full_case_toggle)) {
             print_runs(f, "Full uppercase entries.", ucd.full_upper, first);
             first = false;
-            print_runs(f, "Full titlecase entries.", ucd.full_title, false);
             print_runs(f, "Full lowercase entries.", ucd.full_lower, false);
+            print_runs(f, "Full titlecase entries.", ucd.full_title, false);
         }
         if (flags & generate_flags_full_case_fold) {
             print_runs(f, "Full case fold entries.", ucd.full_case_fold, first);
@@ -313,13 +315,13 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
         fprintf(f, "    %s full_title_index;\n", full_title_index_type.data);
         fprintf(f, "    %s full_lower_index;\n", full_lower_index_type.data);
     }
-    if (flags & generate_flags_full_case_toggle) {
-        auto full_case_toggle_index_type = get_type_from_size(ucd.min_sizes.full_case_toggle_index);
-        fprintf(f, "    %s full_case_toggle_index;\n", full_case_toggle_index_type.data);
-    }
     if (flags & generate_flags_full_case_fold) {
         auto full_case_fold_index_type = get_type_from_size(ucd.min_sizes.full_case_fold_index);
         fprintf(f, "    %s full_case_fold_index;\n", full_case_fold_index_type.data);
+    }
+    if (flags & generate_flags_full_case_toggle) {
+        auto full_case_toggle_index_type = get_type_from_size(ucd.min_sizes.full_case_toggle_index);
+        fprintf(f, "    %s full_case_toggle_index;\n", full_case_toggle_index_type.data);
     }
     if ((flags & generate_flags_canonical) && ucd.min_sizes.canonical_index.size) {
         auto canonical_index_type = get_type_from_size(ucd.min_sizes.canonical_index);
@@ -338,13 +340,13 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
         fprintf(f, "    %s simple_title_offset;\n", simple_title_offset_type.data);
         fprintf(f, "    %s simple_lower_offset;\n", simple_lower_offset_type.data);
     }
-    if (flags & generate_flags_simple_case_toggle) {
-        auto simple_case_toggle_offset_type = get_type_from_size(ucd.min_sizes.simple_case_toggle_offset);
-        fprintf(f, "    %s simple_case_toggle_offset;\n", simple_case_toggle_offset_type.data);
-    }
     if (flags & generate_flags_simple_case_fold) {
         auto simple_case_fold_offset_type = get_type_from_size(ucd.min_sizes.simple_case_fold_offset);
         fprintf(f, "    %s simple_case_fold_offset;\n", simple_case_fold_offset_type.data);
+    }
+    if (flags & generate_flags_simple_case_toggle) {
+        auto simple_case_toggle_offset_type = get_type_from_size(ucd.min_sizes.simple_case_toggle_offset);
+        fprintf(f, "    %s simple_case_toggle_offset;\n", simple_case_toggle_offset_type.data);
     }
     if (flags & generate_flags_canonical) {
         auto simple_canonical_offset_type = get_type_from_size(ucd.min_sizes.simple_canonical_offset);
@@ -383,14 +385,20 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
                     entry.data.full_title_index, entry.data.full_lower_index);
             first = false;
         }
-        if (flags & generate_flags_full_case_toggle) {
-            fprintf(f, "%s%d", (first) ? empty : comma, entry.data.full_case_toggle_index);
-            first = false;
-        }
         if (flags & generate_flags_full_case_fold) {
             fprintf(f, "%s%d", (first) ? empty : comma, entry.data.full_case_fold_index);
             first = false;
         }
+        if (flags & generate_flags_full_case_toggle) {
+            auto case_toggle_index = entry.data.full_case_toggle_index;
+            if (case_toggle_index < 0) {
+                // Negative value means index maps to lower case table.
+                case_toggle_index = -case_toggle_index + (int32_t)full_lower_offset;
+            }
+            fprintf(f, "%s%d", (first) ? empty : comma, case_toggle_index);
+            first = false;
+        }
+
         if ((flags & generate_flags_canonical) && ucd.min_sizes.canonical_index.size) {
             fprintf(f, "%s%d", (first) ? empty : comma, entry.data.canonical_index);
             first = false;
@@ -405,12 +413,12 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
                     entry.data.simple_title_offset, entry.data.simple_lower_offset);
             first = false;
         }
-        if (flags & generate_flags_simple_case_toggle) {
-            fprintf(f, "%s%d", (first) ? empty : comma, entry.data.simple_case_toggle_offset);
-            first = false;
-        }
         if (flags & generate_flags_simple_case_fold) {
             fprintf(f, "%s%d", (first) ? empty : comma, entry.data.simple_case_fold_offset);
+            first = false;
+        }
+        if (flags & generate_flags_simple_case_toggle) {
+            fprintf(f, "%s%d", (first) ? empty : comma, entry.data.simple_case_toggle_offset);
             first = false;
         }
         if (flags & generate_flags_canonical) {
@@ -725,16 +733,16 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
         fprintf(f, "    result.simple_canonical = codepoint + internal->simple_canonical_offset;\n");
     }
     if (flags & generate_flags_compatibility) {
-        fprintf(f, "    result.full_compatibility = codepoint + internal->simple_compatibility_offset;\n");
+        fprintf(f, "    result.simple_compatibility = codepoint + internal->simple_compatibility_offset;\n");
     }
 
-    if (flags & generate_flags_canonical) {
+    if ((flags & generate_flags_canonical) && ucd.min_sizes.canonical_index.size) {
         fprintf(f,
                 "    result.full_canonical = %scodepoint_runs + %scanonical_offset +\n"
                 "                            internal->canonical_index;\n",
                 prefix, prefix);
     }
-    if (flags & generate_flags_compatibility) {
+    if ((flags & generate_flags_compatibility) && ucd.min_sizes.compatibility_index.size) {
         fprintf(f,
                 "    result.full_compatibility = %scodepoint_runs + %scompatibility_offset +\n"
                 "                                internal->compatibility_index;\n",
@@ -758,9 +766,8 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
     }
     if (flags & generate_flags_full_case_toggle) {
         fprintf(f,
-                "    result.full_case_toggle = %scodepoint_runs + %sfull_case_toggle_offset +\n"
-                "                              internal->full_case_toggle_index;\n",
-                prefix, prefix);
+                "    result.full_case_toggle = %scodepoint_runs + internal->full_case_toggle_index;\n",
+                prefix);
     }
     fprintf(f, "    return result;\n}\n\n");
 
@@ -874,10 +881,16 @@ void generate_header_file(const ucd_min_sizes& min_sizes, uint32_t flags, const 
     }
     if (flags & generate_flags_simple_case_fold) fprintf(f, "    uint32_t simple_case_fold;\n");
     if (flags & generate_flags_simple_case_toggle) fprintf(f, "    uint32_t simple_case_toggle;\n");
+    if (flags & generate_flags_canonical) fprintf(f, "    uint32_t simple_canonical;\n");
+    if (flags & generate_flags_compatibility) fprintf(f, "    uint32_t simple_compatibility;\n");
     if (min_sizes.all_arrays.size > 0) {
         auto type = get_type_from_size(min_sizes.all_arrays);
-        if (flags & generate_flags_canonical) fprintf(f, "    const %s* full_canonical;\n", type.data);
-        if (flags & generate_flags_compatibility) fprintf(f, "    const %s* full_compatibility;\n", type.data);
+        if ((flags & generate_flags_canonical) && min_sizes.canonical_index.size) {
+            fprintf(f, "    const %s* full_canonical;\n", type.data);
+        }
+        if ((flags & generate_flags_compatibility) && min_sizes.compatibility_index.size) {
+            fprintf(f, "    const %s* full_compatibility;\n", type.data);
+        }
         if (flags & generate_flags_full_case) {
             fprintf(f,
                     "    const %s* full_upper;\n"

@@ -51,8 +51,8 @@ typedef struct {
     uint32_t simple_lower;
     uint32_t simple_case_fold;
     uint32_t simple_case_toggle;
-    const uint16_t* full_canonical;
-    const uint16_t* full_compatibility;
+    uint32_t simple_canonical;
+    uint32_t simple_compatibility;
     const uint16_t* full_upper;
     const uint16_t* full_title;
     const uint16_t* full_lower;

@@ -81,6 +81,7 @@ void test_free(void* ptr, size_t size) {
 // Use Unicode data that defines even more data.
 #ifdef USE_TESTS_UCD
 #define TMU_NO_UCD
+#define TMU_UCD_DEF extern
 #include "generated/tests_unicode_data.h"
 #include "generated/tests_unicode_data.c"
 #endif /* defined(USE_TESTS_UCD) */
@@ -357,7 +358,13 @@ TEST_CASE("codepoints count") {
 TEST_CASE("case transform simple") {
     auto do_test = [](auto transform, const char* str, const char* expected) {
         char buffer[100];
-        auto result = transform(str, strlen(str), buffer, 100);
+        auto result = transform(str, (tm_size_t)strlen(str), buffer, 100);
+        REQUIRE(result.size < 100);
+        buffer[result.size] = 0;
+
+        CAPTURE(str);
+        CAPTURE(expected);
+        CAPTURE(buffer);
         REQUIRE(result.ec == TM_OK);
         REQUIRE(result.size == (tm_size_t)strlen(expected));
         REQUIRE(memcmp(expected, buffer, result.size * sizeof(char)) == 0);
@@ -371,7 +378,7 @@ TEST_CASE("case transform simple") {
     do_test(tmu_utf8_to_title_simple, "\xC3\xA4", "\xC3\x84");  // LATIN SMALL LETTER A WITH DIAERESIS
 
     do_test(tmu_utf8_to_lower_simple, "ASD", "asd");
-    do_test(tmu_utf8_to_title_simple, "\xC3\x84", "\xC3\xA4");  // LATIN SMALL LETTER A WITH DIAERESIS
+    do_test(tmu_utf8_to_title_simple, "\xC3\x84", "\xC3\x84");  // LATIN CAPITAL LETTER A WITH DIAERESIS
 #endif                                                          /* TMU_UCD_HAS_SIMPLE_CASE */
 
 #if TMU_UCD_HAS_SIMPLE_CASE_TOGGLE
@@ -389,7 +396,13 @@ TEST_CASE("case transform simple") {
 TEST_CASE("case transform") {
     auto do_test = [](auto transform, const char* str, const char* expected) {
         char buffer[100];
-        auto result = transform(str, strlen(str), buffer, 100);
+        auto result = transform(str, (tm_size_t)strlen(str), buffer, 100);
+        REQUIRE(result.size < 100);
+        buffer[result.size] = 0;
+
+        CAPTURE(str);
+        CAPTURE(expected);
+        CAPTURE(buffer);
         REQUIRE(result.ec == TM_OK);
         REQUIRE(result.size == (tm_size_t)strlen(expected));
         REQUIRE(memcmp(expected, buffer, result.size * sizeof(char)) == 0);
@@ -402,7 +415,7 @@ TEST_CASE("case transform") {
     do_test(tmu_utf8_to_title, "\xC3\xA4", "\xC3\x84");  // LATIN SMALL LETTER A WITH DIAERESIS
 
     do_test(tmu_utf8_to_lower, "ASD", "asd");
-    do_test(tmu_utf8_to_title, "\xC3\x84", "\xC3\xA4");  // LATIN SMALL LETTER A WITH DIAERESIS
+    do_test(tmu_utf8_to_title, "\xC3\x84", "\xC3\x84");  // LATIN CAPITAL LETTER A WITH DIAERESIS
 
     // GREEK SMALL LETTER UPSILON WITH PSILI AND VARIA
     do_test(tmu_utf8_to_upper, "\xE1\xBD\x92", "\xCE\xA5\xCC\x93\xCC\x80");
@@ -414,6 +427,17 @@ TEST_CASE("case transform") {
     // LATIN SMALL LIGATURE FFI
     do_test(tmu_utf8_to_title, "\xEF\xAC\x83", "Ffi");
     do_test(tmu_utf8_to_upper, "\xEF\xAC\x83", "FFI");
+
+#if TMU_UCD_HAS_FULL_CASE_TOGGLE
+    do_test(tmu_utf8_toggle_case, "asd", "ASD");
+    do_test(tmu_utf8_toggle_case, "ASD", "asd");
+    do_test(tmu_utf8_toggle_case, "AsD", "aSd");
+    do_test(tmu_utf8_toggle_case, "aSd", "AsD");
+    do_test(tmu_utf8_toggle_case, "\xC3\xA4", "\xC3\x84");  // LATIN SMALL LETTER A WITH DIAERESIS
+    do_test(tmu_utf8_toggle_case, "\xC3\x84", "\xC3\xA4");  // LATIN SMALL LETTER A WITH DIAERESIS
+    // GREEK SMALL LETTER UPSILON WITH PSILI AND VARIA
+    do_test(tmu_utf8_toggle_case, "\xE1\xBD\x92", "\xCE\xA5\xCC\x93\xCC\x80");
+#endif /* TMU_UCD_HAS_FULL_CASE_TOGGLE */
 }
 #endif /* TMU_UCD_HAS_FULL_CASE */
 

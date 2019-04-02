@@ -1248,6 +1248,7 @@ struct ucd_entry {
         int32_t simple_case_fold_offset;
     } data;
 
+    uint8_t internal_case_flags;
     int32_t references;
 
     bool equals(const ucd_entry& other) const { return memcmp(&data, &other.data, sizeof(data_t)) == 0; }
@@ -1689,6 +1690,14 @@ struct unique_ucd {
         pair simple_case_toggle_offset = {0, 0};
         pair simple_case_fold_offset = {0, 0};
 
+        // Handle case toggling seperately, since it encompasses two lists at once.
+        for (auto& run : full_upper) {
+            full_case_toggle_index.max += run.count + 1; // Plus nullterminator.
+        }
+        for (auto& run : full_lower) {
+            full_case_toggle_index.max += run.count + 1; // Plus nullterminator.
+        }
+
         // Unicoda data sizes.
         for (auto& entry : entries) {
             canonical_index.min = min(entry.data.canonical_index, canonical_index.min);
@@ -1699,7 +1708,6 @@ struct unique_ucd {
             full_upper_index.min = min(entry.data.full_upper_index, full_upper_index.min);
             full_title_index.min = min(entry.data.full_title_index, full_title_index.min);
             full_lower_index.min = min(entry.data.full_lower_index, full_lower_index.min);
-            full_case_toggle_index.min = min(entry.data.full_case_toggle_index, full_case_toggle_index.min);
             full_case_fold_index.min = min(entry.data.full_case_fold_index, full_case_fold_index.min);
             simple_upper_offset.min = min(entry.data.simple_upper_offset, simple_upper_offset.min);
             simple_title_offset.min = min(entry.data.simple_title_offset, simple_title_offset.min);
@@ -1715,7 +1723,6 @@ struct unique_ucd {
             full_upper_index.max = max(entry.data.full_upper_index, full_upper_index.max);
             full_title_index.max = max(entry.data.full_title_index, full_title_index.max);
             full_lower_index.max = max(entry.data.full_lower_index, full_lower_index.max);
-            full_case_toggle_index.max = max(entry.data.full_case_toggle_index, full_case_toggle_index.max);
             full_case_fold_index.max = max(entry.data.full_case_fold_index, full_case_fold_index.max);
             simple_upper_offset.max = max(entry.data.simple_upper_offset, simple_upper_offset.max);
             simple_title_offset.max = max(entry.data.simple_title_offset, simple_title_offset.max);
@@ -1875,6 +1882,7 @@ void generate_tables(const vector<data_entry> data_entries, unique_ucd* out) {
 
         auto case_flags = to_flags(0xFFFFFFFFu, data->category, data->bidirectional_category);
 
+        ucd.internal_case_flags = case_flags;
         ucd.data.flags = to_flags(flags, data->category, data->bidirectional_category);
         ucd.data.grapheme_break = (flags & generate_flags_grapheme_break) ? data->grapheme_break : grapheme_break_other;
         ucd.data.width = 0;
@@ -1922,7 +1930,9 @@ void generate_tables(const vector<data_entry> data_entries, unique_ucd* out) {
                 if (get_ucd_case(case_flags) == ucd_case_lower) {
                     ucd.data.full_case_toggle_index = out->add_full_upper_run(f->upper, f->upper_count);
                 } else if (get_ucd_case(case_flags) == ucd_case_upper) {
-                    ucd.data.full_case_toggle_index = out->add_full_lower_run(f->lower, f->lower_count);
+                    // Make index negative, so that it maps to a different entry in the multistage tables than the upper
+                    // case toggle.
+                    ucd.data.full_case_toggle_index = -out->add_full_lower_run(f->lower, f->lower_count);
                 }
             }
 
@@ -1933,19 +1943,19 @@ void generate_tables(const vector<data_entry> data_entries, unique_ucd* out) {
 
         if (auto simple = data->simple) {
             if (flags & generate_flags_simple_case) {
-                if (simple->upper != invalid_codepoint) ucd.data.simple_upper_offset = simple->upper - cp;
-                if (simple->title != invalid_codepoint) ucd.data.simple_title_offset = simple->title - cp;
-                if (simple->lower != invalid_codepoint) ucd.data.simple_lower_offset = simple->lower - cp;
+                if (simple->upper != invalid_codepoint) ucd.data.simple_upper_offset = (int32_t)simple->upper - cp;
+                if (simple->title != invalid_codepoint) ucd.data.simple_title_offset = (int32_t)simple->title - cp;
+                if (simple->lower != invalid_codepoint) ucd.data.simple_lower_offset = (int32_t)simple->lower - cp;
             }
 
             if (flags & generate_flags_simple_case_toggle) {
                 if (get_ucd_case(case_flags) == ucd_case_lower) {
                     if (simple->upper != invalid_codepoint) {
-                        ucd.data.simple_case_toggle_offset = simple->upper - cp;
+                        ucd.data.simple_case_toggle_offset = (int32_t)simple->upper - cp;
                     }
                 } else if (get_ucd_case(case_flags) == ucd_case_upper) {
                     if (simple->lower != invalid_codepoint) {
-                        ucd.data.simple_case_toggle_offset = simple->lower - cp;
+                        ucd.data.simple_case_toggle_offset = (int32_t)simple->lower - cp;
                     }
                 }
             }
