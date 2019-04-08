@@ -1,18 +1,18 @@
 UNICODE_GEN_BUILD ?= release
 # UNICODE_GEN_BUILD ?= debug
 
-unicode_gen_build_dir := ${BUILD_DIR}/${UNICODE_GEN_BUILD}/
+unicode_gen_build_dir := ${BUILD_DIR}${path_sep}${UNICODE_GEN_BUILD}${path_sep}
 
 unicode_gen.out := ${unicode_gen_build_dir}unicode_gen${exe_ext}
 unicode_gen.data_dir := tools/unicode_gen/data/
 unicode_gen.data := $(wildcard ${unicode_gen.data_dir}*)
 
-${unicode_gen.out}: override BUILD := ${UNICODE_GEN_BUILD}
-${unicode_gen.out}: CPP_OPTIONS.gcc += -Wno-missing-field-initializers
-${unicode_gen.out}: CPP_OPTIONS.gcc += -Wno-error=unused-parameter
-${unicode_gen.out}: CPP_OPTIONS.clang += -Wno-missing-field-initializers
-${unicode_gen.out}: CPP_OPTIONS.clang += -Wno-error=unused-parameter
-${unicode_gen.out}: override cpp_options.cl := $(filter-out -EH%, ${cpp_options.cl}) -EHa
+${unicode_gen.out}: private override BUILD := ${UNICODE_GEN_BUILD}
+${unicode_gen.out}: private CPP_OPTIONS.gcc += -Wno-missing-field-initializers
+${unicode_gen.out}: private CPP_OPTIONS.gcc += -Wno-error=unused-parameter
+${unicode_gen.out}: private CPP_OPTIONS.clang += -Wno-missing-field-initializers
+${unicode_gen.out}: private CPP_OPTIONS.clang += -Wno-error=unused-parameter
+${unicode_gen.out}: private options.cl.exception := -EHa
 ${unicode_gen.out}: tools/unicode_gen/src/*.cpp tm_cli.h
 	${hide}echo Compiling $@.
 	${hide}$(call cpp_compile_and_link, tools/unicode_gen/src/main.cpp, $@, .)

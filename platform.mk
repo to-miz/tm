@@ -20,6 +20,7 @@ VERBOSE   := false
 build_dir   := ${BUILD_DIR}/${BUILD}/
 debug_dir   := ${BUILD_DIR}/debug/
 release_dir := ${BUILD_DIR}/release/
+path_sep    := /
 
 # Extensions depending on platform.
 ifeq (${OS},Windows_NT)
@@ -39,6 +40,9 @@ ifeq (${OS},Windows_NT)
 	build_dir   := $(subst /,\,${build_dir})
 	debug_dir   := $(subst /,\,${debug_dir})
 	release_dir := $(subst /,\,${release_dir})
+	path_sep    := $(subst /,\,${path_sep})
+
+	clean_build_dir := del /f/q/s ${BUILD_DIR}${path_sep}*.* >nul 2>nul
 else
 	os := linux
 	exe_ext := .out
@@ -124,7 +128,7 @@ link_libs.clang.debug    :=
 link_libs.clang.release  :=
 link_libs.clang          = ${link_libs.clang.${BUILD}}
 
-output_directive.clang   := -o
+output_directive.clang   = -o${1}
 
 # gcc
 version_suffix.gcc := $(patsubst gcc%,%,$(patsubst g++%,%,${COMPILER}))
@@ -154,7 +158,9 @@ link_libs.gcc.debug    :=
 link_libs.gcc.release  :=
 link_libs.gcc          = ${link_libs.gcc.${BUILD}}
 
-output_directive.gcc   := -o
+output_directive.gcc   = -o${1}
+
+output_directive.other = -o${1}
 
 # cl
 
@@ -174,12 +180,12 @@ warnings.cl  += -w45039 # 'function': pointer or reference to potentially throwi
 
 sanitize.cl := -RTCsu -GS -sdl
 
-options.cl.debug   := -Od -Zi -MDd -Fd${build_dir} ${sanitize.cl}
+options.cl.debug   := -Od -Zi -MDd ${sanitize.cl}
 options.cl.release := -DNDEBUG -MD -GS- -Gy -fp:fast -Ox -Oy- -GL -Gw -Oi -O2
-options.cl        = ${warnings.cl} -EHsc -Oi -permissive- -utf-8 -volatile:iso -DNOMINMAX -DUNICODE  \
-					-D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS \
-					${options.cl.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}}) \
-					-Fo${build_dir} -FC -bigobj
+options.cl.exception := -EHsc
+options.cl        = ${warnings.cl} ${options.cl.exception} -Oi -permissive- -utf-8 -volatile:iso \
+					-DNOMINMAX -DUNICODE -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS \
+					${options.cl.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}}) -FS -FC -bigobj
 
 cpp_options.cl.debug   :=
 cpp_options.cl.release :=
@@ -198,7 +204,7 @@ link_libs.cl.debug    :=
 link_libs.cl.release  :=
 link_libs.cl          = ${link_libs.cl.${BUILD}}
 
-output_directive.cl   := -link -out:
+output_directive.cl   = -Fd"${1}.pdb" -Fe"${1}" -Fo"${1}${obj_ext}" -link -out:"${1}"
 
 # Generic
 
@@ -226,7 +232,7 @@ override cpp_compile_and_link = ${hide}${cpp_compiler.${compiler_selector}} \
 								$(addprefix -D,${CPP_DEFINES.${compiler_selector}}) \
 								$(addprefix -D,${4}) \
 								${1} \
-								${output_directive.${compiler_selector}}$(subst ${space},${empty},${2}) \
+								$(call output_directive.${compiler_selector},$(subst ${space},${empty},${2})) \
 								${link_options} \
 								${LINK_OPTIONS.${compiler_selector}} \
 								${link_libs} \
@@ -241,7 +247,7 @@ override c_compile_and_link   = ${hide}${c_compiler.${compiler_selector}} \
 								$(addprefix -D,${C_DEFINES.${compiler_selector}}) \
 								$(addprefix -D,${4}) \
 								${1} \
-								${output_directive.${compiler_selector}}$(subst ${space},${empty},${2}) \
+								$(call output_directive.${compiler_selector},$(subst ${space},${empty},${2})) \
 								${link_options} \
 								${LINK_OPTIONS.${compiler_selector}} \
 								${link_libs} \

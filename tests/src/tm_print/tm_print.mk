@@ -39,17 +39,21 @@ ${tests.tm_print.tm_conversion_signed_size_t.out}: ${tests.tm_print.deps}
 	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
 	TMP_INT_BACKEND_TM_CONVERSION TMP_FLOAT_BACKEND_TM_CONVERSION SIGNED_SIZE_T)
 
-# TODO: Add TMP_FLOAT_BACKEND_CHARCONV to defines once STL supports it.
+ifeq (${HAS_CHARCONV_FLOAT},true)
+tm_print.charconv_float := TMP_FLOAT_BACKEND_CHARCONV
+else
+tm_print.charconv_without_float := ${space}without float backend
+endif
+
 ${tests.tm_print.charconv.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
 	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
-	TMP_INT_BACKEND_CHARCONV)
+	TMP_INT_BACKEND_CHARCONV ${tm_print.charconv_float})
 
-# TODO: Add TMP_FLOAT_BACKEND_CHARCONV to defines once STL supports it.
 ${tests.tm_print.charconv_signed_size_t.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
 	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
-	TMP_INT_BACKEND_CHARCONV SIGNED_SIZE_T)
+	TMP_INT_BACKEND_CHARCONV ${tm_print.charconv_float} SIGNED_SIZE_T)
 
 tests.tm_print: ${tests.tm_print.all_configs_deps}
 
@@ -74,8 +78,8 @@ tests.tm_print.run: tests.tm_print
 	${hide}echo TESTING: tm_conversion backend with signed size_t
 	${hide}${tests.tm_print.tm_conversion_signed_size_t.out}
 	${hide}echo ---
-	${hide}echo TESTING: charconv backend without float backend
+	${hide}echo TESTING: charconv backend${tm_print.charconv_without_float}
 	${hide}${tests.tm_print.charconv.out}
 	${hide}echo ---
-	${hide}echo TESTING: charconv backend without float backend with signed size_t
+	${hide}echo TESTING: charconv backend${tm_print.charconv_without_float} with signed size_t
 	${hide}${tests.tm_print.charconv_signed_size_t.out}
