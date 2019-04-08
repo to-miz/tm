@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.13 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.14 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -14,11 +14,14 @@ USAGE
     in ONE C or C++ source file before #including this header.
 
 ISSUES
-    - The tm_conversion based implementation always outputs '.' as the decimal point character
-    regardless of the locale, while the snprintf based output outputs the decimal point based on the
-    current locale.
+    - The tm_conversion/charconv based implementation always outputs '.' as the decimal point character
+      regardless of the locale, while the snprintf based output outputs the decimal point based on the
+      current locale.
+    - snprint functions do not return the required buffer length if supplied buffer isn't large enough.
+      This is in contrast to how snprintf works. Currenlty return value is -1 if buffer isn't large enough.
 
 HISTORY
+    v0.0.14 08.04.19 Allow print functions to be called with no variadic arguments.
     v0.0.13 11.03.19 Fixed printing with specified index.
     v0.0.12 10.03.19 Added char* specializations (non-const), fixing not being able to print raw char* strings.
     v0.0.11 09.03.19 Added tmp_parse_print_format for parsing the PrintFormat structure from other sources.
@@ -199,11 +202,11 @@ struct PrintArgList {
 #endif  // TMP_NO_CRT_FILE_PRINTING
 // clang-format on
 
-TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
-                              const PrintArgList& args);
+TMP_DEF int tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
+                        const PrintArgList& args);
 #ifdef TM_STRING_VIEW
-TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
-                              const PrintArgList& args);
+TMP_DEF int tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
+                        const PrintArgList& args);
 #endif
 
 TMP_DEF tm_size_t tmp_parse_print_format(const char* format_specifiers, tm_size_t format_specifiers_len,

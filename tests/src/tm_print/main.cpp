@@ -37,6 +37,15 @@ TEST_CASE("Test basic printing") {
     check_output("{:o}", "10", 8);
 }
 
+TEST_CASE("Test arguments count") {
+    // Zero arguments
+    check_output("test", "test");
+    check_output("{}", "{}");
+
+    // More format specifiers than arguments.
+    check_output("{}{}", "1{}", 1);
+}
+
 TEST_CASE("Test integral type printing") {
     // signed
     check_output("{}", "-1", (char)-1);
@@ -141,9 +150,9 @@ TEST_CASE("Test width") {
 TEST_CASE("Test overflow") {
     char buffer[10];
 
-    CHECK(snprint(nullptr, 0, "{}", 1) == 0);
-    CHECK(snprint(buffer, 0, "{}", 1) == 0);
-    CHECK(snprint(buffer, 1, "{}", 10) == 0);
+    CHECK(snprint(nullptr, 0, "{}", 1) == -1);
+    CHECK(snprint(buffer, 0, "{}", 1) == -1);
+    CHECK(snprint(buffer, 1, "{}", 10) == -1);
 
     CHECK_ASSERTION_FAILURE(snprint(nullptr, 1, "{}", 1));
 #ifdef SIGNED_SIZE_T

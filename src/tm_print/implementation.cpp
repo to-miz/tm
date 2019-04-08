@@ -315,7 +315,7 @@ static const char* tmp_find(const char* first, const char* last, char c) {
 
 static void tmp_print_impl(const char* format, size_t formatLen, const PrintFormat& initialFormatting,
                            const PrintArgList& args, tmp_memory_printer& printout) {
-    // Sanitize flags
+    // Sanitize flags.
     uint32_t formatFlags = initialFormatting.flags & ((1u << PrintFlags::Count) - 1);
 
     const char* formatFirst = format;
@@ -333,7 +333,7 @@ static void tmp_print_impl(const char* format, size_t formatLen, const PrintForm
             continue;
         }
 
-        // parse until '}'
+        // Parse until '}'.
         auto next = tmp_find(formatFirst, formatLast, '}');
         if (!next) {
             TM_ASSERT(0 && "illformed format");
@@ -550,17 +550,17 @@ TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintFormat& i
 #endif  // defined(TM_STRING_VIEW)
 #endif  // !defined(TMP_NO_CRT_FILE_PRINTING)
 
-TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
-                              const PrintArgList& args) {
+TMP_DEF int tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
+                        const PrintArgList& args) {
     tmp_memory_printer mem{dest, 0, len, false, false};
     tmp_print_impl(format, TM_STRLEN(format), initialFormatting, args, mem);
-    return mem.size;
+    return (mem.ec == TM_OK) ? (int)mem.size : -1;
 }
 #ifdef TM_STRING_VIEW
-TMP_DEF tm_size_t tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
-                              const PrintArgList& args) {
+TMP_DEF int tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
+                        const PrintArgList& args) {
     tmp_memory_printer mem{dest, 0, len, false, false};
     tmp_print_impl(TM_STRING_VIEW_DATA(format), TM_STRING_VIEW_SIZE(format), initialFormatting, args, mem);
-    return mem.size;
+    return (mem.ec == TM_OK) ? (int)mem.size : -1;
 }
 #endif  // defined(TM_STRING_VIEW)

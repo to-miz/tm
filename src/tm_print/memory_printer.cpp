@@ -50,25 +50,25 @@ struct tmp_memory_printer {
         do {
             result = print_formatted(end(), remaining(), format, value);
         } while (allowResize && result.ec == TM_EOVERFLOW && grow());
-        if (result.ec == TM_OK)
+        if (result.ec == TM_OK) {
             size += result.size;
-        else
+        } else {
             ec = result.ec;
+        }
         return result.ec == TM_OK;
     }
     bool print_string_value(const char* str, tm_size_t str_len, PrintFormat& format) {
         tm_size_t len = (format.width > 0 && (tm_size_t)format.width > str_len) ? ((tm_size_t)format.width) : (str_len);
 
         bool result = true;
-        if (len > remaining()) {
-            result = grow(len);
-        }
+        if (len > remaining()) result = grow(len);
         if (result) {
             auto print_result = print_formatted(end(), remaining(), format, str, str_len);
             if (print_result.ec == TM_OK) {
                 size += print_result.size;
             } else {
                 result = false;
+                ec = print_result.ec;
             }
         }
         return result;
@@ -164,7 +164,7 @@ struct tmp_memory_printer {
                 auto print_size = value.custom.customPrint(end(), remaining(), format, value.custom.data);
                 if (allowResize && print_size >= remaining()) {
                     result = grow();
-                    if(result) {
+                    if (result) {
                         print_size = value.custom.customPrint(end(), remaining(), format, value.custom.data);
                     }
                 }

@@ -315,38 +315,41 @@ void makePrintArgList(PrintArgList* list, size_t capacity, const Types&... args)
     (void)capacity;
     TM_ASSERT(list->size == capacity);
 }
+template <class... Types>
+void makePrintArgList(PrintArgList* list, size_t capacity) {
+    list->flags = 0;
+    list->size = 0;
+    (void)capacity;
+    TM_ASSERT(list->size == capacity);
+}
+
+// Wrapper to an arguments list array on the stack.
+// The array size is a ternary expression so that the argument list also works with zero arguments.
+#define TMP_INTERNAL_MAKE_ARG_LIST(argList, args)                                               \
+    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print"); \
+    PrintValue values[sizeof...(args) ? sizeof...(args) : 1];                                   \
+    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};                                   \
+    makePrintArgList(&argList, sizeof...(args), args...);
 
 #ifndef TMP_NO_CRT_FILE_PRINTING
 template <class... Types>
 tm_errc print(const char* format, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_print(stdout, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
 tm_errc print(FILE* out, const char* format, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_print(out, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
 tm_errc print(const char* format, const PrintFormat& initialFormatting, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_print(stdout, format, initialFormatting, argList);
 }
 template <class... Types>
 tm_errc print(FILE* out, const char* format, const PrintFormat& initialFormatting, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_print(out, format, initialFormatting, argList);
 }
 // impl
@@ -354,75 +357,52 @@ tm_errc print(FILE* out, const char* format, const PrintFormat& initialFormattin
 #ifdef TM_STRING_VIEW
 template <class... Types>
 tm_errc print(TM_STRING_VIEW format, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_print(stdout, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
 tm_errc print(FILE* out, TM_STRING_VIEW format, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_print(out, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
 tm_errc print(TM_STRING_VIEW format, const PrintFormat& initialFormatting, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_print(stdout, format, initialFormatting, argList);
 }
 template <class... Types>
 tm_errc print(FILE* out, TM_STRING_VIEW format, const PrintFormat& initialFormatting, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to print");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_print(out, format, initialFormatting, argList);
 }
 #endif  // defined( TM_STRING_VIEW )
 #endif  // TMP_NO_CRT_FILE_PRINTING
 
 template <class... Types>
-tm_size_t snprint(char* dest, tm_size_t len, const char* format, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+int snprint(char* dest, tm_size_t len, const char* format, const Types&... args) {
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_snprint(dest, len, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
-tm_size_t snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
-                  const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+int snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting, const Types&... args) {
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_snprint(dest, len, format, initialFormatting, argList);
 }
 #ifdef TM_STRING_VIEW
 template <class... Types>
-tm_size_t snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+int snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const Types&... args) {
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_snprint(dest, len, format, defaultPrintFormat(), argList);
 }
 template <class... Types>
-tm_size_t snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
-                  const Types&... args) {
-    static_assert(sizeof...(args) <= PrintType::Count, "Invalid number of arguments to snprint");
-    PrintValue values[sizeof...(args)];
-    PrintArgList argList = {values, /*flags=*/0, /*size=*/0};
-    makePrintArgList(&argList, sizeof...(args), args...);
+int snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
+            const Types&... args) {
+    TMP_INTERNAL_MAKE_ARG_LIST(argList, args);
     return tmp_snprint(dest, len, format, initialFormatting, argList);
 }
 #endif  // defined( TM_STRING_VIEW )
+
+#undef TMP_INTERNAL_MAKE_ARG_LIST
 
 #ifdef TMP_CUSTOM_PRINTING
 // this looks very confusing, but it checks for the existence of a specific overload of snprint
