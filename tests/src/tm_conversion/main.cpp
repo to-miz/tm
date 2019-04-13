@@ -587,7 +587,7 @@ bool test_roundtrip(PrintFunc print_func, ScanFunc scan_func, ValueType min_val,
     print_test(0, 10000, steps);
     print_test(min_val, max_val, steps);
     printf("mismatches: close: %d; bad: %d; total tests: %llu.\n", closeMismatchCount, mismatchCount - closeMismatchCount,
-           totalTests);
+           (long long unsigned int)totalTests);
 
     return mismatchCount - closeMismatchCount == 0;
 }
