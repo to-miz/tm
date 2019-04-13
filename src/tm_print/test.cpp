@@ -16,8 +16,8 @@
 // #include "tm_print.h"
 
 int main() {
-	print("{}\n", 1);
-	print("{}\n", 1.0f);
-	print("{}\n", 1.0);
+	tml::print("{}\n", 1);
+	tml::print("{}\n", 1.0f);
+	tml::print("{}\n", 1.0);
 	return 0;
 }

@@ -1,4 +1,4 @@
-static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint32_t value, const PrintFormat& format) {
+static PrintFormattedResult tmp_print_value(char* dest, tm_size_t maxlen, uint32_t value, const PrintFormat& format) {
     TM_ASSERT(!dest || maxlen > 0);
     TM_ASSERT_VALID_SIZE(maxlen);
 
@@ -9,14 +9,19 @@ static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint32_t val
     } else if (format.base == 8) {
         format_string = "%" PRIo32;
     }
-    auto size = TMP_SNPRINTF(dest, (size_t)maxlen, format_string, value);
-    if (size > 0 && (tm_size_t)size <= maxlen) {
+    int size = TMP_SNPRINTF(dest, (size_t)maxlen, format_string, value);
+    if (size < 0) {
+        result.ec = TM_EINVAL;
+    } else if ((tm_size_t)size >= maxlen) {
+        result.size = (tm_size_t)size;
+        result.ec = TM_ERANGE;
+    } else {
         result.size = (tm_size_t)size;
         result.ec = TM_OK;
     }
     return result;
 }
-static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint64_t value, const PrintFormat& format) {
+static PrintFormattedResult tmp_print_value(char* dest, tm_size_t maxlen, uint64_t value, const PrintFormat& format) {
     TM_ASSERT(!dest || maxlen > 0);
     TM_ASSERT_VALID_SIZE(maxlen);
 
@@ -27,8 +32,13 @@ static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, uint64_t val
     } else if (format.base == 8) {
         format_string = "%" PRIo64;
     }
-    auto size = TMP_SNPRINTF(dest, (size_t)maxlen, format_string, value);
-    if (size > 0 && (tm_size_t)size <= maxlen) {
+    int size = TMP_SNPRINTF(dest, (size_t)maxlen, format_string, value);
+    if (size < 0) {
+        result.ec = TM_EINVAL;
+    } else if ((tm_size_t)size >= maxlen) {
+        result.size = (tm_size_t)size;
+        result.ec = TM_ERANGE;
+    } else {
         result.size = (tm_size_t)size;
         result.ec = TM_OK;
     }

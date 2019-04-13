@@ -12,6 +12,7 @@ typedef int tm_size_t;
 #define TM_CONVERSION_IMPLEMENTATION
 #define TM_PRINT_IMPLEMENTATION
 #define TMP_CUSTOM_PRINTING
+#define TMP_USE_STL
 #include <tm_print.h>
 
 #include <string_view>
@@ -21,12 +22,37 @@ void check_output(const char* format, const char* expected_string, const Args&..
     const tm_size_t buffer_size = 100;
     char buffer[buffer_size];
 
-    auto result_size = snprint(buffer, buffer_size, format, args...);
-    REQUIRE(result_size < buffer_size);
+    auto expected = std::string_view(expected_string);
+
+    CAPTURE(format);
+    CAPTURE(expected_string);
+
+    // Check whether needed size calculations are correct.
+    auto needed_size = tml::snprint(nullptr, 0, format, args...);
+    REQUIRE(needed_size >= 0);
+    REQUIRE((size_t)needed_size == expected.size());
+
+    // Check whether printing to static buffers work.
+    auto result_size = tml::snprint(buffer, buffer_size, format, args...);
+    REQUIRE(result_size >= 0);
+    REQUIRE((tm_size_t)result_size < buffer_size);
     buffer[result_size] = 0;
     auto printed = std::string_view(buffer);
-    auto expected = std::string_view(expected_string);
     CHECK(printed == expected);
+
+    // Check whether std::string printing works.
+    auto str = tml::string_format(format, args...);
+    CHECK(str == expected);
+}
+
+template <class... Args>
+void expect_error(const char* format, const Args&... args) {
+    const tm_size_t buffer_size = 100;
+    char buffer[buffer_size];
+
+    CAPTURE(format);
+
+    CHECK(tml::snprint(buffer, buffer_size, format, args...) < 0);
 }
 
 TEST_CASE("Test basic printing") {
@@ -40,10 +66,89 @@ TEST_CASE("Test basic printing") {
 TEST_CASE("Test arguments count") {
     // Zero arguments
     check_output("test", "test");
-    check_output("{}", "{}");
+}
+
+TEST_CASE("Test format validation") {
+    // No arguments but placeholders.
+    expect_error("{}");
+    expect_error("{0}");
+
+    // Specified index out of range.
+    expect_error("{1}", 1);
+    expect_error("{2}", 1, 2);
+    expect_error("{100}", 1, 2);
 
     // More format specifiers than arguments.
-    check_output("{}{}", "1{}", 1);
+    expect_error("{}{}", 1);
+    expect_error("{0}{}{}", 1);
+    expect_error("{}{}{0}", 1);
+    expect_error("{}{0}{}", 1);
+    expect_error("{0}{0}{}{}", 1);
+
+    // Escaped placeholder tokens.
+    auto check_escaped_token = [](const char* format, const char* expected) {
+        // Test escaped tokens in various positions in a string.
+        const char* changed[] = {"%s",       "%stest",   "test%s",   "test%stest",   "%s%s",
+                                 "%stest%s", "test%s%s", "%s%stest", "test%s%stest", "test%stest%stest"};
+        const tm_size_t buffer_size = 100;
+        char format_buffer[buffer_size];
+        char expected_buffer[buffer_size];
+
+        for (auto entry : changed) {
+            int new_format_len = snprintf(format_buffer, buffer_size, entry, format, format);
+            int new_expected_len = snprintf(expected_buffer, buffer_size, entry, expected, expected);
+            REQUIRE(new_format_len >= 0);
+            REQUIRE(new_format_len < buffer_size);
+            REQUIRE(new_expected_len >= 0);
+            REQUIRE(new_expected_len < buffer_size);
+            format_buffer[new_format_len] = 0;
+            expected_buffer[new_expected_len] = 0;
+
+            check_output(format_buffer, expected_buffer);
+            check_output(format_buffer, expected_buffer, 1);
+            check_output(format_buffer, expected_buffer, 1, 2);
+            check_output(format_buffer, expected_buffer, "{");
+            check_output(format_buffer, expected_buffer, "}");
+            check_output(format_buffer, expected_buffer, "{", "}");
+            check_output(format_buffer, expected_buffer, "}", "{");
+        }
+    };
+    check_escaped_token("{{", "{");
+    check_escaped_token("}}", "}");
+    check_escaped_token("{{}}", "{}");
+    check_escaped_token("}}{{", "}{");
+    check_escaped_token("test}}test{{test", "test}test{test");
+
+    // Unescaped placeholder tokens.
+    auto expect_error_escaped_token = [](const char* format) {
+        // Test escaped tokens in various positions in a string.
+        const char* changed[] = {"%s", "%stest", "test%s", "test%stest", "%stest%s", "test%stest%stest"};
+        const tm_size_t buffer_size = 100;
+        char format_buffer[buffer_size];
+
+        for (auto entry : changed) {
+            int new_format_len = snprintf(format_buffer, buffer_size, entry, format, format);
+            REQUIRE(new_format_len >= 0);
+            REQUIRE(new_format_len < buffer_size);
+            format_buffer[new_format_len] = 0;
+
+            expect_error(format_buffer);
+            expect_error(format_buffer, 1);
+            expect_error(format_buffer, 1, 2);
+            expect_error(format_buffer, "{");
+            expect_error(format_buffer, "}");
+            expect_error(format_buffer, "{", "}");
+            expect_error(format_buffer, "}", "{");
+        }
+    };
+
+    const char* error_format_strings[] = {
+        "{", "{{{", "}", "}}}", "{{}", "{{asd}", "{}}", "{asd}}", "{0}}", "\\{", "\\{{{", "\\}", "\\}}}",
+    };
+    // Test format strings with 0 and some arguments.
+    for (auto format_string : error_format_strings) {
+        expect_error_escaped_token(format_string);
+    }
 }
 
 TEST_CASE("Test integral type printing") {
@@ -150,19 +255,28 @@ TEST_CASE("Test width") {
 TEST_CASE("Test overflow") {
     char buffer[10];
 
-    CHECK(snprint(nullptr, 0, "{}", 1) == -1);
-    CHECK(snprint(buffer, 0, "{}", 1) == -1);
-    CHECK(snprint(buffer, 1, "{}", 10) == -1);
+    CHECK(tml::snprint(nullptr, 0, "{}", 1) == 1);
+    CHECK(tml::snprint(buffer, 0, "{}", 1) == 1);
+    CHECK(tml::snprint(buffer, 1, "{}", 10) == 2);
 
-    CHECK_ASSERTION_FAILURE(snprint(nullptr, 1, "{}", 1));
+    CHECK_ASSERTION_FAILURE(tml::snprint(nullptr, 1, "{}", 1));
 #ifdef SIGNED_SIZE_T
-    CHECK_ASSERTION_FAILURE(snprint(nullptr, -1, "{}", 1));
-    CHECK_ASSERTION_FAILURE(snprint(buffer, -1, "{}", 1));
+    CHECK_ASSERTION_FAILURE(tml::snprint(nullptr, -1, "{}", 1));
+    CHECK_ASSERTION_FAILURE(tml::snprint(buffer, -1, "{}", 1));
 #endif
 }
 
-TEST_CASE("Indexed") {
+TEST_CASE("Test indexed") {
     check_output("{} {}", "1 2", 1, 2);
+    check_output("{} {} {0}", "1 2 1", 1, 2);
+    check_output("{} {} {0} {1} {0}", "1 2 1 2 1", 1, 2);
+
     check_output("{0} {1}", "1 2", 1, 2);
     check_output("{1} {0}", "2 1", 1, 2);
+
+    check_output("{0} {0}", "1 1", 1, 2);
+    check_output("{0} {}", "1 1", 1, 2);
+    check_output("{1} {}", "2 1", 1, 2);
+    check_output("{0} {} {}", "1 1 2", 1, 2);
+    check_output("{1} {} {}", "2 1 2", 1, 2);
 }

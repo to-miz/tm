@@ -3,6 +3,8 @@
 // clang-format off
 #include "../common/tm_assert_valid_size.inc"
 
+namespace tml {
+
 namespace {
 
 struct PrintSizes {
@@ -12,20 +14,13 @@ struct PrintSizes {
 };
 
 #if !defined(TMP_TM_CONVERSION_INCLUDED)
-    struct PrintFormattedResult {
-        tm_size_t size;
-        tm_errc ec;
-    };
-
     static PrintFormattedResult scan_u32_n(const char* str, tm_size_t maxlen, uint32_t* out, int32_t base) {
         TM_ASSERT(out);
         TM_ASSERT(base >= 2 && base <= 36);
         TM_ASSERT_VALID_SIZE(maxlen);
 
         PrintFormattedResult result = {maxlen, TM_EOVERFLOW};
-        if (maxlen <= 0) {
-            return result;
-        }
+        if (maxlen <= 0) return result;
         #if defined(TMP_CHARCONV_INCLUDED)
             auto std_result = std::from_chars(str, str + maxlen, *out, base);
             if(std_result.ec == std::errc{}) {
@@ -47,18 +42,16 @@ struct PrintSizes {
         return result;
     }
 #else
-    typedef tmc_conv_result PrintFormattedResult;
-
     template <class T>
     PrintSizes tmp_get_print_sizes(T value, const PrintFormat& format, bool negative);
 #endif
 // clang-format on
 
-static bool tmp_parse_format_specifiers(const char* p, tm_size_t len, PrintFormat* format, uint32_t* currentIndex) {
+static bool tmp_parse_format_specifiers(const char* p, tm_size_t len, PrintFormat* format, uint32_t* current_index) {
     if (len <= 0) return false;
     bool index_specified = false;
     const char* end = p + len;
-    auto scan_index_result = scan_u32_n(p, (tm_size_t)(end - p), currentIndex, 10);
+    auto scan_index_result = scan_u32_n(p, (tm_size_t)(end - p), current_index, 10);
     if (scan_index_result.ec == TM_OK) {
         p += scan_index_result.size;
         index_specified = true;
@@ -72,7 +65,6 @@ static bool tmp_parse_format_specifiers(const char* p, tm_size_t len, PrintForma
     return index_specified;
 }
 
-// TODO: this could be done better with dependency to type_traits
 template <class T>
 struct UnsignedPair {
     T value;
@@ -106,13 +98,18 @@ static UnsignedPair<uint32_t> tmp_make_unsigned(uint32_t v) { return {v, false};
 static UnsignedPair<uint64_t> tmp_make_unsigned(uint64_t v) { return {v, false}; }
 #endif  // !defined(TMP_INT_BACKEND_TM_CONVERSION)
 
-static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, const char* str,
-                                            tm_size_t str_len) {
+static PrintFormattedResult tmp_print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format,
+                                                const char* str, tm_size_t str_len, tm_size_t str_width) {
     TM_ASSERT_VALID_SIZE(maxlen);
     TM_ASSERT_VALID_SIZE(str_len);
+    TM_ASSERT_VALID_SIZE(str_width);
 
     const auto width = format.width;
-    tm_size_t size = (width > 0 && (tm_size_t)width > str_len) ? width : str_len;
+    tm_size_t size = str_len;
+    if (format.width > 0) {
+        tm_size_t spaces = ((tm_size_t)format.width > str_width) ? ((tm_size_t)format.width - width) : 0;
+        size = str_len + spaces;
+    }
     if (size > maxlen) {
         return {maxlen, TM_EOVERFLOW};
     }
@@ -137,13 +134,13 @@ static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const 
     return {size, TM_OK};
 }
 
-static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, bool value) {
+static PrintFormattedResult tmp_print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, bool value) {
     TM_ASSERT(dest || maxlen == 0);
     TM_ASSERT_VALID_SIZE(maxlen);
 
     auto flags = format.flags;
     if (flags & PrintFlags::BoolAsNumber) {
-        return print_formatted(dest, maxlen, format, (value) ? "1" : "0", 1);
+        return tmp_print_formatted(dest, maxlen, format, (value) ? "1" : "0", 1, 1);
     }
     const bool lowercase = ((flags & PrintFlags::Lowercase) != 0);
     const char* str = nullptr;
@@ -155,7 +152,7 @@ static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const 
         str = (lowercase) ? "false" : "FALSE";
         str_len = 5;
     }
-    return print_formatted(dest, maxlen, format, str, str_len);
+    return tmp_print_formatted(dest, maxlen, format, str, str_len, str_len);
 }
 
 static tm_size_t tmp_get_decorated_size(tm_size_t digits, const PrintFormat& format, bool negative) {
@@ -231,14 +228,14 @@ static void tmp_print_decoration(char* dest, tm_size_t maxlen, const PrintSizes&
 }
 
 static PrintFormattedResult tmp_move_printed_value_and_decorate(char* dest, tm_size_t maxlen, const PrintFormat& format,
-                                                                PrintFormattedResult printResult, bool negative) {
+                                                                PrintFormattedResult print_result, bool negative) {
     TM_ASSERT(dest || maxlen == 0);
     TM_ASSERT_VALID_SIZE(maxlen);
 
-    if (printResult.ec != TM_OK) return printResult;
+    if (print_result.ec != TM_OK) return print_result;
 
     PrintSizes sizes = {};
-    sizes.digits = printResult.size;
+    sizes.digits = print_result.size;
     sizes.decorated = tmp_get_decorated_size(sizes.digits, format, negative);
     sizes.size = sizes.decorated;
 
@@ -263,9 +260,14 @@ static PrintFormattedResult tmp_move_printed_value_and_decorate(char* dest, tm_s
         }
     }
 
+    if (sizes.size > maxlen) {
+        print_result.size = sizes.size;
+        print_result.ec = TM_ERANGE;
+        return print_result;
+    }
     tmp_print_decoration(dest, maxlen, sizes, format, negative);
-    printResult.size = sizes.size;
-    return printResult;
+    print_result.size = sizes.size;
+    return print_result;
 }
 
 #ifdef TMP_INT_BACKEND_CRT
@@ -293,72 +295,104 @@ static PrintFormattedResult tmp_move_printed_value_and_decorate(char* dest, tm_s
 #endif  // defined(TMP_FLOAT_BACKEND_CHARCONV)
 
 template <class T>
-static PrintFormattedResult print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, T value) {
+static PrintFormattedResult tmp_print_formatted(char* dest, tm_size_t maxlen, const PrintFormat& format, T value) {
     TM_ASSERT(dest || maxlen == 0);
     TM_ASSERT_VALID_SIZE(maxlen);
 
-    if (maxlen <= 0 || (format.width > 0 && (tm_size_t)format.width > maxlen)) {
-        return {maxlen, TM_EOVERFLOW};
-    }
+    if (maxlen <= 0) return {maxlen, TM_EOVERFLOW};
+    TM_ASSERT(dest);
 
     auto pair = tmp_make_unsigned(value);
     bool sign = pair.negative || ((format.flags & PrintFlags::Sign) != 0);
-    auto result = tmp_print(dest + sign, maxlen - sign, pair.value, format);
+    auto result = tmp_print_value(dest + sign, maxlen - sign, pair.value, format);
     return tmp_move_printed_value_and_decorate(dest, maxlen, format, result, pair.negative);
 }
 
+#include "allocator_context.cpp"
 #include "memory_printer.cpp"
 
 static const char* tmp_find(const char* first, const char* last, char c) {
     return (const char*)TM_MEMCHR(first, c, last - first);
 }
 
-static void tmp_print_impl(const char* format, size_t formatLen, const PrintFormat& initialFormatting,
+static bool tmp_print_string_escaped(const char* first, const char* last, tmp_memory_printer& printout) {
+    const char* p = first;
+    while ((p = tmp_find(first, last, '}')) != nullptr) {
+        // Print string including '}'.
+        ++p;
+        if (!printout(first, (tm_size_t)(p - first))) return false;
+
+        // Check for unescaped '}'.
+        if (p >= last || *p != '}') {
+            printout.ec = TM_EINVAL;
+            return false;
+        }
+        ++p;  // Skip escaped '}'.
+
+        first = p;
+    }
+    if (first < last) {
+        if (!printout(first, (tm_size_t)(last - first))) return false;
+    }
+    return true;
+}
+
+static void tmp_print_impl(const char* format, size_t format_len, const PrintFormat& initial_formatting,
                            const PrintArgList& args, tmp_memory_printer& printout) {
     // Sanitize flags.
-    uint32_t formatFlags = initialFormatting.flags & ((1u << PrintFlags::Count) - 1);
+    uint32_t format_flags = initial_formatting.flags & ((1u << PrintFlags::Count) - 1);
 
-    const char* formatFirst = format;
-    const char* formatLast = format + formatLen;
+    const char* format_first = format;
+    const char* format_last = format + format_len;
     auto index = 0u;
-    const char* p = formatFirst;
-    auto flags = args.flags;
-    while (flags && (p = tmp_find(formatFirst, formatLast, '{')) != nullptr) {
-        if (!printout(formatFirst, (tm_size_t)(p - formatFirst))) return;
+    const char* p = format_first;
+    uint64_t currentArgTypeFlags = args.flags;
+    while ((p = tmp_find(format_first, format_last, '{')) != nullptr) {
+        if (!tmp_print_string_escaped(format_first, p, printout)) return;
         ++p;
         if (*p == '{') {
             if (!printout("{", 1)) return;
             ++p;
-            formatFirst = p;
+            format_first = p;
             continue;
         }
 
         // Parse until '}'.
-        auto next = tmp_find(formatFirst, formatLast, '}');
+        auto next = tmp_find(format_first, format_last, '}');
         if (!next) {
-            TM_ASSERT(0 && "illformed format");
-            break;
+            printout.ec = TM_EINVAL;
+            return;
         }
 
-        PrintFormat printFormat = initialFormatting;
-        printFormat.flags = formatFlags;
-        auto currentIndex = index;
-        auto current = flags & PrintType::Mask;
-        bool index_specified = tmp_parse_format_specifiers(p, (tm_size_t)(next - p), &printFormat, &currentIndex);
+        PrintFormat print_format = initial_formatting;
+        print_format.flags = format_flags;
+        auto current_index = index;
+        auto current_arg_type = currentArgTypeFlags & PrintType::Mask;
+        bool index_specified = tmp_parse_format_specifiers(p, (tm_size_t)(next - p), &print_format, &current_index);
+        // Check whether specified index in format specifier is valid.
+        if (current_index >= args.size) {
+            printout.ec = TM_EINVAL;
+            return;
+        }
 
         if (!index_specified) {
             ++index;
-            flags >>= PrintType::Bits;
+            currentArgTypeFlags >>= PrintType::Bits;
         } else {
-            current = (args.flags >> (currentIndex * PrintType::Bits)) & PrintType::Mask;
+            current_arg_type = (args.flags >> (current_index * PrintType::Bits)) & PrintType::Mask;
         }
-        formatFirst = next + 1;
+        format_first = next + 1;
 
-        TM_ASSERT(currentIndex < args.size);
-        if (!printout((int)current, args.args[currentIndex], printFormat)) return;
+        // Check whether current arg type is a valid entry of PrintType.
+        // This can happen if there are more unindexed '{}' placeholders than supplied arguments.
+        if (current_arg_type <= 0 || current_arg_type >= PrintType::Last) {
+            printout.ec = TM_EINVAL;
+            return;
+        }
+        if (!printout((int)current_arg_type, args.args[current_index], print_format)) return;
     }
-    if (formatFirst < formatLast) {
-        if (!printout(formatFirst, (tm_size_t)(formatLast - formatFirst))) return;
+    if (format_first < format_last) {
+        if (!tmp_print_string_escaped(format_first, format_last, printout)) return;
     }
 }
 
@@ -370,7 +404,7 @@ TMP_DEF tm_size_t tmp_parse_print_format(const char* format_specifiers, tm_size_
     TM_ASSERT(out);
     TM_ASSERT_VALID_SIZE(format_specifiers_len);
 
-    *out = defaultPrintFormat();
+    *out = default_print_format();
     unsigned int flags = PrintFlags::Default;
 
     // Pad with spaces by default.
@@ -528,39 +562,50 @@ TMP_DEF tm_size_t tmp_parse_print_format(const char* format_specifiers, tm_size_
 }
 
 #ifndef TMP_NO_CRT_FILE_PRINTING
-TMP_DEF tm_errc tmp_print(FILE* out, const char* format, const PrintFormat& initialFormatting,
+TMP_DEF tm_errc tmp_print(FILE* out, const char* format, size_t format_len, const PrintFormat& initial_formatting,
                           const PrintArgList& args) {
     char sbo[TMP_SBO_SIZE];
-    tmp_memory_printer printer = {sbo, 0, TMP_SBO_SIZE, true, false};
+    tmp_memory_printer printer = {sbo, TMP_SBO_SIZE, tmp_default_allocator()};
 
-    tmp_print_impl(format, TM_STRLEN(format), initialFormatting, args, printer);
+    tmp_print_impl(format, format_len, initial_formatting, args, printer);
     fwrite(printer.data, sizeof(char), printer.size, out);
     return printer.ec;
 }
-#ifdef TM_STRING_VIEW
-TMP_DEF tm_errc tmp_print(FILE* out, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
-                          const PrintArgList& args) {
-    char sbo[TMP_SBO_SIZE];
-    tmp_memory_printer printer = {sbo, 0, TMP_SBO_SIZE, true, false};
-
-    tmp_print_impl(TM_STRING_VIEW_DATA(format), TM_STRING_VIEW_SIZE(format), initialFormatting, args, printer);
-    fwrite(printer.data, sizeof(char), printer.size, out);
-    return printer.ec;
-}
-#endif  // defined(TM_STRING_VIEW)
 #endif  // !defined(TMP_NO_CRT_FILE_PRINTING)
 
-TMP_DEF int tmp_snprint(char* dest, tm_size_t len, const char* format, const PrintFormat& initialFormatting,
-                        const PrintArgList& args) {
-    tmp_memory_printer mem{dest, 0, len, false, false};
-    tmp_print_impl(format, TM_STRLEN(format), initialFormatting, args, mem);
-    return (mem.ec == TM_OK) ? (int)mem.size : -1;
+TMP_DEF int tmp_snprint(char* dest, tm_size_t len, const char* format, size_t format_len,
+                        const PrintFormat& initial_formatting, const PrintArgList& args) {
+    tmp_memory_printer mem{dest, len};
+    tmp_print_impl(format, format_len, initial_formatting, args, mem);
+    if (mem.ec == TM_OK) {
+        // Force null termination, overwriting last character if must be.
+        // This is also the behavior of snprintf, we want to imitate it to minimize surprises.
+        if (mem.remaining()) {
+            *mem.end() = 0;
+        } else {
+            if (dest && len > 0) dest[len - 1] = 0;
+        }
+        return (int)mem.size;
+    }
+    if (mem.ec == TM_ERANGE) return (int)mem.necessary;
+    return -1;
 }
-#ifdef TM_STRING_VIEW
-TMP_DEF int tmp_snprint(char* dest, tm_size_t len, TM_STRING_VIEW format, const PrintFormat& initialFormatting,
-                        const PrintArgList& args) {
-    tmp_memory_printer mem{dest, 0, len, false, false};
-    tmp_print_impl(TM_STRING_VIEW_DATA(format), TM_STRING_VIEW_SIZE(format), initialFormatting, args, mem);
-    return (mem.ec == TM_OK) ? (int)mem.size : -1;
+
+#ifdef TMP_USE_STL
+TMP_DEF ::std::string tmp_string_format(const char* format, size_t format_len, const PrintFormat& initial_formatting,
+                                        const PrintArgList& args) {
+    ::std::string result;
+    tmp_memory_printer mem{nullptr, 0, tmp_std_string_allocator(&result)};
+    tmp_print_impl(format, format_len, initial_formatting, args, mem);
+    if (mem.ec == TM_OK) {
+        // Resize resulting string to the actual size consumed by memory printer.
+        // Memory printer will allocate in advance and then might not use all of the capacity.
+        result.resize(mem.size);
+    } else {
+        result.clear();
+    }
+    return result;
 }
-#endif  // defined(TM_STRING_VIEW)
+#endif /* defined(TMP_USE_STL) */
+
+}  // namespace tml

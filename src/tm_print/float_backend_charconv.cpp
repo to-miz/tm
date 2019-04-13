@@ -10,7 +10,7 @@ std::chars_format tmp_to_std_flags(unsigned flags) {
     return result;
 }
 
-static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, double value, const PrintFormat& format) {
+static PrintFormattedResult tmp_print_value(char* dest, tm_size_t maxlen, double value, const PrintFormat& format) {
     TM_ASSERT(!dest || maxlen > 0);
     TM_ASSERT_VALID_SIZE(maxlen);
     TM_ASSERT(format.base >= 2 && format.base <= 36);
@@ -27,7 +27,7 @@ static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, double value
     }
     return {maxlen, TM_EOVERFLOW};
 }
-static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, float value, const PrintFormat& format) {
+static PrintFormattedResult tmp_print_value(char* dest, tm_size_t maxlen, float value, const PrintFormat& format) {
     TM_ASSERT(!dest || maxlen > 0);
     TM_ASSERT_VALID_SIZE(maxlen);
     TM_ASSERT(format.base >= 2 && format.base <= 36);

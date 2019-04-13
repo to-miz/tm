@@ -1,4 +1,4 @@
-static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, double value, const PrintFormat& format) {
+static PrintFormattedResult tmp_print_value(char* dest, tm_size_t maxlen, double value, const PrintFormat& format) {
     TM_ASSERT(!dest || maxlen > 0);
     TM_ASSERT_VALID_SIZE(maxlen);
     TM_ASSERT(format.base >= 2 && format.base <= 36);
@@ -30,9 +30,14 @@ static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, double value
     } else {
         size = TMP_SNPRINTF(dest, maxlen, fmt_buffer, precision, value);
     }
-    if (size > 0 && (tm_size_t)size <= maxlen) {
+    if (size < 0) {
+        result.ec = TM_EINVAL;
+    } else if ((tm_size_t)size >= maxlen) {
+        result.size = (tm_size_t)size;
+        result.ec = TM_ERANGE;
+    } else {
         if (format.flags & PrintFlags::Hex) {
-            // remove 0x prefix to make output same as other backends
+            // Remove 0x prefix to make output same as other backends.
             if (size > 2) {
                 TM_ASSERT(dest[0] == '0');
                 TM_ASSERT(dest[1] == 'x' || dest[1] == 'X');
@@ -45,6 +50,6 @@ static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, double value
     }
     return result;
 }
-static PrintFormattedResult tmp_print(char* dest, tm_size_t maxlen, float value, const PrintFormat& format) {
-    return tmp_print(dest, maxlen, (double)value, format);
+static PrintFormattedResult tmp_print_value(char* dest, tm_size_t maxlen, float value, const PrintFormat& format) {
+    return tmp_print_value(dest, maxlen, (double)value, format);
 }

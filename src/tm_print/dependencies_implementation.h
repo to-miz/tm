@@ -19,14 +19,7 @@
         #define TM_STRLEN std::strlen
     #endif
 
-    /* cstdlib dependency */
-    #if !defined(TMP_MALLOC) || !defined(TMP_REALLOC) || !defined(TMP_FREE)
-        // either all or none have to be defined
-        #include <cstdlib>
-        #define TMP_MALLOC(type, size) (type*)malloc(size)
-        #define TMP_FREE(ptr) free(ptr)
-        #define TMP_REALLOC(type, ptr, size) (type*)realloc(ptr, size)
-    #endif
+    #include "../common/tm_malloc_cpp.inc"
 
     /*
     What dependency/backend to use to convert values.
@@ -95,7 +88,7 @@
         #define TMP_TOUPPER toupper
     #endif
 
-    // the buffer size used for small buffer optimization, change this by profiling if malloc is a bottleneck
+    // The buffer size used for small buffer optimization, change this by profiling if malloc is a bottleneck.
     #ifndef TMP_SBO_SIZE
         #define TMP_SBO_SIZE 200
     #endif  // !defined( TMP_SBO_SIZE )

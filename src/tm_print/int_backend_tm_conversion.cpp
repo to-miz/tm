@@ -38,36 +38,36 @@ PrintSizes tmp_get_print_sizes(T value, const PrintFormat& format, bool negative
     return result;
 }
 
-static PrintFormattedResult tmp_print_decimal_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value) {
+static PrintFormattedResult tmp_print_value_decimal_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value) {
     return print_decimal_u32_w(dest, maxlen, width, value);
 }
-static PrintFormattedResult tmp_print_decimal_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value) {
+static PrintFormattedResult tmp_print_value_decimal_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value) {
     return print_decimal_u64_w(dest, maxlen, width, value);
 }
-static PrintFormattedResult tmp_print_hex_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value,
-                                            bool lowercase) {
+static PrintFormattedResult tmp_print_value_hex_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value,
+                                                  bool lowercase) {
     return print_hex_u32_w(dest, maxlen, width, value, lowercase);
 }
-static PrintFormattedResult tmp_print_hex_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value,
-                                            bool lowercase) {
+static PrintFormattedResult tmp_print_value_hex_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value,
+                                                  bool lowercase) {
     return print_hex_u64_w(dest, maxlen, width, value, lowercase);
 }
-static PrintFormattedResult tmp_print_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value, int32_t base,
-                                        bool lowercase) {
+static PrintFormattedResult tmp_print_value_w(char* dest, tm_size_t maxlen, tm_size_t width, uint32_t value,
+                                              int32_t base, bool lowercase) {
     return print_u32_w(dest, maxlen, width, value, base, lowercase);
 }
-static PrintFormattedResult tmp_print_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value, int32_t base,
-                                        bool lowercase) {
+static PrintFormattedResult tmp_print_value_w(char* dest, tm_size_t maxlen, tm_size_t width, uint64_t value,
+                                              int32_t base, bool lowercase) {
     return print_u64_w(dest, maxlen, width, value, base, lowercase);
 }
 
 template <class T>
-static PrintFormattedResult print_formatted_unsigned(char* dest, tm_size_t maxlen, const PrintSizes& sizes,
-                                                     const PrintFormat& format, T value, bool negative) {
+static PrintFormattedResult tmp_print_formatted_unsigned(char* dest, tm_size_t maxlen, const PrintSizes& sizes,
+                                                         const PrintFormat& format, T value, bool negative) {
     PrintFormattedResult result = {0, TM_OK};
     if (sizes.size > maxlen) {
-        result.size = maxlen;
-        result.ec = TM_EOVERFLOW;
+        result.size = sizes.size;
+        result.ec = TM_ERANGE;
         return result;
     }
     result.size = sizes.size;
@@ -86,17 +86,17 @@ static PrintFormattedResult print_formatted_unsigned(char* dest, tm_size_t maxle
     PrintFormattedResult print_result = {};
     switch (format.base) {
         case 10: {
-            print_result = tmp_print_decimal_w(dest, remaining, sizes.digits, value);
+            print_result = tmp_print_value_decimal_w(dest, remaining, sizes.digits, value);
             break;
         }
         case 16: {
             bool lowercase = (flags & PrintFlags::Lowercase) != 0;
-            print_result = tmp_print_hex_w(dest, remaining, sizes.digits, value, lowercase);
+            print_result = tmp_print_value_hex_w(dest, remaining, sizes.digits, value, lowercase);
             break;
         }
         default: {
             bool lowercase = (flags & PrintFlags::Lowercase) != 0;
-            print_result = tmp_print_w(dest, remaining, sizes.digits, value, format.base, lowercase);
+            print_result = tmp_print_value_w(dest, remaining, sizes.digits, value, format.base, lowercase);
             break;
         }
     }
