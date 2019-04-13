@@ -44,7 +44,7 @@ ifeq (${OS},Windows_NT)
 
 	clean_build_dir := del /f/q/s \
 	                   ${build_dir_root}*.exe ${build_dir_root}*.lib ${build_dir_root}*.dll \
-	                   ${build_dir_root}*.obj ${build_dir_root}*.pdb >nul 2>nul
+	                   ${build_dir_root}*.obj ${build_dir_root}*.pdb ${build_dir_root}*.exp >nul 2>nul
 else
 	os := linux
 	exe_ext := .out
