@@ -84,6 +84,7 @@ ISSUES
 
 HISTORY
     v0.0.18 13.04.19 Fixed gcc/clang compilation warnings.
+                     Fixed custom printing support that was broken after using std::decay.
     v0.0.17 11.04.19 Added toplevel namespace tml.
                      Added allocator support.
                      Changed tml::snprint to behave like snprintf.

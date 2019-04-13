@@ -1,3 +1,5 @@
+// TODO: Test custom printing.
+
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <assert_throws.h>
 #include <doctest/doctest.h>

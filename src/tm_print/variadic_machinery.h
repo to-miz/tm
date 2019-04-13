@@ -185,12 +185,12 @@ struct tmp_type_flags<TM_STRING_VIEW, Types...> {
 #endif
 #ifdef TMP_CUSTOM_PRINTING
 template <class T, class... Types>
-struct tmp_type_flags<const T&, Types...> {
+struct tmp_type_flags<T, Types...> {
     enum : uint64_t { value = PrintType::Custom | (tmp_type_flags<Types...>::value << PrintType::Bits) };
 };
 #else
 template <class T, class... Types>
-struct tmp_type_flags<const T&, Types...> {
+struct tmp_type_flags<T, Types...> {
     enum : uint64_t { value = 0 };
 };
 #endif
