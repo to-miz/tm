@@ -1,11 +1,11 @@
 /*
-tm_arrayview.h v1.1.6 - public domain - https://github.com/to-miz/tm
-written by Tolga Mizrak 2016
+tm_arrayview.h v1.1.7 - public domain - https://github.com/to-miz/tm
+Author: Tolga Mizrak 2016
 
-no warranty; use at your own risk
+No warranty; use at your own risk.
 
 LICENSE
-    see license notes at end of file
+    See license notes at end of file.
 
 NOTES
     ArrayView, UninitializedArrayView and GridView classes for POD types.
@@ -39,24 +39,25 @@ SWITCHES
         std::container usage and UninitializedArrayView usage will require code changes.
 
 HISTORY
-    v1.1.6  06.10.18 changed formatting
-                     changed some macro definitions to commonly used ones
-    v1.1.5  20.06.17 improved constness of GridView
-    v1.1.4c 25.08.18 added repository link
-    v1.1.4b 10.02.17 removed inline since they are unnecessary
-    v1.1.4a 10.01.17 fixed a warning for signed/unsigned mismatch if tm_size_t is signed
-    v1.1.4  10.01.17 added a conversion operator overload from ArrayView< T > to
-                     ArrayView< const T >
-    v1.1.3  07.12.16 added std::initializer_list assign to UninitializedArrayView
-    v1.1.2a 07.10.16 minor adjustment of size_t usage
-                     fixed a minor assertion error
-    v1.1.2  07.10.16 removed get_index and unsigned int arithmetic when tm_size_t is signed
-    v1.1.1  10.09.16 fixed a couple of typos in macro definitions
-                     added TMA_INT64_ACCOSSORS
-    v1.1c   10.09.16 added TMA_EMPLACE_BACK_RETURNS_POINTER
-    v1.1a   11.07.16 fixed a bug with preventing sign extensions not actually doing anything
-    v1.1    11.07.16 added GridView
-    v1.0    10.07.16 initial commit
+    v1.1.7  13.10.19 Fixed gcc/clang compilation errors.
+    v1.1.6  06.10.18 Changed formatting.
+                     Changed some macro definitions to commonly used ones.
+    v1.1.5  20.06.17 Improved constness of GridView.
+    v1.1.4c 25.08.18 Added repository link.
+    v1.1.4b 10.02.17 Removed inline since they are unnecessary.
+    v1.1.4a 10.01.17 Fixed a warning for signed/unsigned mismatch if tm_size_t is signed.
+    v1.1.4  10.01.17 Added a conversion operator overload from ArrayView<T> to.
+                     ArrayView<const T>.
+    v1.1.3  07.12.16 Added std::initializer_list assign to UninitializedArrayView.
+    v1.1.2a 07.10.16 Minor adjustment of size_t usage.
+                     Fixed a minor assertion error.
+    v1.1.2  07.10.16 Removed get_index and unsigned int arithmetic when tm_size_t is signed.
+    v1.1.1  10.09.16 Fixed a couple of typos in macro definitions.
+                     Added TMA_INT64_ACCOSSORS.
+    v1.1c   10.09.16 Added TMA_EMPLACE_BACK_RETURNS_POINTER.
+    v1.1a   11.07.16 Fixed a bug with preventing sign extensions not actually doing anything.
+    v1.1    11.07.16 Added GridView.
+    v1.0    10.07.16 Initial commit.
 */
 
 #pragma once
@@ -253,22 +254,22 @@ struct Array {
 template <class T>
 struct ArrayView : Array<T> {
     ArrayView() : Array{nullptr, 0} {}
-    ArrayView(const Array& other) : Array{other.data(), other.size()} {}
+    ArrayView(const Array<T>& other) : Array<T>{other.data(), other.size()} {}
     ArrayView(const ArrayView&) = default;
     ArrayView& operator=(const ArrayView&) = default;
 
-    ArrayView(T* ptr, tm_size_t sz) : Array{ptr, sz} {}
+    ArrayView(T* ptr, tm_size_t sz) : Array<T>{ptr, sz} {}
     ArrayView(T* first, T* last) : Array{first, static_cast<tm_size_t>(last - first)} {}
 
     template <tm_size_t N>
-    ArrayView(T (&array)[N]) : Array{array, N} {}
+    ArrayView(T (&array)[N]) : Array<T>{array, N} {}
 
     template <class Container>
-    ArrayView(Container& container) : Array{container.data(), static_cast<tm_size_t>(container.size())} {}
+    ArrayView(Container& container) : Array<T>{container.data(), static_cast<tm_size_t>(container.size())} {}
 
-    ArrayView(const std::initializer_list<T>& list) : Array{list.begin(), static_cast<tm_size_t>(list.size())} {}
+    ArrayView(const std::initializer_list<T>& list) : Array<T>{list.begin(), static_cast<tm_size_t>(list.size())} {}
 
-    operator ArrayView<const T>() const { return ArrayView<const T>{ptr, sz}; }
+    operator ArrayView<const T>() const { return ArrayView<const T>{this->ptr, this->sz}; }
 };
 
 template <class T>
