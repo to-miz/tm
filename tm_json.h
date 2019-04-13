@@ -1,11 +1,11 @@
 /*
-tm_json.h v0.2.4 - public domain - https://github.com/to-miz/tm
-written by Tolga Mizrak 2016
+tm_json.h v0.2.5 - public domain - https://github.com/to-miz/tm
+Author: Tolga Mizrak 2016
 
-no warranty; use at your own risk
+No warranty; use at your own risk.
 
 LICENSE
-    see license notes at end of file
+    See license notes at end of file.
 
 USAGE
     This file works as both the header and implementation.
@@ -116,6 +116,7 @@ ISSUES
       or not using the fallback string conversion routines at all (see SWITCHES and TMJ_TO_INT).
 
 HISTORY
+    v0.2.5  13.04.19  Fixed macro argument names of TMJ_TO_INT etc. having wrong order.
     v0.2.4  25.02.19  Implemented Unicode escape sequences.
                       Fixed a bug with unescaped string copying.
                       Fixed signed size_t compilation warnings.
@@ -262,12 +263,12 @@ HISTORY
     // for more details, see TMJ_TO_INT section at SWITCHES at the top of this file
     #ifndef TMJ_TO_INT
         #define TMJ_DEFINE_OWN_STRING_CONVERSIONS
-        #define TMJ_TO_INT(str, len, base, def) tmj_to_int((str), (len), (base), (def))
-        #define TMJ_TO_UINT(str, len, base, def) tmj_to_uint((str), (len), (base), (def))
-        #define TMJ_TO_INT64(str, len, base, def) tmj_to_int64((str), (len), (base), (def))
-        #define TMJ_TO_UINT64(str, len, base, def) tmj_to_uint64((str), (len), (base), (def))
-        #define TMJ_TO_FLOAT(str, len, def) tmj_to_float((str), (len), (def))
-        #define TMJ_TO_DOUBLE(str, len, def) tmj_to_double((str), (len), (def))
+        #define TMJ_TO_INT(str, len, out_ptr, base) tmj_to_int((str), (len), (out_ptr), (base))
+        #define TMJ_TO_UINT(str, len, out_ptr, base) tmj_to_uint((str), (len), (out_ptr), (base))
+        #define TMJ_TO_INT64(str, len, out_ptr, base) tmj_to_int64((str), (len), (out_ptr), (base))
+        #define TMJ_TO_UINT64(str, len, out_ptr, base) tmj_to_uint64((str), (len), (out_ptr), (base))
+        #define TMJ_TO_FLOAT(str, len, out_ptr) tmj_to_float((str), (len), (out_ptr))
+        #define TMJ_TO_DOUBLE(str, len, out_ptr) tmj_to_double((str), (len), (out_ptr))
     #endif
 #endif
 
