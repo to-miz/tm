@@ -42,7 +42,9 @@ ifeq (${OS},Windows_NT)
 	release_dir := $(subst /,\,${release_dir})
 	path_sep    := $(subst /,\,${path_sep})
 
-	clean_build_dir := del /f/q/s ${BUILD_DIR}${path_sep}*.* >nul 2>nul
+	clean_build_dir := del /f/q/s \
+	                   ${build_dir_root}*.exe ${build_dir_root}*.lib ${build_dir_root}*.dll \
+	                   ${build_dir_root}*.obj ${build_dir_root}*.pdb >nul 2>nul
 else
 	os := linux
 	exe_ext := .out
@@ -55,6 +57,10 @@ else
 	endif
 
 	mkdir_cmd = mkdir -p ${1}
+
+	clean_build_dir := find ${build_dir_root} -type f \
+	                   \( -name "*.out" -o -name "*.a" -o -name "*.so" -o -name "*.o" \) \
+	                   -delete
 endif
 
 # Create build dirs.
