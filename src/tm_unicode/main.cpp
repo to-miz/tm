@@ -65,6 +65,9 @@ ISSUES
     - No conditional special casing support, like for instance FINAL SIGMA
       (sigma character at the end of a word has a different lowercase variant).
     - tmu_atomic_write not implemented yet for CRT backend.
+    - tmu_utf8_width not implemented properly yet, it calculates the width of all codepoints of a string instead of
+      calculating the width of display glyphs.
+    - Grapheme break detection not implemented yet.
 
 HISTORY
     v0.1.4  02.04.19 Fixed gcc/clang compilation errors.

@@ -65,6 +65,9 @@ ISSUES
     - No conditional special casing support, like for instance FINAL SIGMA
       (sigma character at the end of a word has a different lowercase variant).
     - tmu_atomic_write not implemented yet for CRT backend.
+    - tmu_utf8_width not implemented properly yet, it calculates the width of all codepoints of a string instead of
+      calculating the width of display glyphs.
+    - Grapheme break detection not implemented yet.
 
 HISTORY
     v0.1.4  02.04.19 Fixed gcc/clang compilation errors.
@@ -4615,6 +4618,8 @@ TMU_DEF int tmu_utf8_width(tmu_utf8_stream stream) {
     int result = 0;
     uint32_t codepoint = TMU_INVALID_CODEPOINT;
     while (tmu_utf8_extract(&stream, &codepoint)) {
+        /* FIXME: Instead of calculating the width codepoint for codepoint, this should instead calculate the width of
+         * each grapheme break cluster instead. */
         result += tmu_ucd_get_width(codepoint);
     }
     return result;
