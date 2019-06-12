@@ -282,3 +282,16 @@ TEST_CASE("Test indexed") {
     check_output("{0} {} {}", "1 1 2", 1, 2);
     check_output("{1} {} {}", "2 1 2", 1, 2);
 }
+
+// TODO: What is the correct behavior when specifying shortest representation with a given precision?
+#if 0
+TEST_CASE("Test precision with shortest") {
+    check_output("{:g}", "1", 1.0);
+    check_output("{:g}", "1.11", 1.11);
+    check_output("{:.2g}", "1.1", 1.11);
+    check_output("{:.3g}", "1.11", 1.11);
+    check_output("{:.4g}", "1.11", 1.11);
+    check_output("{:.2g}", "1.1", 1.11);
+    check_output("{:.2g}", "1.2", 1.19);
+}
+#endif

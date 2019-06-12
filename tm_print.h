@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.18 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.21 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -81,8 +81,12 @@ ISSUES
     - snprint may not be able to return necessary buffer len when supplied buffer isn't enough if a
       floating point number has to be printed that exceeds the small buffer size (200 bytes by default).
       In that case the return value is -1.
+    - Types that are implicitly convertible to string_view produce errors currently.
 
 HISTORY
+    v0.0.21 30.05.19 Made error codes depend on <errno.h> by default.
+    v0.0.20 03.05.19 Added static asserts to sanity check tm_conversion.h backend print flags compatibility.
+    v0.0.19 14.04.19 Fixed tmp_has_custom_printer detecting wrong signature for custom snprint functions.
     v0.0.18 13.04.19 Fixed gcc/clang compilation warnings.
                      Fixed custom printing support that was broken after using std::decay.
     v0.0.17 11.04.19 Added toplevel namespace tml.
@@ -255,7 +259,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_14E73C89_58CA_4CC4_9D19_99F0A3D7EA07_
 #define _TM_PRINT_H_INCLUDED_14E73C89_58CA_4CC4_9D19_99F0A3D7EA07_
 
-#define TMP_VERSION 0x00000012u
+#define TMP_VERSION 0x00000015u
 
 /* assert */
 #ifndef TM_ASSERT
@@ -283,8 +287,8 @@ HISTORY
    You can override this block by defining TM_SIZE_T_DEFINED and the typedefs before including this file. */
 #ifndef TM_SIZE_T_DEFINED
     #define TM_SIZE_T_DEFINED
-    #define TM_SIZE_T_IS_SIGNED 0 /* define to 1 if tm_size_t is signed */
-    #include <stddef.h> /* include C version so identifiers are in global namespace */
+    #define TM_SIZE_T_IS_SIGNED 0 /* Define to 1 if tm_size_t is signed. */
+    #include <stddef.h> /* Include C version so identifiers are in global namespace. */
     typedef size_t tm_size_t;
 #endif /* !defined(TM_SIZE_T_DEFINED) */
 
@@ -292,25 +296,31 @@ HISTORY
    before including this file. */
 #ifndef TM_ERRC_DEFINED
     #define TM_ERRC_DEFINED
+    #include <errno.h>
     enum TM_ERRC_CODES {
-        TM_OK           = 0,   /* Same as std::errc() */
-        TM_EPERM        = 1,   /* Same as std::errc::operation_not_permitted */
-        TM_ENOENT       = 2,   /* Same as std::errc::no_such_file_or_directory */
-        TM_EIO          = 5,   /* Same as std::errc::io_error */
-        TM_ENOMEM       = 12,  /* Same as std::errc::not_enough_memory */
-        TM_EACCES       = 13,  /* Same as std::errc::permission_denied */
-        TM_EBUSY        = 16,  /* Same as std::errc::device_or_resource_busy */
-        TM_EEXIST       = 17,  /* Same as std::errc::file_exists */
-        TM_EEXDEV       = 18,  /* Same as std::errc::cross_device_link */
-        TM_ENODEV       = 19,  /* Same as std::errc::no_such_device */
-        TM_EINVAL       = 22,  /* Same as std::errc::invalid_argument */
-        TM_EMFILE       = 24,  /* Same as std::errc::too_many_files_open */
-        TM_EFBIG        = 27,  /* Same as std::errc::file_too_large */
-        TM_ENOSPC       = 28,  /* Same as std::errc::no_space_on_device */
-        TM_ERANGE       = 34,  /* Same as std::errc::result_out_of_range */
-        TM_ENAMETOOLONG = 36,  /* Same as std::errc::filename_too_long */
-        TM_ENOTEMPTY    = 39,  /* Same as std::errc::directory_not_empty */
-        TM_EOVERFLOW    = 75,  /* Same as std::errc::value_too_large */
+        TM_OK           = 0,            /* Alternatively std::errc() */
+        TM_EPERM        = EPERM,        /* Alternatively std::errc::operation_not_permitted */
+        TM_ENOENT       = ENOENT,       /* Alternatively std::errc::no_such_file_or_directory */
+        TM_EIO          = EIO,          /* Alternatively std::errc::io_error */
+        TM_EAGAIN       = EAGAIN,       /* Alternatively std::errc::resource_unavailable_try_again */
+        TM_ENOMEM       = ENOMEM,       /* Alternatively std::errc::not_enough_memory */
+        TM_EACCES       = EACCES,       /* Alternatively std::errc::permission_denied */
+        TM_EBUSY        = EBUSY,        /* Alternatively std::errc::device_or_resource_busy */
+        TM_EEXIST       = EEXIST,       /* Alternatively std::errc::file_exists */
+        TM_EXDEV        = EXDEV,        /* Alternatively std::errc::cross_device_link */
+        TM_ENODEV       = ENODEV,       /* Alternatively std::errc::no_such_device */
+        TM_EINVAL       = EINVAL,       /* Alternatively std::errc::invalid_argument */
+        TM_EMFILE       = EMFILE,       /* Alternatively std::errc::too_many_files_open */
+        TM_EFBIG        = EFBIG,        /* Alternatively std::errc::file_too_large */
+        TM_ENOSPC       = ENOSPC,       /* Alternatively std::errc::no_space_on_device */
+        TM_ERANGE       = ERANGE,       /* Alternatively std::errc::result_out_of_range */
+        TM_ENAMETOOLONG = ENAMETOOLONG, /* Alternatively std::errc::filename_too_long */
+        TM_ENOLCK       = ENOLCK,       /* Alternatively std::errc::no_lock_available */
+        TM_ECANCELED    = ECANCELED,    /* Alternatively std::errc::operation_canceled */
+        TM_ENOSYS       = ENOSYS,       /* Alternatively std::errc::function_not_supported */
+        TM_ENOTEMPTY    = ENOTEMPTY,    /* Alternatively std::errc::directory_not_empty */
+        TM_EOVERFLOW    = EOVERFLOW,    /* Alternatively std::errc::value_too_large */
+        TM_ETIMEDOUT    = ETIMEDOUT,    /* Alternatively std::errc::timed_out */
     };
     typedef int tm_errc;
 #endif
@@ -924,12 +934,11 @@ template <class... Types>
 // This way we can do a static_assert on whether the overload exists and report an error otherwise.
 template <class T>
 class tmp_has_custom_printer {
-    typedef tm_size_t printer_t(char*, tm_size_t, const PrintFormat&, const T&);
     typedef char no;
 
     template <class C>
     static auto test(C c)
-        -> decltype(static_cast<tm_size_t (*)(char*, tm_size_t, const PrintFormat&, const C&)>(&snprint));
+        -> decltype(static_cast<int (*)(char*, tm_size_t, const ::tml::PrintFormat&, const C&)>(&snprint));
     template <class C>
     static no test(...);
 
@@ -1501,9 +1510,27 @@ static PrintFormattedResult tmp_print_value(char* dest, tm_size_t maxlen, float 
 #endif  // defined(TMP_FLOAT_BACKEND_CRT)
 
 #ifdef TMP_FLOAT_BACKEND_TM_CONVERSION
+
 static uint32_t tmp_convert_flags(uint32_t flags) {
-    // assuming that flags are 1 to 1 compatible with the ones in tm_conversion.h
-    return flags & ((1u << PF_COUNT) - 1);  // mask out flags not defined in tm_conversion
+
+#define tmp_version_mismatch_error              \
+    "Internal Error: Incompatible print flags." \
+    " Are tm_conversion.h and tm_print.h versions mismatched?"
+
+    // Make sure that print flags are 1 to 1 compatible with the ones in tm_conversion.h.
+    static_assert((uint32_t)PrintFlags::Fixed == (uint32_t)PF_FIXED, tmp_version_mismatch_error);
+    static_assert((uint32_t)PrintFlags::Scientific == (uint32_t)PF_SCIENTIFIC, tmp_version_mismatch_error);
+    static_assert((uint32_t)PrintFlags::Hex == (uint32_t)PF_HEX, tmp_version_mismatch_error);
+    static_assert((uint32_t)PrintFlags::Shortest == (uint32_t)PF_SHORTEST, tmp_version_mismatch_error);
+    static_assert((uint32_t)PrintFlags::TrailingZeroes == (uint32_t)PF_TRAILING_ZEROES, tmp_version_mismatch_error);
+    static_assert((uint32_t)PrintFlags::BoolAsNumber == (uint32_t)PF_BOOL_AS_NUMBER, tmp_version_mismatch_error);
+    static_assert((uint32_t)PrintFlags::Lowercase == (uint32_t)PF_LOWERCASE, tmp_version_mismatch_error);
+    static_assert((uint32_t)PrintFlags::Sign == (uint32_t)PF_SIGNBIT, tmp_version_mismatch_error);
+    static_assert(PF_COUNT == 8, tmp_version_mismatch_error);
+#undef tmp_version_mismatch_error
+
+    // Assuming that flags are 1 to 1 compatible with the ones in tm_conversion.h.
+    return flags & ((1u << PF_COUNT) - 1);  // Mask out flags not defined in tm_conversion.
 }
 
 static PrintFormattedResult tmp_print_value(char* dest, tm_size_t maxlen, double value, const PrintFormat& format) {

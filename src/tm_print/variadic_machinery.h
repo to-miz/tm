@@ -428,12 +428,11 @@ template <class... Types>
 // This way we can do a static_assert on whether the overload exists and report an error otherwise.
 template <class T>
 class tmp_has_custom_printer {
-    typedef tm_size_t printer_t(char*, tm_size_t, const PrintFormat&, const T&);
     typedef char no;
 
     template <class C>
     static auto test(C c)
-        -> decltype(static_cast<tm_size_t (*)(char*, tm_size_t, const PrintFormat&, const C&)>(&snprint));
+        -> decltype(static_cast<int (*)(char*, tm_size_t, const ::tml::PrintFormat&, const C&)>(&snprint));
     template <class C>
     static no test(...);
 

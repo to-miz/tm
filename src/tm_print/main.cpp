@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.18 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.21 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -81,8 +81,12 @@ ISSUES
     - snprint may not be able to return necessary buffer len when supplied buffer isn't enough if a
       floating point number has to be printed that exceeds the small buffer size (200 bytes by default).
       In that case the return value is -1.
+    - Types that are implicitly convertible to string_view produce errors currently.
 
 HISTORY
+    v0.0.21 30.05.19 Made error codes depend on <errno.h> by default.
+    v0.0.20 03.05.19 Added static asserts to sanity check tm_conversion.h backend print flags compatibility.
+    v0.0.19 14.04.19 Fixed tmp_has_custom_printer detecting wrong signature for custom snprint functions.
     v0.0.18 13.04.19 Fixed gcc/clang compilation warnings.
                      Fixed custom printing support that was broken after using std::decay.
     v0.0.17 11.04.19 Added toplevel namespace tml.
@@ -153,7 +157,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_14E73C89_58CA_4CC4_9D19_99F0A3D7EA07_
 #define _TM_PRINT_H_INCLUDED_14E73C89_58CA_4CC4_9D19_99F0A3D7EA07_
 
-#define TMP_VERSION 0x00000012u
+#define TMP_VERSION 0x00000015u
 
 #include "dependencies_header.h"
 
@@ -346,4 +350,5 @@ TMP_DEF ::std::string tmp_string_format(const char* format, size_t format_len, c
 #include "implementation.cpp"
 #endif  // TM_PRINT_IMPLEMENTATION
 
+#define MERGE_YEAR 2016
 #include "../common/LICENSE.inc"
