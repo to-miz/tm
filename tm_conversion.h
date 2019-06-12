@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.9.6 - public domain - https://github.com/to-miz/tm
+tm_conversion.h v0.9.9.7 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -96,6 +96,7 @@ ISSUES
     - print_double, print_float need 64 bit arithmetic
 
 HISTORY
+    v0.9.9.7   30.05.19 Made error codes depend on <errno.h> by default.
     v0.9.9.6   14.01.19 Improved TM_STRING_VIEW and tm_errc support.
     v0.9.9.5   06.10.18 Fixed compilation errors when TMC_CPP_OVERLOADS is defined.
     v0.9.9.4   05.10.18 Added shortest flag for floating points.
@@ -348,7 +349,7 @@ int main() {
 #ifndef _TM_CONVERSION_H_INCLUDED_
 #define _TM_CONVERSION_H_INCLUDED_
 
-#define TMC_VERSION 0x00090906u
+#define TMC_VERSION 0x00090907u
 
 /* Fixed width ints. Include C version so identifiers are in global namespace. */
 #include <stdint.h>
@@ -386,25 +387,31 @@ int main() {
    before including this file. */
 #ifndef TM_ERRC_DEFINED
     #define TM_ERRC_DEFINED
+    #include <errno.h>
     enum TM_ERRC_CODES {
-        TM_OK           = 0,   /* Same as std::errc() */
-        TM_EPERM        = 1,   /* Same as std::errc::operation_not_permitted */
-        TM_ENOENT       = 2,   /* Same as std::errc::no_such_file_or_directory */
-        TM_EIO          = 5,   /* Same as std::errc::io_error */
-        TM_ENOMEM       = 12,  /* Same as std::errc::not_enough_memory */
-        TM_EACCES       = 13,  /* Same as std::errc::permission_denied */
-        TM_EBUSY        = 16,  /* Same as std::errc::device_or_resource_busy */
-        TM_EEXIST       = 17,  /* Same as std::errc::file_exists */
-        TM_EEXDEV       = 18,  /* Same as std::errc::cross_device_link */
-        TM_ENODEV       = 19,  /* Same as std::errc::no_such_device */
-        TM_EINVAL       = 22,  /* Same as std::errc::invalid_argument */
-        TM_EMFILE       = 24,  /* Same as std::errc::too_many_files_open */
-        TM_EFBIG        = 27,  /* Same as std::errc::file_too_large */
-        TM_ENOSPC       = 28,  /* Same as std::errc::no_space_on_device */
-        TM_ERANGE       = 34,  /* Same as std::errc::result_out_of_range */
-        TM_ENAMETOOLONG = 36,  /* Same as std::errc::filename_too_long */
-        TM_ENOTEMPTY    = 39,  /* Same as std::errc::directory_not_empty */
-        TM_EOVERFLOW    = 75,  /* Same as std::errc::value_too_large */
+        TM_OK           = 0,            /* Alternatively std::errc() */
+        TM_EPERM        = EPERM,        /* Alternatively std::errc::operation_not_permitted */
+        TM_ENOENT       = ENOENT,       /* Alternatively std::errc::no_such_file_or_directory */
+        TM_EIO          = EIO,          /* Alternatively std::errc::io_error */
+        TM_EAGAIN       = EAGAIN,       /* Alternatively std::errc::resource_unavailable_try_again */
+        TM_ENOMEM       = ENOMEM,       /* Alternatively std::errc::not_enough_memory */
+        TM_EACCES       = EACCES,       /* Alternatively std::errc::permission_denied */
+        TM_EBUSY        = EBUSY,        /* Alternatively std::errc::device_or_resource_busy */
+        TM_EEXIST       = EEXIST,       /* Alternatively std::errc::file_exists */
+        TM_EXDEV        = EXDEV,        /* Alternatively std::errc::cross_device_link */
+        TM_ENODEV       = ENODEV,       /* Alternatively std::errc::no_such_device */
+        TM_EINVAL       = EINVAL,       /* Alternatively std::errc::invalid_argument */
+        TM_EMFILE       = EMFILE,       /* Alternatively std::errc::too_many_files_open */
+        TM_EFBIG        = EFBIG,        /* Alternatively std::errc::file_too_large */
+        TM_ENOSPC       = ENOSPC,       /* Alternatively std::errc::no_space_on_device */
+        TM_ERANGE       = ERANGE,       /* Alternatively std::errc::result_out_of_range */
+        TM_ENAMETOOLONG = ENAMETOOLONG, /* Alternatively std::errc::filename_too_long */
+        TM_ENOLCK       = ENOLCK,       /* Alternatively std::errc::no_lock_available */
+        TM_ECANCELED    = ECANCELED,    /* Alternatively std::errc::operation_canceled */
+        TM_ENOSYS       = ENOSYS,       /* Alternatively std::errc::function_not_supported */
+        TM_ENOTEMPTY    = ENOTEMPTY,    /* Alternatively std::errc::directory_not_empty */
+        TM_EOVERFLOW    = EOVERFLOW,    /* Alternatively std::errc::value_too_large */
+        TM_ETIMEDOUT    = ETIMEDOUT,    /* Alternatively std::errc::timed_out */
     };
     typedef int tm_errc;
 #endif
