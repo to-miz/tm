@@ -3,7 +3,7 @@ There are two licenses you can freely choose from - MIT or Public Domain
 ---------------------------------------------------------------------------
 
 MIT License:
-Copyright (c) 2016 Tolga Mizrak
+Copyright (c) MERGE_YEAR Tolga Mizrak
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -53,3 +53,4 @@ For more information, please refer to <http://unlicense.org/>
 
 ---------------------------------------------------------------------------
 */
+#undef MERGE_YEAR
