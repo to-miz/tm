@@ -1,5 +1,5 @@
 /*
-tm_arrayview.h v1.1.7 - public domain - https://github.com/to-miz/tm
+tm_arrayview.h v1.1.8 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -39,7 +39,9 @@ SWITCHES
         std::container usage and UninitializedArrayView usage will require code changes.
 
 HISTORY
-    v1.1.7  13.10.19 Fixed gcc/clang compilation errors.
+    v1.1.8  16.04.19 Added TM_CONSTEXPR.
+                     Improved constexpr-ness of ArrayView.
+    v1.1.7  13.04.19 Fixed gcc/clang compilation errors.
     v1.1.6  06.10.18 Changed formatting.
                      Changed some macro definitions to commonly used ones.
     v1.1.5  20.06.17 Improved constness of GridView.
@@ -96,6 +98,11 @@ HISTORY
         tm_size_t x;
         tm_size_t y;
     } tma_point;
+#endif
+
+// Define this to constexpr if available.
+#ifndef TM_CONSTEXPR
+    #define TM_CONSTEXPR
 #endif
 
 // Define these like this if tm_size_t is a 32bit value and you also want 64bit accessors (ie operator[]).
@@ -253,21 +260,22 @@ struct Array {
 
 template <class T>
 struct ArrayView : Array<T> {
-    ArrayView() : Array{nullptr, 0} {}
+    TM_CONSTEXPR ArrayView() : Array{nullptr, 0} {}
     ArrayView(const Array<T>& other) : Array<T>{other.data(), other.size()} {}
     ArrayView(const ArrayView&) = default;
     ArrayView& operator=(const ArrayView&) = default;
 
-    ArrayView(T* ptr, tm_size_t sz) : Array<T>{ptr, sz} {}
-    ArrayView(T* first, T* last) : Array{first, static_cast<tm_size_t>(last - first)} {}
+    TM_CONSTEXPR ArrayView(T* ptr, tm_size_t sz) : Array<T>{ptr, sz} {}
+    TM_CONSTEXPR ArrayView(T* first, T* last) : Array{first, static_cast<tm_size_t>(last - first)} {}
 
     template <tm_size_t N>
-    ArrayView(T (&array)[N]) : Array<T>{array, N} {}
+    TM_CONSTEXPR ArrayView(T (&array)[N]) : Array<T>{array, N} {}
 
     template <class Container>
     ArrayView(Container& container) : Array<T>{container.data(), static_cast<tm_size_t>(container.size())} {}
 
-    ArrayView(const std::initializer_list<T>& list) : Array<T>{list.begin(), static_cast<tm_size_t>(list.size())} {}
+    TM_CONSTEXPR ArrayView(const std::initializer_list<T>& list)
+        : Array<T>{list.begin(), static_cast<tm_size_t>(list.size())} {}
 
     operator ArrayView<const T>() const { return ArrayView<const T>{this->ptr, this->sz}; }
 };
