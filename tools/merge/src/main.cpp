@@ -220,12 +220,20 @@ merge_error_t parse_define_statement(stream_t* stream, std::vector<merge_definit
         return merge_error;
     }
 
-    auto line_end = find(stream->p, '\n', (size_t)(stream->end - stream->p));
+    size_t remaining = (size_t)(stream->end - stream->p);
+    auto line_end = find(stream->p, '\n', remaining);
+    const char* new_stream_p = nullptr;
     if (!line_end) {
         line_end = stream->end;
+        new_stream_p = line_end;
+    } else {
+        new_stream_p = line_end + 1;
+    }
+    if (remaining && *(line_end - 1) == '\r') {
+        --line_end;
     }
     out.push_back({token.str, stream->p, token.len, distance(stream->p, line_end)});
-    stream->p = line_end;
+    stream->p = new_stream_p;
     guard.dismiss();
     return merge_ok;
 }
@@ -239,20 +247,22 @@ void erase_undef_statements(std::vector<char>& data, const std::vector<merge_def
 
         for (;;) {
             pos = std::search(pos, data.end(), search_val.begin(), search_val.end());
-            if (pos == data.end()) {
-                break;
-            }
+            if (pos == data.end()) break;
             auto last = pos + search_val.size();
-            // only replace if we matched to a whole identifier and not a substr
-            if ((pos != data.begin() && isalnum(*(pos - 1))) || (last + 1 != data.end() && isalnum(*(last + 1)))) {
+            // Only replace if we matched to a whole identifier and not a substr.
+            if ((pos != data.begin() && isalnum((unsigned char)*(pos - 1))) ||
+                (last != data.end() && isalnum((unsigned char)*last))) {
                 pos = last;
                 continue;
             }
-            // extend range to end of line
+
+            // Extend range to beginning of line.
+            while (pos != data.begin() && *pos != '\n') --pos;
+            if (pos != data.begin() && *pos == '\r') --pos;
+
+            // Extend range to end of line.
             last = std::find(last, data.end(), '\n');
-            if (last != data.end()) {
-                ++last;
-            }
+            if (last != data.end()) ++last;
             pos = data.erase(pos, last);
         }
     }
@@ -289,7 +299,7 @@ indentation_result get_indent(std::vector<char>::iterator first, std::vector<cha
                 break;
             }
         }
-	}
+    }
     return result;
 }
 void indent_range(std::vector<char>& data, std::vector<char>::iterator first, std::vector<char>::iterator last,
@@ -369,17 +379,15 @@ merge_error_t merge_include_statement(stream_t* stream, const char* dir, size_t 
     erase_undef_statements(file.data, definitions);
 
     for (auto& def : definitions) {
-        // replace all occurences of def.name with def.value
+        // Replace all occurences of def.name with def.value.
         auto pos = file.data.begin();
         for (;;) {
             pos = std::search(pos, file.data.end(), def.name, def.name + def.name_len);
-            if (pos == file.data.end()) {
-                break;
-            }
+            if (pos == file.data.end()) break;
             auto last = pos + def.name_len;
-            // only replace if we matched to a whole identifier and not a substr
-            if ((pos != file.data.begin() && isalnum(*(pos - 1))) ||
-                (last + 1 != file.data.end() && isalnum(*(last + 1)))) {
+            // Only replace if we matched to a whole identifier and not a substr.
+            if ((pos != file.data.begin() && isalnum((unsigned char)*(pos - 1))) ||
+                (last != file.data.end() && isalnum((unsigned char)*last))) {
                 pos = last;
                 continue;
             }

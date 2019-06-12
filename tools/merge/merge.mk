@@ -7,6 +7,6 @@ merge.out := ${merge_build_dir}merge${exe_ext}
 ${merge.out}: private override BUILD := ${MERGE_BUILD}
 ${merge.out}: tools/merge/src/main.cpp
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tools/merge/src/main.cpp, $@, .)
+	${hide}$(call cxx_compile_and_link, tools/merge/src/main.cpp, $@, .)
 
 merge: ${merge.out}
