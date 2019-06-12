@@ -1,0 +1,67 @@
+{
+	"folders":
+	[
+		{
+			"path": "./../../",
+			"folder_exclude_patterns": ["build", "builds", ".git", "tools"],
+			"file_exclude_patterns": [
+				"tm_print.h",
+				"tm_async.h"
+			],
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"read_only_files": [
+			"tm_print.h",
+			"tm_async.h"
+		],
+		"read_only_folders": [
+		]
+	},
+	"build_systems": [
+		{
+			"name": "make",
+			"cmd": "make merge.tm_async",
+
+			"windows": {
+				"shell": false,
+				"file_regex": "(.*)\\(([0-9]+)\\): (error|note|warning)",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../",
+			},
+
+			"linux": {
+				"shell": true,
+				"file_regex": "^(..[^:\n]*):([0-9]+):?([0-9]+)?:? (.*)$",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../",
+			},
+
+			"variants": [
+				{
+					"name": "build unmerged",
+					"cmd": "make unmerged.tm_async"
+				},
+				{
+					"name": "build unmerged c",
+					"cmd": "make unmerged.tm_async.c"
+				},
+                {
+                    "name": "merge",
+                    "cmd": "make tm_async.h"
+                },
+				{
+					"name": "build tests",
+					"cmd": "make tests.tm_async"
+				},
+				{
+					"name": "run tests",
+					"cmd": "make tests.tm_async.run"
+				}
+			]
+		}
+	]
+}

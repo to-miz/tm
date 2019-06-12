@@ -40,6 +40,11 @@ include tests/src/tm_bezier/tm_bezier.mk
 include src/tm_unicode/tm_unicode.mk
 include tests/src/tm_unicode/tm_unicode.mk
 
+include src/tm_async/tm_async.mk
+
+include src/tm_small_vector/tm_small_vector.mk
+include tests/src/tm_small_vector/tm_small_vector.mk
+
 # Combined
 
 merge.all.deps := tm_conversion.h tm_print.h tm_json.h tm_cli.h
