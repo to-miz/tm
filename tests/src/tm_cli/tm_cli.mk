@@ -6,4 +6,4 @@ ${tests.tm_cli.c.out}: tm_cli.h
 
 tests.tm_cli: ${tests.tm_cli.c.out}
 
-tests.tm_cli.run:
+tests.tm_cli.run: ${tests.tm_cli.c.out}

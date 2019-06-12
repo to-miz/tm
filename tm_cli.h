@@ -1,5 +1,5 @@
 /*
-tm_cli.h v0.2.2 - public domain - https://github.com/to-miz/tm
+tm_cli.h v0.2.3 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -18,6 +18,7 @@ PURPOSE
     loading config files, preprocessing and parsing the same commandline with differing options.
 
 HISTORY
+    v0.2.3  12.04.19 Added tmcli_get_remaining_args to get remaining unparsed options.
     v0.2.2  10.02.19 Changed const-ness of argv parameters since it was too lenient.
     v0.2.1  03.02.19 Made short options optional if a long name is available.
                      Added error checking for valid options. Options with no shortor long names will
@@ -87,8 +88,8 @@ HISTORY
    You can override this block by defining TM_SIZE_T_DEFINED and the typedefs before including this file. */
 #ifndef TM_SIZE_T_DEFINED
     #define TM_SIZE_T_DEFINED
-    #define TM_SIZE_T_IS_SIGNED 0 /* define to 1 if tm_size_t is signed */
-    #include <stddef.h> /* include C version so identifiers are in global namespace */
+    #define TM_SIZE_T_IS_SIGNED 0 /* Define to 1 if tm_size_t is signed. */
+    #include <stddef.h> /* Include C version so identifiers are in global namespace. */
     typedef size_t tm_size_t;
 #endif /* !defined(TM_SIZE_T_DEFINED) */
 
@@ -242,6 +243,16 @@ Validates the parser after the whole commandline has been parsed.
 Call this to make sure that all required options were provided after parsing is complete.
 */
 TMCLI_DEF tm_bool tmcli_validate(tmcli_parser* parser);
+
+typedef struct tmcli_args_struct {
+    int argc;
+    tmcli_tchar const* const* argv;
+} tmcli_args;
+/*
+Returns remaining unparsed options. Can be used to get remaining options after a standalone '--' after a successful
+parse.
+*/
+TMCLI_DEF tmcli_args tmcli_get_remaining_args(const tmcli_parser* parser);
 
 #ifdef __cplusplus
 }
@@ -709,6 +720,18 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
     return TM_TRUE;
 }
 
+TMCLI_DEF tmcli_args tmcli_get_remaining_args(const tmcli_parser* parser) {
+    TM_ASSERT(parser);
+    TM_ASSERT(parser->argc >= 0);
+    TM_ASSERT(parser->argv);
+    TM_ASSERT(parser->current <= parser->argc);
+
+    tmcli_args result = {0, TM_NULL};
+    result.argc = parser->argc - parser->current;
+    result.argv = parser->argv + parser->current;
+    return result;
+}
+
 #ifdef __cplusplus
 }
 #endif
@@ -720,7 +743,7 @@ There are two licenses you can freely choose from - MIT or Public Domain
 ---------------------------------------------------------------------------
 
 MIT License:
-Copyright (c) 2016 Tolga Mizrak
+Copyright (c) 2018 Tolga Mizrak
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

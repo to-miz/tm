@@ -450,6 +450,18 @@ TMCLI_DEF tm_bool tmcli_next(tmcli_parser* parser, tmcli_parsed_option* parsed_o
     return TM_TRUE;
 }
 
+TMCLI_DEF tmcli_args tmcli_get_remaining_args(const tmcli_parser* parser) {
+    TM_ASSERT(parser);
+    TM_ASSERT(parser->argc >= 0);
+    TM_ASSERT(parser->argv);
+    TM_ASSERT(parser->current <= parser->argc);
+
+    tmcli_args result = {0, TM_NULL};
+    result.argc = parser->argc - parser->current;
+    result.argv = parser->argv + parser->current;
+    return result;
+}
+
 #ifdef __cplusplus
 }
 #endif

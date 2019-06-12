@@ -42,12 +42,12 @@
 
 			"variants": [
 				{
-					"name": "make C build",
-					"cmd": "make tm_cli-c"
+					"name": "make tests",
+					"cmd": "make tests.tm_cli"
 				},
 				{
 					"name": "run tests",
-					"cmd": "make tm_cli-run-tests"
+					"cmd": "make tests.tm_cli.run"
 				}
 			]
 		}

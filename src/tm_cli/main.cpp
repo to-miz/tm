@@ -1,5 +1,5 @@
 /*
-tm_cli.h v0.2.2 - public domain - https://github.com/to-miz/tm
+tm_cli.h v0.2.3 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -18,6 +18,7 @@ PURPOSE
     loading config files, preprocessing and parsing the same commandline with differing options.
 
 HISTORY
+    v0.2.3  12.04.19 Added tmcli_get_remaining_args to get remaining unparsed options.
     v0.2.2  10.02.19 Changed const-ness of argv parameters since it was too lenient.
     v0.2.1  03.02.19 Made short options optional if a long name is available.
                      Added error checking for valid options. Options with no shortor long names will
@@ -213,6 +214,16 @@ Call this to make sure that all required options were provided after parsing is 
 */
 TMCLI_DEF tm_bool tmcli_validate(tmcli_parser* parser);
 
+typedef struct tmcli_args_struct {
+    int argc;
+    tmcli_tchar const* const* argv;
+} tmcli_args;
+/*
+Returns remaining unparsed options. Can be used to get remaining options after a standalone '--' after a successful
+parse.
+*/
+TMCLI_DEF tmcli_args tmcli_get_remaining_args(const tmcli_parser* parser);
+
 #ifdef __cplusplus
 }
 #endif
@@ -223,4 +234,5 @@ TMCLI_DEF tm_bool tmcli_validate(tmcli_parser* parser);
 #include "implementation.c"
 #endif /* defined(TM_CLI_IMPLEMENTATION) */
 
+#define MERGE_YEAR 2018
 #include "../common/LICENSE.inc"
