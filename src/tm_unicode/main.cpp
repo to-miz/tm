@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.4 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.1.5 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -70,6 +70,7 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY
+    v0.1.5  30.05.19 Made error codes depend on <errno.h> by default.
     v0.1.4  02.04.19 Fixed gcc/clang compilation errors.
                      Implemented full case toggling.
     v0.1.3  21.03.19 Fixed tmu_get_ucd_width being used instead of tmu_ucd_get_width.
@@ -161,4 +162,5 @@ HISTORY
 
 #endif /* defined(TM_UNICODE_IMPLEMENTATION) */
 
+#define MERGE_YEAR 2019
 #include "../common/LICENSE.inc"

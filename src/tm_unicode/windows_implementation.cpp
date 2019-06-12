@@ -70,7 +70,7 @@ static tm_errc tmu_winerror_to_errc(DWORD error, tm_errc def) {
             return TM_ENOTEMPTY;
 
         case ERROR_NOT_SAME_DEVICE:
-            return TM_EEXDEV;
+            return TM_EXDEV;
 
         case ERROR_TOO_MANY_OPEN_FILES:
             return TM_EMFILE;

@@ -53,34 +53,34 @@ ${tests.tm_unicode.default.c.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
 	${hide}$(call c_compile_and_link, tests/src/tm_unicode/main.c, $@, , USE_TESTS_UCD)
 
-${tests.tm_unicode.windows.c.out}: LINK_LIBS.cl := Shell32.lib
+${tests.tm_unicode.windows.c.out}: C_LINK_LIBS.cl := Shell32.lib
 ${tests.tm_unicode.windows.c.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
 	${hide}$(call c_compile_and_link, tests/src/tm_unicode/main.c, $@,, USE_WINDOWS_H)
 
 ${tests.tm_unicode.default.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_TESTS_UCD)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_TESTS_UCD)
 
 ${tests.tm_unicode.signed_size_t.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_SIGNED_SIZE_T USE_TESTS_UCD)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_SIGNED_SIZE_T USE_TESTS_UCD)
 
 ${tests.tm_unicode.msvc_crt.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_MSVC_CRT)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_MSVC_CRT)
 
 ${tests.tm_unicode.msvc_crt.signed_size_t.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_MSVC_CRT USE_SIGNED_SIZE_T)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_MSVC_CRT USE_SIGNED_SIZE_T)
 
 ${tests.tm_unicode.windows.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_WINDOWS_H)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_WINDOWS_H)
 
 ${tests.tm_unicode.windows.signed_size_t.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_WINDOWS_H USE_SIGNED_SIZE_T)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_WINDOWS_H USE_SIGNED_SIZE_T)
 
 tests.tm_unicode: ${tests.tm_unicode.all_config_deps}
 

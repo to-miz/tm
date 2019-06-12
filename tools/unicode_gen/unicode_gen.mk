@@ -1,21 +1,11 @@
-UNICODE_GEN_BUILD ?= release
-# UNICODE_GEN_BUILD ?= debug
+unicode_gen_build ?= release
 
-unicode_gen_build_dir := ${BUILD_DIR}${path_sep}${UNICODE_GEN_BUILD}${path_sep}
+unicode_gen_build_dir := ${BUILD_DIR}${path_sep}${unicode_gen_build}${path_sep}
 
-unicode_gen.out := ${unicode_gen_build_dir}unicode_gen${exe_ext}
 unicode_gen.data_dir := tools/unicode_gen/data/
 unicode_gen.data := $(wildcard ${unicode_gen.data_dir}*)
 
-${unicode_gen.out}: private override BUILD := ${UNICODE_GEN_BUILD}
-${unicode_gen.out}: private CPP_OPTIONS.gcc += -Wno-missing-field-initializers
-${unicode_gen.out}: private CPP_OPTIONS.gcc += -Wno-error=unused-parameter
-${unicode_gen.out}: private CPP_OPTIONS.clang += -Wno-missing-field-initializers
-${unicode_gen.out}: private CPP_OPTIONS.clang += -Wno-error=unused-parameter
-${unicode_gen.out}: private options.cl.exception := -EHa
-${unicode_gen.out}: tools/unicode_gen/src/*.cpp tm_cli.h
-	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tools/unicode_gen/src/main.cpp, $@, .)
+include tools/unicode_gen/rules.mk
 
 unicode_gen.flags    := case_info \
 						category \
@@ -32,7 +22,8 @@ unicode_gen.options := --prefix=tmu_ \
 
 ${unicode_gen_build_dir}test.h ${unicode_gen_build_dir}test.cpp: ${unicode_gen.out}
 	${hide}echo Generating test unicode files.
-	${hide}${unicode_gen.out} dir tools/unicode_gen/data ${unicode_gen.options} -o${unicode_gen_build_dir}test.cpp --header=${unicode_gen_build_dir}test.h
+	${hide}${unicode_gen.out} dir tools/unicode_gen/data ${unicode_gen.options} \
+		-o${unicode_gen_build_dir}test.cpp --header=${unicode_gen_build_dir}test.h
 
 unicode_gen: ${unicode_gen.out}
 

@@ -389,7 +389,7 @@ TEST_CASE("error reporting") {
 TEST_CASE("error reporting") {
     const char* fn = "abc/test";
     const char* fn3 = "def/test3";
-    const char test_data = 0;
+    char test_data = 0;
     char very_long_fn[1024];
     for (auto i = 0; i < 1024; ++i) very_long_fn[i] = 'X';
     very_long_fn[1023] = 0; /* Nullterminate */

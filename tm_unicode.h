@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.4 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.1.5 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -70,6 +70,7 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY
+    v0.1.5  30.05.19 Made error codes depend on <errno.h> by default.
     v0.1.4  02.04.19 Fixed gcc/clang compilation errors.
                      Implemented full case toggling.
     v0.1.3  21.03.19 Fixed tmu_get_ucd_width being used instead of tmu_ucd_get_width.
@@ -99,8 +100,8 @@ HISTORY
    You can override this block by defining TM_SIZE_T_DEFINED and the typedefs before including this file. */
 #ifndef TM_SIZE_T_DEFINED
     #define TM_SIZE_T_DEFINED
-    #define TM_SIZE_T_IS_SIGNED 0 /* define to 1 if tm_size_t is signed */
-    #include <stddef.h> /* include C version so identifiers are in global namespace */
+    #define TM_SIZE_T_IS_SIGNED 0 /* Define to 1 if tm_size_t is signed. */
+    #include <stddef.h> /* Include C version so identifiers are in global namespace. */
     typedef size_t tm_size_t;
 #endif /* !defined(TM_SIZE_T_DEFINED) */
 
@@ -138,25 +139,31 @@ TM_STRING_VIEW_SIZE and TM_STRING_VIEW_MAKE.
    before including this file. */
 #ifndef TM_ERRC_DEFINED
     #define TM_ERRC_DEFINED
+    #include <errno.h>
     enum TM_ERRC_CODES {
-        TM_OK           = 0,   /* Same as std::errc() */
-        TM_EPERM        = 1,   /* Same as std::errc::operation_not_permitted */
-        TM_ENOENT       = 2,   /* Same as std::errc::no_such_file_or_directory */
-        TM_EIO          = 5,   /* Same as std::errc::io_error */
-        TM_ENOMEM       = 12,  /* Same as std::errc::not_enough_memory */
-        TM_EACCES       = 13,  /* Same as std::errc::permission_denied */
-        TM_EBUSY        = 16,  /* Same as std::errc::device_or_resource_busy */
-        TM_EEXIST       = 17,  /* Same as std::errc::file_exists */
-        TM_EEXDEV       = 18,  /* Same as std::errc::cross_device_link */
-        TM_ENODEV       = 19,  /* Same as std::errc::no_such_device */
-        TM_EINVAL       = 22,  /* Same as std::errc::invalid_argument */
-        TM_EMFILE       = 24,  /* Same as std::errc::too_many_files_open */
-        TM_EFBIG        = 27,  /* Same as std::errc::file_too_large */
-        TM_ENOSPC       = 28,  /* Same as std::errc::no_space_on_device */
-        TM_ERANGE       = 34,  /* Same as std::errc::result_out_of_range */
-        TM_ENAMETOOLONG = 36,  /* Same as std::errc::filename_too_long */
-        TM_ENOTEMPTY    = 39,  /* Same as std::errc::directory_not_empty */
-        TM_EOVERFLOW    = 75,  /* Same as std::errc::value_too_large */
+        TM_OK           = 0,            /* Alternatively std::errc() */
+        TM_EPERM        = EPERM,        /* Alternatively std::errc::operation_not_permitted */
+        TM_ENOENT       = ENOENT,       /* Alternatively std::errc::no_such_file_or_directory */
+        TM_EIO          = EIO,          /* Alternatively std::errc::io_error */
+        TM_EAGAIN       = EAGAIN,       /* Alternatively std::errc::resource_unavailable_try_again */
+        TM_ENOMEM       = ENOMEM,       /* Alternatively std::errc::not_enough_memory */
+        TM_EACCES       = EACCES,       /* Alternatively std::errc::permission_denied */
+        TM_EBUSY        = EBUSY,        /* Alternatively std::errc::device_or_resource_busy */
+        TM_EEXIST       = EEXIST,       /* Alternatively std::errc::file_exists */
+        TM_EXDEV        = EXDEV,        /* Alternatively std::errc::cross_device_link */
+        TM_ENODEV       = ENODEV,       /* Alternatively std::errc::no_such_device */
+        TM_EINVAL       = EINVAL,       /* Alternatively std::errc::invalid_argument */
+        TM_EMFILE       = EMFILE,       /* Alternatively std::errc::too_many_files_open */
+        TM_EFBIG        = EFBIG,        /* Alternatively std::errc::file_too_large */
+        TM_ENOSPC       = ENOSPC,       /* Alternatively std::errc::no_space_on_device */
+        TM_ERANGE       = ERANGE,       /* Alternatively std::errc::result_out_of_range */
+        TM_ENAMETOOLONG = ENAMETOOLONG, /* Alternatively std::errc::filename_too_long */
+        TM_ENOLCK       = ENOLCK,       /* Alternatively std::errc::no_lock_available */
+        TM_ECANCELED    = ECANCELED,    /* Alternatively std::errc::operation_canceled */
+        TM_ENOSYS       = ENOSYS,       /* Alternatively std::errc::function_not_supported */
+        TM_ENOTEMPTY    = ENOTEMPTY,    /* Alternatively std::errc::directory_not_empty */
+        TM_EOVERFLOW    = EOVERFLOW,    /* Alternatively std::errc::value_too_large */
+        TM_ETIMEDOUT    = ETIMEDOUT,    /* Alternatively std::errc::timed_out */
     };
     typedef int tm_errc;
 #endif
@@ -785,6 +792,7 @@ TMU_DEF std::vector<char> tmu_read_file_as_utf8_to_vector(TM_STRING_VIEW filenam
 #ifndef TM_UNREFERENCED_PARAM
 	#define TM_UNREFERENCED_PARAM(x) ((void)(x))
 	#define TM_UNREFERENCED(x) ((void)(x))
+    #define TM_MAYBE_UNUSED(x) ((void)(x))
 #endif
 
 #ifndef TM_ASSERT_VALID_SIZE
@@ -5300,7 +5308,7 @@ static tm_errc tmu_winerror_to_errc(DWORD error, tm_errc def) {
             return TM_ENOTEMPTY;
 
         case ERROR_NOT_SAME_DEVICE:
-            return TM_EEXDEV;
+            return TM_EXDEV;
 
         case ERROR_TOO_MANY_OPEN_FILES:
             return TM_EMFILE;
@@ -6948,7 +6956,7 @@ There are two licenses you can freely choose from - MIT or Public Domain
 ---------------------------------------------------------------------------
 
 MIT License:
-Copyright (c) 2016 Tolga Mizrak
+Copyright (c) 2019 Tolga Mizrak
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

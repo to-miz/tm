@@ -65,7 +65,7 @@ void tmf_make_relative_path_n_internal(const char* from, tm_size_t from_len, tmf
 #ifdef WIN32
     /* Check whether paths are on same device. */
     if (*from != *to) {
-        out->ec = TM_EEXDEV;
+        out->ec = TM_EXDEV;
         return;
     }
 #endif
