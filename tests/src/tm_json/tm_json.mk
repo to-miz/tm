@@ -28,23 +28,23 @@ ${tests.tm_json.c.out}: ${tests.tm_json.deps}
 
 ${tests.tm_json.default.out}: ${tests.tm_json.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_json/main.cpp, $@)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_json/main.cpp, $@)
 
 ${tests.tm_json.tm_conversion.out}: ${tests.tm_json.deps} tm_conversion.h
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_json/main.cpp, $@,,USE_TM_CONVERSION)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_json/main.cpp, $@,,USE_TM_CONVERSION)
 
 ${tests.tm_json.string_view.out}: ${tests.tm_json.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_json/main.cpp, $@,,USE_STRING_VIEW)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_json/main.cpp, $@,,USE_STRING_VIEW)
 
 ${tests.tm_json.charconv.out}: ${tests.tm_json.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_json/main.cpp, $@,,USE_CHARCONV)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_json/main.cpp, $@,,USE_CHARCONV)
 
 ${tests.tm_json.signed_size_t.out}: ${tests.tm_json.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_json/main.cpp, $@,,${tests.tm_json.signed_size_t.defines})
+	${hide}$(call cxx_compile_and_link, tests/src/tm_json/main.cpp, $@,,${tests.tm_json.signed_size_t.defines})
 
 tests.tm_json: ${tests.tm_json.all_config_deps}
 

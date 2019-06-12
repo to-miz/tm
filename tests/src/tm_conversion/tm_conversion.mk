@@ -3,7 +3,7 @@ tests.tm_conversion.c.out := ${build_dir}tests.tm_conversion.c${exe_ext}
 
 ${tests.tm_conversion.out}: tests/src/tm_conversion/main.cpp tm_conversion.h
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_conversion/main.cpp, $@)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_conversion/main.cpp, $@)
 
 tests.tm_conversion: ${tests.tm_conversion.out} ${tests.tm_conversion.c.out}
 

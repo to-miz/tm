@@ -7,7 +7,7 @@ ${tests.tm_bin_packing.c.out}: tests/src/tm_bin_packing/main.c tm_bin_packing.h
 
 ${tests.tm_bin_packing.default.out}: tests/src/tm_bin_packing/main.cpp tm_bin_packing.h
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_bin_packing/main.cpp, $@)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_bin_packing/main.cpp, $@)
 
 tests.tm_bin_packing.c: ${tests.tm_bin_packing.c.out}
 

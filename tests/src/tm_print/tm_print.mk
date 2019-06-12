@@ -13,30 +13,29 @@ tests.tm_print.all_configs_deps := ${tests.tm_print.default.out}
 tests.tm_print.all_configs_deps += ${tests.tm_print.crt.out} ${tests.tm_print.crt_signed_size_t.out}
 tests.tm_print.all_configs_deps += ${tests.tm_print.tm_conversion.out}
 tests.tm_print.all_configs_deps += ${tests.tm_print.tm_conversion_signed_size_t.out}
-tests.tm_print.all_configs_deps += ${tests.tm_print.charconv.out} ${tests.tm_print.charconv_signed_size_t.out}
 
 ${tests.tm_print.default.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@)
+	${hide}$(call cxx_compile_and_link, ${tests.tm_print.src}, $@)
 
 ${tests.tm_print.crt.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
+	${hide}$(call cxx_compile_and_link, ${tests.tm_print.src}, $@,, \
 	TMP_INT_BACKEND_CRT TMP_FLOAT_BACKEND_CRT)
 
 ${tests.tm_print.crt_signed_size_t.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
+	${hide}$(call cxx_compile_and_link, ${tests.tm_print.src}, $@,, \
 	TMP_INT_BACKEND_CRT TMP_FLOAT_BACKEND_CRT SIGNED_SIZE_T)
 
 ${tests.tm_print.tm_conversion.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
+	${hide}$(call cxx_compile_and_link, ${tests.tm_print.src}, $@,, \
 	TMP_INT_BACKEND_TM_CONVERSION TMP_FLOAT_BACKEND_TM_CONVERSION)
 
 ${tests.tm_print.tm_conversion_signed_size_t.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
+	${hide}$(call cxx_compile_and_link, ${tests.tm_print.src}, $@,, \
 	TMP_INT_BACKEND_TM_CONVERSION TMP_FLOAT_BACKEND_TM_CONVERSION SIGNED_SIZE_T)
 
 ifeq (${HAS_CHARCONV_FLOAT},true)
@@ -45,14 +44,24 @@ else
 tm_print.charconv_without_float := ${space}without float backend
 endif
 
+ifeq (${HAS_CHARCONV},true)
+tests.tm_print.run: ${tests.tm_print.charconv.out} ${tests.tm_print.charconv_signed_size_t.out}
+	${hide}echo ---
+	${hide}echo TESTING: charconv backend${tm_print.charconv_without_float}
+	${hide}${tests.tm_print.charconv.out}
+	${hide}echo ---
+	${hide}echo TESTING: charconv backend${tm_print.charconv_without_float} with signed size_t
+	${hide}${tests.tm_print.charconv_signed_size_t.out}
+endif
+
 ${tests.tm_print.charconv.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
+	${hide}$(call cxx_compile_and_link, ${tests.tm_print.src}, $@,, \
 	TMP_INT_BACKEND_CHARCONV ${tm_print.charconv_float})
 
 ${tests.tm_print.charconv_signed_size_t.out}: ${tests.tm_print.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, ${tests.tm_print.src}, $@,, \
+	${hide}$(call cxx_compile_and_link, ${tests.tm_print.src}, $@,, \
 	TMP_INT_BACKEND_CHARCONV ${tm_print.charconv_float} SIGNED_SIZE_T)
 
 tests.tm_print: ${tests.tm_print.all_configs_deps}
@@ -77,9 +86,3 @@ tests.tm_print.run: tests.tm_print
 	${hide}echo ---
 	${hide}echo TESTING: tm_conversion backend with signed size_t
 	${hide}${tests.tm_print.tm_conversion_signed_size_t.out}
-	${hide}echo ---
-	${hide}echo TESTING: charconv backend${tm_print.charconv_without_float}
-	${hide}${tests.tm_print.charconv.out}
-	${hide}echo ---
-	${hide}echo TESTING: charconv backend${tm_print.charconv_without_float} with signed size_t
-	${hide}${tests.tm_print.charconv_signed_size_t.out}

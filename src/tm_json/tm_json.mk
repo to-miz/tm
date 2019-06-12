@@ -3,7 +3,7 @@ unmerged.tm_json.c.out := ${build_dir}unmerged.tm_json.c${exe_ext}
 
 ${unmerged.tm_json.out}: src/tm_json/*.cpp
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, src/tm_json/test.cpp, $@, src/tm_json .)
+	${hide}$(call cxx_compile_and_link, src/tm_json/test.cpp, $@, src/tm_json .)
 
 ${unmerged.tm_json.c.out}: src/tm_json/*.c
 	${hide}echo Compiling $@.
