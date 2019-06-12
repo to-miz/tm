@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.3.3 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.3.4 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -20,6 +20,7 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
+    v0.3.4  02.05.19 Added tmsu_find_word_end_n and tmsu_find_word_start_n.
     v0.3.3  06.03.19 Added optional defines for TM_STRCSPN and TM_STRSPN to make use
                      of CRT if it is present.
                      Fixed a C compilation error due to use of auto.
@@ -106,8 +107,8 @@ HISTORY
    You can override this block by defining TM_SIZE_T_DEFINED and the typedefs before including this file. */
 #ifndef TM_SIZE_T_DEFINED
     #define TM_SIZE_T_DEFINED
-    #define TM_SIZE_T_IS_SIGNED 0 /* define to 1 if tm_size_t is signed */
-    #include <stddef.h> /* include C version so identifiers are in global namespace */
+    #define TM_SIZE_T_IS_SIGNED 0 /* Define to 1 if tm_size_t is signed. */
+    #include <stddef.h> /* Include C version so identifiers are in global namespace. */
     typedef size_t tm_size_t;
 #endif /* !defined(TM_SIZE_T_DEFINED) */
 
@@ -269,6 +270,28 @@ The start and length of the token is then stored into the output parameter out.
 */
 TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
                                    const char* delimiters_last, tmsu_string_view* out);
+
+/* Word tokenizing. */
+
+/*
+Returns the end of a word.
+Behavior is similar to pressing Control+Right on most editors.
+Default word seperators are: " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?".
+*/
+TMSU_DEF const char* tmsu_find_word_end(const char* str);
+TMSU_DEF const char* tmsu_find_word_end_ex(const char* str, const char* word_seperators);
+TMSU_DEF const char* tmsu_find_word_end_n(const char* first, const char* last);
+TMSU_DEF const char* tmsu_find_word_end_n_ex(const char* first, const char* last, const char* word_seperators_first,
+                                             const char* word_seperators_last);
+
+/*
+Returns the start of a word by doing a reverse search from the end of the string and moving backwards.
+Behavior is similar to pressing Control+Left on most editors.
+Default word seperators are: " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?".
+*/
+TMSU_DEF const char* tmsu_find_word_start_n(const char* first, const char* last);
+TMSU_DEF const char* tmsu_find_word_start_n_ex(const char* first, const char* last, const char* word_seperators_first,
+                                               const char* word_seperators_last);
 
 /* Whitespace trimming */
 
@@ -878,6 +901,49 @@ TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* deli
     return TM_TRUE;
 }
 
+/* Word tokenizing. */
+static const char TMSU_WORD_SEPERATORS[] = " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?";
+TMSU_DEF const char* tmsu_find_word_end(const char* str) {
+    TM_ASSERT(str);
+    return tmsu_find_word_end_n_ex(str, str + TM_STRLEN(str), TMSU_WORD_SEPERATORS,
+                                   TMSU_WORD_SEPERATORS + (sizeof(TMSU_WORD_SEPERATORS) - 1));
+}
+TMSU_DEF const char* tmsu_find_word_end_ex(const char* str, const char* word_seperators) {
+    TM_ASSERT(str);
+    TM_ASSERT(word_seperators);
+    return tmsu_find_word_end_n_ex(str, str + TM_STRLEN(str), word_seperators,
+                                   word_seperators + TM_STRLEN(word_seperators));
+}
+TMSU_DEF const char* tmsu_find_word_end_n(const char* first, const char* last) {
+    return tmsu_find_word_end_n_ex(first, last, TMSU_WORD_SEPERATORS,
+                                   TMSU_WORD_SEPERATORS + (sizeof(TMSU_WORD_SEPERATORS) - 1));
+}
+TMSU_DEF const char* tmsu_find_word_end_n_ex(const char* first, const char* last, const char* word_seperators_first,
+                                             const char* word_seperators_last) {
+    first = tmsu_trim_left_n(first, last);
+    return tmsu_find_first_of_n(first, last, word_seperators_first, word_seperators_last);
+}
+
+TMSU_DEF const char* tmsu_find_word_start_n(const char* first, const char* last) {
+    return tmsu_find_word_start_n_ex(first, last, TMSU_WORD_SEPERATORS,
+                                     TMSU_WORD_SEPERATORS + (sizeof(TMSU_WORD_SEPERATORS) - 1));
+}
+TMSU_DEF const char* tmsu_find_word_start_n_ex(const char* first, const char* last, const char* word_seperators_first,
+                                               const char* word_seperators_last) {
+    last = tmsu_trim_right_n(first, last);
+    const char* word_start = first;
+    if (first != last) {
+        word_start = tmsu_find_last_of_n_ex(first, last, word_seperators_first, word_seperators_last, TM_NULL);
+        if (word_start) {
+            // We found a word seperator, skip it, so that word_start actually points to the beginning of a word.
+            ++word_start;
+        } else {
+            word_start = first;
+        }
+    }
+    return word_start;
+}
+
 /* Whitespace trimming */
 
 static const int TMSU_WHITESPACE_COUNT = 6;
@@ -1316,7 +1382,7 @@ There are two licenses you can freely choose from - MIT or Public Domain
 ---------------------------------------------------------------------------
 
 MIT License:
-Copyright (c) 2016 Tolga Mizrak
+Copyright (c) 2018 Tolga Mizrak
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

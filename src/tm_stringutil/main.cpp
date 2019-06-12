@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.3.3 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.3.4 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2018
 
 no warranty; use at your own risk
@@ -20,6 +20,7 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
+    v0.3.4  02.05.19 Added tmsu_find_word_end_n and tmsu_find_word_start_n.
     v0.3.3  06.03.19 Added optional defines for TM_STRCSPN and TM_STRSPN to make use
                      of CRT if it is present.
                      Fixed a C compilation error due to use of auto.
@@ -233,6 +234,28 @@ The start and length of the token is then stored into the output parameter out.
 TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
                                    const char* delimiters_last, tmsu_string_view* out);
 
+/* Word tokenizing. */
+
+/*
+Returns the end of a word.
+Behavior is similar to pressing Control+Right on most editors.
+Default word seperators are: " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?".
+*/
+TMSU_DEF const char* tmsu_find_word_end(const char* str);
+TMSU_DEF const char* tmsu_find_word_end_ex(const char* str, const char* word_seperators);
+TMSU_DEF const char* tmsu_find_word_end_n(const char* first, const char* last);
+TMSU_DEF const char* tmsu_find_word_end_n_ex(const char* first, const char* last, const char* word_seperators_first,
+                                             const char* word_seperators_last);
+
+/*
+Returns the start of a word by doing a reverse search from the end of the string and moving backwards.
+Behavior is similar to pressing Control+Left on most editors.
+Default word seperators are: " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?".
+*/
+TMSU_DEF const char* tmsu_find_word_start_n(const char* first, const char* last);
+TMSU_DEF const char* tmsu_find_word_start_n_ex(const char* first, const char* last, const char* word_seperators_first,
+                                               const char* word_seperators_last);
+
 /* Whitespace trimming */
 
 TMSU_DEF const char* tmsu_trim_left(const char* str);
@@ -334,4 +357,5 @@ extern "C" {
 
 #endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
 
+#define MERGE_YEAR 2018
 #include "../common/LICENSE.inc"

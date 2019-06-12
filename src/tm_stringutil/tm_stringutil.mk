@@ -2,7 +2,7 @@ unmerged.tm_stringutil.out := ${build_dir}unmerged.tm_stringutil${exe_ext}
 
 ${unmerged.tm_stringutil.out}: src/tm_stringutil/*.cpp
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, src/tm_stringutil/test.cpp, $@, src/tm_stringutil)
+	${hide}$(call cxx_compile_and_link, src/tm_stringutil/test.cpp, $@, src/tm_stringutil)
 
 unmerged.tm_stringutil: ${unmerged.tm_stringutil.out}
 

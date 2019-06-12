@@ -13,7 +13,7 @@ tests.tm_stringutil.all_config_deps := ${tests.tm_stringutil.default.out} \
 
 ${tests.tm_stringutil.default.out}: ${tests.tm_stringutil.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_stringutil/main.cpp, $@)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_stringutil/main.cpp, $@)
 
 ${tests.tm_stringutil.c.out}: ${tests.tm_stringutil.deps}
 	${hide}echo Compiling $@.
@@ -21,11 +21,11 @@ ${tests.tm_stringutil.c.out}: ${tests.tm_stringutil.deps}
 
 ${tests.tm_stringutil.string_view.out}: ${tests.tm_stringutil.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_stringutil/main.cpp, $@,, USE_STRING_VIEW)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_stringutil/main.cpp, $@,, USE_STRING_VIEW)
 
 ${tests.tm_stringutil.signed_size_t.out}: ${tests.tm_stringutil.deps}
 	${hide}echo Compiling $@.
-	${hide}$(call cpp_compile_and_link, tests/src/tm_stringutil/main.cpp, $@,, USE_STRING_VIEW USE_SIGNED_SIZE_T)
+	${hide}$(call cxx_compile_and_link, tests/src/tm_stringutil/main.cpp, $@,, USE_STRING_VIEW USE_SIGNED_SIZE_T)
 
 tests.tm_stringutil: ${tests.tm_stringutil.all_config_deps}
 

@@ -484,6 +484,49 @@ TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* deli
     return TM_TRUE;
 }
 
+/* Word tokenizing. */
+static const char TMSU_WORD_SEPERATORS[] = " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?";
+TMSU_DEF const char* tmsu_find_word_end(const char* str) {
+    TM_ASSERT(str);
+    return tmsu_find_word_end_n_ex(str, str + TM_STRLEN(str), TMSU_WORD_SEPERATORS,
+                                   TMSU_WORD_SEPERATORS + (sizeof(TMSU_WORD_SEPERATORS) - 1));
+}
+TMSU_DEF const char* tmsu_find_word_end_ex(const char* str, const char* word_seperators) {
+    TM_ASSERT(str);
+    TM_ASSERT(word_seperators);
+    return tmsu_find_word_end_n_ex(str, str + TM_STRLEN(str), word_seperators,
+                                   word_seperators + TM_STRLEN(word_seperators));
+}
+TMSU_DEF const char* tmsu_find_word_end_n(const char* first, const char* last) {
+    return tmsu_find_word_end_n_ex(first, last, TMSU_WORD_SEPERATORS,
+                                   TMSU_WORD_SEPERATORS + (sizeof(TMSU_WORD_SEPERATORS) - 1));
+}
+TMSU_DEF const char* tmsu_find_word_end_n_ex(const char* first, const char* last, const char* word_seperators_first,
+                                             const char* word_seperators_last) {
+    first = tmsu_trim_left_n(first, last);
+    return tmsu_find_first_of_n(first, last, word_seperators_first, word_seperators_last);
+}
+
+TMSU_DEF const char* tmsu_find_word_start_n(const char* first, const char* last) {
+    return tmsu_find_word_start_n_ex(first, last, TMSU_WORD_SEPERATORS,
+                                     TMSU_WORD_SEPERATORS + (sizeof(TMSU_WORD_SEPERATORS) - 1));
+}
+TMSU_DEF const char* tmsu_find_word_start_n_ex(const char* first, const char* last, const char* word_seperators_first,
+                                               const char* word_seperators_last) {
+    last = tmsu_trim_right_n(first, last);
+    const char* word_start = first;
+    if (first != last) {
+        word_start = tmsu_find_last_of_n_ex(first, last, word_seperators_first, word_seperators_last, TM_NULL);
+        if (word_start) {
+            // We found a word seperator, skip it, so that word_start actually points to the beginning of a word.
+            ++word_start;
+        } else {
+            word_start = first;
+        }
+    }
+    return word_start;
+}
+
 /* Whitespace trimming */
 
 static const int TMSU_WHITESPACE_COUNT = 6;

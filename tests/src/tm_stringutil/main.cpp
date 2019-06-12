@@ -172,3 +172,29 @@ TEST_CASE("find last not of") {
     CHECK(find_last_not_of(first, last, "b", first) == first);
     CHECK(find_last_not_of(first, last, "b", nullptr) == first);
 }
+
+TEST_CASE("word tokenizing") {
+    {
+        // Check logic behind word seperators array.
+        const char* word_seperators_first = TMSU_WORD_SEPERATORS;
+        const char* word_seperators_last = TMSU_WORD_SEPERATORS + (sizeof(TMSU_WORD_SEPERATORS) - 1);
+        REQUIRE(word_seperators_first < word_seperators_last);
+        // word_seperators_last should point to the null terminator.
+        REQUIRE(*word_seperators_last == 0);
+    }
+
+    {
+        const char* str = "First Word";
+        CHECK(tmsu_find_word_end(str) == str + 5);       // Returns " Word".
+        CHECK(tmsu_find_word_end(str + 5) == str + 10);  // Returns end of string.
+    }
+
+    {
+        string_view str = "  First Word   ";
+        auto str_first = str.data();
+        auto str_last = str.data() + str.size();
+        CHECK(tmsu_find_word_start_n(str_first, str_last) == str_first + 8);       // Returns "Word   ".
+        CHECK(tmsu_find_word_start_n(str_first, str_first + 8) == str_first + 2);  // Returns "  ".
+        CHECK(tmsu_find_word_start_n(str_first, str_first + 2) == str_first);      // Returns beginning of string.
+    }
+}
