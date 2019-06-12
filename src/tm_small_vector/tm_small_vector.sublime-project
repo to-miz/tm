@@ -1,0 +1,67 @@
+{
+	"folders":
+	[
+		{
+			"path": "./../../",
+			"folder_exclude_patterns": ["build", "builds", ".git", "tools"],
+			"file_exclude_patterns": [
+				"tm_print.h",
+				"tm_small_vector.h"
+			],
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"read_only_files": [
+			"tm_print.h",
+			"tm_small_vector.h"
+		],
+		"read_only_folders": [
+		]
+	},
+	"build_systems": [
+		{
+			"name": "make",
+			"cmd": "make merge.tm_small_vector",
+
+			"windows": {
+				"shell": false,
+				"file_regex": "(.*)\\(([0-9]+)\\): (error|note|warning)",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../",
+			},
+
+			"linux": {
+				"shell": true,
+				"file_regex": "^(..[^:\n]*):([0-9]+):?([0-9]+)?:? (.*)$",
+				"selector": "source.cpp",
+				"working_dir": "${project_path}/../../",
+			},
+
+			"variants": [
+				{
+					"name": "build unmerged",
+					"cmd": "make unmerged.tm_small_vector"
+				},
+                {
+                    "name": "merge",
+                    "cmd": "make tm_small_vector.h"
+                },
+				{
+					"name": "build tests",
+					"cmd": "make tests.tm_small_vector"
+				},
+				{
+					"name": "run default tests",
+					"cmd": "make tests.tm_small_vector.default.run"
+				},
+                {
+                    "name": "run all tests",
+                    "cmd": "make tests.tm_small_vector.run"
+                }
+			]
+		}
+	]
+}
