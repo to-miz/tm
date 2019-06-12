@@ -84,18 +84,18 @@ SWITCHES
                             stay unmodified.
                 base:       Base to use for the integer conversion.
             If you do not define these, the implementation will use stdlib.h to implement them.
-            Since the crt string conversion functions are do not allow non nullterminated strings, the
+            Since the crt string conversion functions do not allow non nullterminated strings, the
             implementation has to copy the strings into a temporary buffer and nullterminate it
             before passing them into the crt string conversion functions.
         TMJ_DEFINE_INFINITY_AND_NAN:
-            define this if you want to use the float extension flag and the math.h definitions of
+            Define this if you want to use the float extension flag and the math.h definitions of
             INFINITY and NAN. If you do not wish to use the float extension flag
             when parsing (JSON_READER_EXTENDED_FLOATS), you do not need to define these.
             Otherwise define TM_INFINITY and TM_NAN yourself with the inf and nan representations
             on your platform.
         TM_INFINITY:
         TM_NAN:
-            these are automatically defined if you define TMJ_DEFINE_INFINITY_AND_NAN and if math.h
+            These are automatically defined if you define TMJ_DEFINE_INFINITY_AND_NAN and if math.h
             has definitions for INFINITY and NAN. If you do not wish to use the float extension flag
             when parsing (JSON_READER_EXTENDED_FLOATS), you do not need to define these.
             Otherwise define TM_INFINITY and TM_NAN yourself with the inf and nan representations
