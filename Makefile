@@ -6,7 +6,7 @@ tests.include_dirs  := tests/external . tests/src/
 tests.dependencies  := tests/external/doctest/doctest.h tests/src/assert_throws.h tests/src/assert_throws.cpp
 
 ${build_dir}tests.%: ${tests.dependencies}
-${build_dir}tests.%: private CPP_INCLUDES += ${tests.include_dirs}
+${build_dir}tests.%: private CXX_INCLUDES += ${tests.include_dirs}
 ${build_dir}tests.%: private C_INCLUDES   += ${tests.include_dirs}
 # Testing needs functions marked as extern C to be able to throw C++ exceptions, so EHsc can't be used, otherwise UB.
 ${build_dir}tests.%: private options.cl.exception := -EHs

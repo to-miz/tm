@@ -4,7 +4,8 @@
 # Set up project and platform defaults. These can be user supplied in the commandline.
 
 BUILD     := debug
-COMPILER  := default
+CXX       ?= g++
+CC        ?= gcc
 BUILD_DIR := build
 ARCH      := 64
 VERBOSE   := false
@@ -17,10 +18,11 @@ VERBOSE   := false
 
 # Directories
 
-build_dir   := ${BUILD_DIR}/${BUILD}/
-debug_dir   := ${BUILD_DIR}/debug/
-release_dir := ${BUILD_DIR}/release/
-path_sep    := /
+build_dir      := ${BUILD_DIR}/${BUILD}/
+debug_dir      := ${BUILD_DIR}/debug/
+release_dir    := ${BUILD_DIR}/release/
+build_dir_root := ${BUILD_DIR}/
+path_sep       := /
 
 # Extensions depending on platform.
 ifeq (${OS},Windows_NT)
@@ -30,21 +32,25 @@ ifeq (${OS},Windows_NT)
 	dll_ext := .dll
 	obj_ext := .obj
 
-	ifeq ("${COMPILER}", "default")
-		override COMPILER := cl
-	endif
-
 	mkdir_cmd = mkdir $(subst /,\,${1}) 2>nul
 
 	# Turn paths seperators to Windows path seperators.
-	build_dir   := $(subst /,\,${build_dir})
-	debug_dir   := $(subst /,\,${debug_dir})
-	release_dir := $(subst /,\,${release_dir})
-	path_sep    := $(subst /,\,${path_sep})
+	build_dir      := $(subst /,\,${build_dir})
+	debug_dir      := $(subst /,\,${debug_dir})
+	release_dir    := $(subst /,\,${release_dir})
+	build_dir_root := $(subst /,\,${build_dir_root})
+	path_sep       := $(subst /,\,${path_sep})
+
+	make_quoted_string = ""${1}""
 
 	clean_build_dir := del /f/q/s \
 	                   ${build_dir_root}*.exe ${build_dir_root}*.lib ${build_dir_root}*.dll \
 	                   ${build_dir_root}*.obj ${build_dir_root}*.pdb ${build_dir_root}*.exp >nul 2>nul
+
+	shell_random := cmd /c "echo %RANDOM%"
+	shell_delete = del /f/q/s "${1}${path_sep}${2}" >nul 2>nul
+
+	windows_defines := NOMINMAX UNICODE _CRT_SECURE_NO_WARNINGS _SCL_SECURE_NO_WARNINGS
 else
 	os := linux
 	exe_ext := .out
@@ -52,16 +58,20 @@ else
 	dll_ext := .so
 	obj_ext := .o
 
-	ifeq ("${COMPILER}", "default")
-		override COMPILER := gcc
-	endif
-
 	mkdir_cmd = mkdir -p ${1}
+
+	make_quoted_string = \"${1}\"
 
 	clean_build_dir := find ${build_dir_root} -type f \
 	                   \( -name "*.out" -o -name "*.a" -o -name "*.so" -o -name "*.o" \) \
 	                   -delete
+
+	shell_random := /bin/bash -c "echo $$RANDOM"
+	shell_delete = find /f/q/s "${1}" -name "${2}" -type f -delete
 endif
+
+# Helper functions.
+make_build_dir = ${BUILD_DIR}${path_sep}${1}${path_sep}
 
 # Create build dirs.
 $(shell $(call mkdir_cmd, ${debug_dir}))
@@ -75,52 +85,89 @@ else
 endif
 
 # Compiler detection.
-maybe_gcc := $(findstring gcc,${COMPILER}) $(findstring g++,${COMPILER})
+cxx_maybe_gcc := $(findstring gcc,${CXX})$(findstring g++,${CXX})
 
-ifneq ($(findstring clang,${COMPILER}),)
-	compiler_selector := clang
+ifneq ($(findstring clang-cl,${CXX}),)
+	cxx_compiler_selector := cl
+	cxx_compiler.cl := ${CXX}
+	clang_cl_warnings := -Qunused-arguments
 else
-ifneq ($(findstring gcc,${maybe_gcc}),)
-	compiler_selector := gcc
+ifneq ($(findstring clang,${CXX}),)
+	cxx_compiler_selector := clang
+	cxx_compiler.clang := ${CXX}
 else
-ifneq ($(findstring .bat,${COMPILER}),)
+ifneq (${cxx_maybe_gcc},)
+	cxx_compiler_selector := gcc
+	cxx_compiler.gcc := ${CXX}
+else
+ifneq ($(findstring .bat,${CXX}),)
 	# batch file wrapper around cl.exe where you can specify the target architecture.
-	compiler_selector := cl
-	cpp_compiler.cl := ${COMPILER} x${ARCH}
-	c_compiler.cl := ${COMPILER} x${ARCH}
+	cxx_compiler_selector := cl
+	cxx_compiler.cl := ${CXX} x${ARCH}
 else
-ifneq ($(findstring cl,${COMPILER}),)
+ifneq ($(findstring cl,${CXX}),)
 	# cl
-	compiler_selector := cl
-	cpp_compiler.cl := ${COMPILER}
-	c_compiler.cl := ${COMPILER}
+	cxx_compiler_selector := cl
+	cxx_compiler.cl := ${CXX}
 else
-$(error Unsupported compiler "${COMPILER}")
+	cxx_compiler_selector := other
+	cxx_compiler.other := ${CXX}
 endif # cl
 endif # cl.bat
 endif # gcc
 endif # clang
+endif # clang-cl
+
+c_maybe_gcc := $(findstring gcc,${CC})$(findstring g++,${CC})
+
+ifneq ($(findstring clang-cl,${CC}),)
+	c_compiler_selector := cl
+	c_compiler.cl := ${CC}
+else
+ifneq ($(findstring clang,${CC}),)
+	c_compiler_selector := clang
+	c_compiler.clang := ${CC}
+else
+ifneq (${c_maybe_gcc},)
+	c_compiler_selector := gcc
+	c_compiler.gcc := ${CC}
+else
+ifneq ($(findstring .bat,${CC}),)
+	# batch file wrapper around cl.exe where you can specify the target architecture.
+	c_compiler_selector := cl
+	c_compiler.cl := ${CC} x${ARCH}
+else
+ifneq ($(findstring cl,${CC}),)
+	# cl
+	c_compiler_selector := cl
+	c_compiler.cl := ${CC}
+else
+	c_compiler_selector := other
+	c_compiler.other := ${CC}
+	output_directive.other := -o
+endif # cl
+endif # cl.bat
+endif # gcc
+endif # clang
+endif # clang-cl
 
 # Common defines.
 
-DEFINES.debug := _DEBUG
-DEFINES.release := NDEBUG
+DEFINES.debug := _DEBUG ${windows_defines}
+DEFINES.release := NDEBUG ${windows_defines}
 
 # clang
-version_suffix.clang := $(patsubst clang%,%,$(patsubst clang++%,%,${COMPILER}))
-cpp_compiler.clang := clang++${version_suffix.clang}
-c_compiler.clang := clang${version_suffix.clang}
 
 warnings.clang := -Wall -Wextra -Werror -pedantic -pedantic-errors
-sanitize.clang := -fsanitize=address
+sanitize.clang ?= -fsanitize=address
 
 options.clang.debug   := -fstack-protector-all -g -ggdb -fno-omit-frame-pointer ${sanitize.clang}
 options.clang.release := -O3 -march=native
 options.clang = ${warnings.clang} -m${ARCH} ${options.clang.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}})
 
-cpp_options.clang.debug :=
-cpp_options.clang.release :=
-cpp_options.clang = -std=c++17 ${cpp_options.clang.${BUILD}} ${options.clang}
+cxx_options.clang.debug :=
+cxx_options.clang.release :=
+cxx_options.clang = -std=c++17 ${cxx_options.clang.${BUILD}} ${options.clang}
 
 c_options.clang.debug :=
 c_options.clang.release :=
@@ -137,20 +184,17 @@ link_libs.clang          = ${link_libs.clang.${BUILD}}
 output_directive.clang   = -o${1}
 
 # gcc
-version_suffix.gcc := $(patsubst gcc%,%,$(patsubst g++%,%,${COMPILER}))
-cpp_compiler.gcc := g++${version_suffix.gcc}
-c_compiler.gcc := gcc${version_suffix.gcc}
 
 warnings.gcc := -Wall -Wextra -Werror -pedantic -pedantic-errors
-sanitize.gcc := -fsanitize=address
+sanitize.gcc ?= -fsanitize=address
 
 options.gcc.debug   := -fstack-protector-all -g -ggdb -fno-omit-frame-pointer ${sanitize.gcc}
 options.gcc.release := -O3 -march=native
 options.gcc = ${warnings.gcc} -m${ARCH} ${options.gcc.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}})
 
-cpp_options.gcc.debug :=
-cpp_options.gcc.release :=
-cpp_options.gcc = -std=c++17 ${cpp_options.gcc.${BUILD}} ${options.gcc}
+cxx_options.gcc.debug :=
+cxx_options.gcc.release :=
+cxx_options.gcc = -std=c++17 ${cxx_options.gcc.${BUILD}} ${options.gcc}
 
 c_options.gcc.debug :=
 c_options.gcc.release :=
@@ -183,6 +227,8 @@ warnings.cl  += -w44906 # string literal cast to 'LPWSTR'
 warnings.cl  += -w45039 # 'function': pointer or reference to potentially throwing function passed
 						# to extern C function under -EHc.
 						# Undefined behavior may occur if this function throws an exception.
+warnings.cl  += -w44746 # volatile access of '<expression>' is subject to /volatile:[iso|ms] setting
+warnings.cl += ${clang_cl_warnings}
 
 sanitize.cl := -RTCsu -GS -sdl
 
@@ -190,12 +236,11 @@ options.cl.debug   := -Od -Zi -MDd ${sanitize.cl}
 options.cl.release := -DNDEBUG -MD -GS- -Gy -fp:fast -Ox -Oy- -GL -Gw -Oi -O2
 options.cl.exception := -EHsc
 options.cl        = ${warnings.cl} ${options.cl.exception} -Oi -permissive- -utf-8 -volatile:iso \
-					-DNOMINMAX -DUNICODE -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS \
 					${options.cl.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}}) -FS -FC -bigobj
 
-cpp_options.cl.debug   :=
-cpp_options.cl.release :=
-cpp_options.cl         = -std:c++latest ${cpp_options.cl.${BUILD}} ${options.cl}
+cxx_options.cl.debug   :=
+cxx_options.cl.release :=
+cxx_options.cl         = -std:c++latest ${cxx_options.cl.${BUILD}} ${options.cl}
 
 c_options.cl.debug   :=
 c_options.cl.release :=
@@ -204,57 +249,67 @@ c_options.cl         = ${c_options.cl.${BUILD}} ${options.cl}
 link_options.cl.debug   :=
 link_options.cl.release := -ltcg
 # Subsystem is either CONSOLE or WINDOWS most of the time.
-link_options.cl         = -subsystem:CONSOLE -incremental:NO -nologo ${link_options.cl.${BUILD}}
+link_options.cl.subsystem := CONSOLE
+link_options.cl         = -subsystem:${link_options.cl.subsystem} -incremental:NO -nologo ${link_options.cl.${BUILD}}
 
 link_libs.cl.debug    :=
 link_libs.cl.release  :=
 link_libs.cl          = ${link_libs.cl.${BUILD}}
 
-output_directive.cl   = -Fd"${1}.pdb" -Fe"${1}" -Fo"${1}${obj_ext}" -link -out:"${1}"
+pdb_suffix.cl :=
+output_directive.cl = -Fd"${1}${pdb_suffix.cl}.pdb" -Fe"${1}" -Fo"${build_dir}/" \
+                      -link -out:${1} -pdb:${1}${pdb_suffix.cl}.pdb
 
 # Generic
 
-cpp_options = ${cpp_options.${compiler_selector}}
-c_options = ${c_options.${compiler_selector}}
-link_options = ${link_options.${compiler_selector}}
-link_libs = ${link_libs.${compiler_selector}}
+cxx_options = ${CPPFLAGS} ${CXXFLAGS} ${cxx_options.${cxx_compiler_selector}}
+c_options = ${CPPFLAGS} ${CFLAGS} ${c_options.${c_compiler_selector}}
+cxx_link_options = ${LDFLAGS} ${link_options.${cxx_compiler_selector}}
+c_link_options = ${LDFLAGS} ${link_options.${c_compiler_selector}}
+cxx_link_libs = ${LDLIBS} ${link_libs.${cxx_compiler_selector}}
+c_link_libs = ${LDLIBS} ${link_libs.${c_compiler_selector}}
 
 empty :=
 space := ${empty} ${empty}
 comma := ,
+define newline :=
+
+
+endef
 
 # Compilation commands
 # ${1} Source files
 # ${2} Output filename
 # ${3} Additional includes
 # ${4} Additional defines
-override cpp_compile_and_link = ${hide}${cpp_compiler.${compiler_selector}} \
-								${cpp_options} \
-								${CPP_OPTIONS.${compiler_selector}} \
-								$(addprefix -I,${CPP_INCLUDES}) \
-								$(addprefix -I,${CPP_INCLUDES.${compiler_selector}}) \
+override cxx_compile_and_link = ${hide}${cxx_compiler.${cxx_compiler_selector}} \
+								${cxx_options} \
+								${CXX_OPTIONS.${cxx_compiler_selector}} \
+								$(addprefix -I,${CXX_INCLUDES}) \
+								$(addprefix -I,${CXX_INCLUDES.${cxx_compiler_selector}}) \
 								$(addprefix -I,${3}) \
-								$(addprefix -D,${CPP_DEFINES}) \
-								$(addprefix -D,${CPP_DEFINES.${compiler_selector}}) \
+								$(addprefix -D,${CXX_DEFINES}) \
+								$(addprefix -D,${CXX_DEFINES.${cxx_compiler_selector}}) \
 								$(addprefix -D,${4}) \
 								${1} \
-								$(call output_directive.${compiler_selector},$(subst ${space},${empty},${2})) \
-								${link_options} \
-								${LINK_OPTIONS.${compiler_selector}} \
-								${link_libs} \
-								${LINK_LIBS.${compiler_selector}}
-override c_compile_and_link   = ${hide}${c_compiler.${compiler_selector}} \
+								$(call output_directive.${cxx_compiler_selector},$(subst ${space},${empty},${2})) \
+								${cxx_link_options} \
+								${CXX_LINK_OPTIONS.${cxx_compiler_selector}} \
+								${cxx_link_libs} \
+								${CXX_LINK_LIBS.${cxx_compiler_selector}}
+
+override c_compile_and_link   = ${hide}${c_compiler.${c_compiler_selector}} \
 								${c_options} \
-								${C_OPTIONS.${compiler_selector}} \
+								${C_OPTIONS.${c_compiler_selector}} \
 								$(addprefix -I,${C_INCLUDES}) \
-								$(addprefix -I,${C_INCLUDES.${compiler_selector}}) \
+								$(addprefix -I,${C_INCLUDES.${c_compiler_selector}}) \
 								$(addprefix -I,${3}) \
 								$(addprefix -D,${C_DEFINES}) \
-								$(addprefix -D,${C_DEFINES.${compiler_selector}}) \
+								$(addprefix -D,${C_DEFINES.${c_compiler_selector}}) \
 								$(addprefix -D,${4}) \
 								${1} \
-								$(call output_directive.${compiler_selector},$(subst ${space},${empty},${2})) \
-								${link_options} \
-								${LINK_OPTIONS.${compiler_selector}} \
-								${link_libs} \
-								${LINK_LIBS.${compiler_selector}}
+								$(call output_directive.${c_compiler_selector},$(subst ${space},${empty},${2})) \
+								${c_link_options} \
+								${C_LINK_OPTIONS.${c_compiler_selector}} \
+								${c_link_libs} \
+								${C_LINK_LIBS.${c_compiler_selector}}
