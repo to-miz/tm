@@ -575,6 +575,8 @@ TMP_DEF tm_errc tmp_print(FILE* out, const char* format, size_t format_len, cons
 
 TMP_DEF int tmp_snprint(char* dest, tm_size_t len, const char* format, size_t format_len,
                         const PrintFormat& initial_formatting, const PrintArgList& args) {
+    TM_ASSERT_VALID_SIZE(len);
+    TM_ASSERT(dest || len == 0);
     tmp_memory_printer mem{dest, len};
     tmp_print_impl(format, format_len, initial_formatting, args, mem);
     if (mem.ec == TM_OK) {
