@@ -1,5 +1,5 @@
 /*
-tm_arrayview.h v1.1.8 - public domain - https://github.com/to-miz/tm
+tm_arrayview.h v1.2.0 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -39,6 +39,7 @@ SWITCHES
         std::container usage and UninitializedArrayView usage will require code changes.
 
 HISTORY
+    v1.2.0  24.06.19 Added try_push_back and try_pop_back to UninitializedArrayView.
     v1.1.8  16.04.19 Added TM_CONSTEXPR.
                      Improved constexpr-ness of ArrayView.
     v1.1.7  13.04.19 Fixed gcc/clang compilation errors.
@@ -484,6 +485,19 @@ struct UninitializedArrayView {
     void pop_back() {
         --sz;
         TM_ASSERT(sz >= 0);
+    }
+
+    bool try_push_back(const T& elem) {
+        if (!remaining()) return false;
+        push_back(elem);
+        return true;
+    }
+    bool try_pop_back() {
+        if (sz > 0) {
+            --sz;
+            return true;
+        }
+        return false;
     }
 
 // define TMA_EMPLACE_BACK_RETURNS_POINTER if you want emplace_back to return a pointer instead
