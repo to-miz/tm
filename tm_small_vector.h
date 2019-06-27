@@ -1,5 +1,5 @@
 /*
-tm_small_vector.h v0.0.1 - public domain - https://github.com/to-miz/tm
+tm_small_vector.h v0.0.2 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -32,6 +32,9 @@ ISSUES
     - Not yet first release.
 
 HISTORY     (DD.MM.YY)
+    v0.0.2   27.06.19 Added copy/move constructors and assignment operators.
+                      Refactored code such that memcpy/memmove is possible on insert/assign.
+                      Renamed small_vector_impl to small_vector_base and moved it out of detail namespace.
     v0.0.1   08.06.19 Initial Commit.
 */
 
@@ -89,33 +92,33 @@ HISTORY     (DD.MM.YY)
 #include <type_traits>
 
 #if !defined(TM_MEMMOVE) || !defined(TM_MEMCPY) || !defined(TM_MEMSET)
-    #include <cstring>
-    #ifndef TM_MEMMOVE
-        #define TM_MEMMOVE ::std::memmove
-    #endif
-    #ifndef TM_MEMCPY
-        #define TM_MEMCPY ::std::memcpy
-    #endif
-    #ifndef TM_MEMSET
-        #define TM_MEMSET ::std::memset
-    #endif
+#include <cstring>
+#ifndef TM_MEMMOVE
+#define TM_MEMMOVE ::std::memmove
+#endif
+#ifndef TM_MEMCPY
+#define TM_MEMCPY ::std::memcpy
+#endif
+#ifndef TM_MEMSET
+#define TM_MEMSET ::std::memset
+#endif
 #endif
 
 #ifndef TMSV_NO_ITERATOR
-    #include <iterator>
-    namespace tml {
-        using ::std::iterator_traits;
-    }
+#include <iterator>
+namespace tml {
+using ::std::iterator_traits;
+}
 #else
-    namespace tml {
-        // If <iterator> is not allowed, we use
-        template <class T>
-        struct iterator_traits {};
-        template <class T>
-        struct iterator_traits<T*> {
-            struct iterator_category {};
-        };
-    }
+namespace tml {
+// If <iterator> is not allowed, we use
+template <class T>
+struct iterator_traits {};
+template <class T>
+struct iterator_traits<T*> {
+    struct iterator_category {};
+};
+}  // namespace tml
 #endif
 
 #ifndef TMSV_NO_INITIALIZER_LIST
@@ -137,9 +140,9 @@ struct small_vector_guts {
     static constexpr const usize_type is_sbo_mask = ((usize_type)1 << ((sizeof(usize_type) * 8) - 1u));
     static constexpr const size_type max_count = (size_type)(~(((usize_type)1 << ((sizeof(usize_type) * 8) - 1u))));
 
-    T* ptr;
-    size_type sz;
-    usize_type cap_mask;
+    T* ptr = nullptr;
+    size_type sz = 0;
+    usize_type cap_mask = 0;
 
     void set_sbo_capacity(tm_size_t cap) {
         TM_ASSERT(cap <= max_count);
@@ -155,7 +158,7 @@ struct small_vector_guts {
 };
 
 template <class T>
-class small_vector_base : protected small_vector_guts<T> {
+class small_vector_impl_base : protected small_vector_guts<T> {
    protected:
     typedef small_vector_guts<T> guts_t;
     using guts_t::cap_mask;
@@ -350,7 +353,7 @@ struct small_vector_alloc {
 };
 
 template <class T>
-struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_base<T> {
+struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_base<T> {
    protected:
     small_vector_guts<T> create(tm_size_t capacity) {
         TM_ASSERT_VALID_SIZE(capacity);
@@ -499,7 +502,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_base<T>
 };
 
 template <class T>
-struct small_vector_alloc<T, no_allocator_tag> : public small_vector_base<T> {
+struct small_vector_alloc<T, no_allocator_tag> : public small_vector_impl_base<T> {
    protected:
     typedef small_vector_guts<T> guts_t;
 
@@ -522,11 +525,27 @@ struct small_vector_alloc<T, no_allocator_tag> : public small_vector_base<T> {
     void shrink_to_fit(small_vector_guts<T>*) {}
 };
 
+template <class T, tm_size_t N>
+class small_vector_sbo {
+   public:
+    alignas(alignof(T)) char sbo[N * sizeof(T)];
+
+    T* get_sbo() { return (T*)sbo; }
+};
+
+template <class T>
+class small_vector_sbo<T, 0> {
+   public:
+    T* get_sbo() { return nullptr; }
+};
+
+}  // namespace detail
+
 template <class T, class AllocatorTag = malloc_allocator_tag>
-class small_vector_impl : public small_vector_alloc<T, AllocatorTag> {
+class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorTag> {
    protected:
-    typedef small_vector_alloc<T, AllocatorTag> base;
-    typedef small_vector_guts<T> guts_t;
+    typedef ::tml::detail::small_vector_alloc<T, AllocatorTag> base;
+    typedef ::tml::detail::small_vector_guts<T> guts_t;
 
    public:
     using base::begin;
@@ -558,7 +577,7 @@ class small_vector_impl : public small_vector_alloc<T, AllocatorTag> {
 
    protected:
     void make_guts_from_sbo_uninitialized(T* sbo, tm_size_t cap, tm_size_t required) {
-        typedef small_vector_guts<T> guts_t;
+        typedef typename ::tml::detail::small_vector_guts<T> guts_t;
         TM_ASSERT(sbo || cap == 0);
         TM_ASSERT_VALID_SIZE(cap);
         TM_ASSERT(cap <= guts_t::max_count);
@@ -585,9 +604,76 @@ class small_vector_impl : public small_vector_alloc<T, AllocatorTag> {
     }
 
    public:
-    small_vector_impl() = default;
+    static void copy_uninitialized(T* dest, const T* src, size_type count) {
+        if constexpr (::std::is_trivially_copyable<T>::value) {
+            TM_MEMCPY(dest, src, count * sizeof(T));
+        } else {
+            for (size_type i = 0; i < count; ++i, (void)++src) {
+                TM_PLACEMENT_NEW(&dest[i]) T(::std::move(*src));
+            }
+        }
+    }
+
+    small_vector_base() = default;
+    small_vector_base(const small_vector_base& other) {
+        size_type other_size = other.size();
+        static_cast<guts_t&>(*this) = this->create(other_size);
+        if (this->capacity() >= other_size) {
+            copy_uninitialized(this->ptr, other.ptr, other_size);
+            this->sz = other_size;
+        }
+    }
+    small_vector_base(small_vector_base&& other) {
+        if (other.is_sbo()) {
+            // Can't take ownership of ptr because ptr is not heap allocated. Do a copy instead.
+            size_type other_size = other.size();
+            static_cast<guts_t&>(*this) = this->create(other_size);
+            if (this->capacity() >= other_size) {
+                copy_uninitialized(this->ptr, other.ptr, other_size);
+                this->sz = other_size;
+            }
+            // TODO: Should we clear on failure still? We expect that other is cleared after a move, but on failure we
+            // lose data.
+            other.clear();
+        } else {
+            // Don't take ownership of other if it is empty with less capacity.
+            if (other.sz == 0 && other.capacity() < this->capacity()) return;
+
+            // Take ownership of storage.
+            this->ptr = other.ptr;
+            this->sz = other.sz;
+            this->cap_mask = other.cap_mask;
+            other.ptr = nullptr;
+            other.sz = 0;
+            other.cap_mask = 0;
+        }
+    }
+    small_vector_base& operator=(const small_vector_base& other) {
+        if (this != &other) {
+            assign(other.begin(), other.end());
+        }
+        return *this;
+    }
+    small_vector_base& operator=(small_vector_base&& other) {
+        if (this != &other) {
+            if (other.is_sbo()) {
+                assign(other.begin(), other.end());
+                other.clear();
+            } else {
+                base::destroy(this);
+                // Take ownership of storage.
+                this->ptr = other.ptr;
+                this->sz = other.sz;
+                this->cap_mask = other.cap_mask;
+                other.ptr = nullptr;
+                other.sz = 0;
+                other.cap_mask = 0;
+            }
+        }
+        return *this;
+    }
     // Named constructors.
-    ~small_vector_impl() { base::destroy(this); }
+    ~small_vector_base() { base::destroy(this); }
 
     iterator insert(const_iterator pos, size_type n, const T& value) {
         if (!owns(value)) {
@@ -721,7 +807,7 @@ class small_vector_impl : public small_vector_alloc<T, AllocatorTag> {
         return nullptr;
     }
 
-    bool swap(small_vector_impl& other) {
+    bool swap(small_vector_base& other) {
         if (this == &other) return true;
 
         using ::std::swap;
@@ -903,28 +989,52 @@ class small_vector_impl : public small_vector_alloc<T, AllocatorTag> {
 
         room_result room = {};
         if (make_room(pos, n, &room)) {
-            if constexpr (::std::is_trivially_copyable<T>::value) {
-                // Raw loop instead of memcpy/std::copy.
-                // We can't use memcpy directly since iterators might not be contiguous.
-                // We don't use std::copy so we don't instantiate templates with possible tag dispatch unnecessarily.
-                // This should be optimized into a memcpy for contiguous memory anyway.
-                for (T* dest = room.first_initialized; dest != room.first_uninitialized; ++dest, (void)++first) {
-                    *dest = *first;
-                }
-            } else {
-                // Copy assign into initialized range.
-                for (T* dest = room.first_initialized; dest != room.first_uninitialized; ++dest, (void)++first) {
-                    *dest = *first;
-                }
-
-                // Copy construct into uninitialized range.
-                for (T *dest = room.first_uninitialized, *dest_end = ptr + prefix_count + n; dest != dest_end;
-                     ++dest, (void)++first) {
-                    TM_PLACEMENT_NEW(dest) T(*first);
-                }
-            }
+            copy_unchecked(first, room, /*dest_end=*/ptr + prefix_count + n);
         }
         return ptr + prefix_count;
+    }
+
+    template <class InputIt>
+    static void copy_unchecked(InputIt first, room_result room, T* dest_end) {
+        TM_MAYBE_UNUSED(dest_end);
+        if constexpr (::std::is_trivially_copyable<T>::value) {
+            // Raw loop instead of memcpy/std::copy.
+            // We can't use memcpy directly since iterators might not be contiguous.
+            // We don't use std::copy so we don't instantiate templates with possible tag dispatch unnecessarily.
+            // This should be optimized into a memcpy for contiguous memory anyway.
+            for (T* dest = room.first_initialized; dest != room.first_uninitialized; ++dest, (void)++first) {
+                *dest = *first;
+            }
+        } else {
+            // Copy assign into initialized range.
+            for (T* dest = room.first_initialized; dest != room.first_uninitialized; ++dest, (void)++first) {
+                *dest = *first;
+            }
+
+            // Copy construct into uninitialized range.
+            for (T* dest = room.first_uninitialized; dest != dest_end; ++dest, (void)++first) {
+                TM_PLACEMENT_NEW(dest) T(*first);
+            }
+        }
+    }
+    static void copy_unchecked(const_iterator first, room_result room, T* dest_end) {
+        TM_MAYBE_UNUSED(dest_end);
+        if constexpr (::std::is_trivially_copyable<T>::value) {
+            TM_MEMCPY(room.first_initialized, first, (room.first_uninitialized - room.first_initialized) * sizeof(T));
+        } else {
+            // Copy assign into initialized range.
+            for (T* dest = room.first_initialized; dest != room.first_uninitialized; ++dest, (void)++first) {
+                *dest = *first;
+            }
+
+            // Copy construct into uninitialized range.
+            for (T* dest = room.first_uninitialized; dest != dest_end; ++dest, (void)++first) {
+                TM_PLACEMENT_NEW(dest) T(*first);
+            }
+        }
+    }
+    static void copy_unchecked(iterator first, room_result room, T* dest_end) {
+        copy_unchecked(static_cast<const_iterator>(first), room, dest_end);
     }
 
     bool assign_n_impl(size_type n, const T& value) {
@@ -935,7 +1045,7 @@ class small_vector_impl : public small_vector_alloc<T, AllocatorTag> {
         if (n > capacity()) {
             this->destroy(this);
 
-            static_cast<small_vector_guts<T>&>(*this) = this->create(n);
+            static_cast<typename ::tml::detail::small_vector_guts<T>&>(*this) = this->create(n);
             if (!ptr) return false;
         }
 
@@ -991,35 +1101,7 @@ class small_vector_impl : public small_vector_alloc<T, AllocatorTag> {
             if (!new_guts.ptr) return false;
         }
 
-        TM_ASSERT(guts->ptr);
-        if constexpr (::std::is_trivially_copyable<T>::value) {
-            // Raw loop instead of memcpy/std::copy.
-            // We can't use memcpy directly since iterators might not be contiguous.
-            // We don't use std::copy so we don't instantiate templates with possible tag dispatch unnecessarily.
-            // This should be optimized into a memcpy for contiguous memory anyway.
-            for (size_type i = 0; i < n; ++i, (void)++first) {
-                guts->ptr[i] = *first;
-            }
-        } else {
-            size_type initialized_range = (guts->sz < n) ? guts->sz : n;
-            size_type uninitialized_range = n - initialized_range;
-            for (size_type i = 0; i < initialized_range; ++i, (void)++first) {
-                guts->ptr[i] = *first;
-            }
-
-            for (size_type i = 0; i < uninitialized_range; ++i, (void)++first) {
-                TM_PLACEMENT_NEW(&guts->ptr[initialized_range + i]) T(*first);
-            }
-
-            if constexpr (!std::is_trivially_destructible<T>::value) {
-                if (guts->sz > n) {
-                    for (size_type i = n, last_index = guts->sz; i < last_index; ++i) {
-                        guts->ptr[i].~T();
-                    }
-                }
-            }
-        }
-        guts->sz = n;
+        assign_unchecked(first, n, guts);
 
         if (guts == &new_guts) {
             this->destroy(this);
@@ -1028,47 +1110,147 @@ class small_vector_impl : public small_vector_alloc<T, AllocatorTag> {
         }
         return true;
     }
+
+    template <class InputIt>
+    static void assign_unchecked(InputIt first, size_type n, guts_t* dest) {
+        TM_ASSERT(dest->ptr);
+        if constexpr (::std::is_trivially_copyable<T>::value) {
+            // Raw loop instead of memcpy/std::copy.
+            // We can't use memcpy directly since iterators might not be contiguous.
+            // We don't use std::copy so we don't instantiate templates with possible tag dispatch unnecessarily.
+            // This should be optimized into a memcpy for contiguous memory anyway.
+            for (size_type i = 0; i < n; ++i, (void)++first) {
+                dest->ptr[i] = *first;
+            }
+        } else {
+            size_type initialized_range = (dest->sz < n) ? dest->sz : n;
+            size_type uninitialized_range = n - initialized_range;
+            for (size_type i = 0; i < initialized_range; ++i, (void)++first) {
+                dest->ptr[i] = *first;
+            }
+
+            for (size_type i = 0; i < uninitialized_range; ++i, (void)++first) {
+                TM_PLACEMENT_NEW(&dest->ptr[initialized_range + i]) T(*first);
+            }
+
+            if constexpr (!std::is_trivially_destructible<T>::value) {
+                if (dest->sz > n) {
+                    for (size_type i = n, last_index = dest->sz; i < last_index; ++i) {
+                        dest->ptr[i].~T();
+                    }
+                }
+            }
+        }
+        dest->sz = n;
+    }
+    static void assign_unchecked(const_iterator first, size_type n, guts_t* dest) {
+        TM_ASSERT(dest->ptr);
+        if constexpr (::std::is_trivially_copyable<T>::value) {
+            // We use memmove instead of memcpy since dest->ptr and first are allowed to overlap.
+            TM_MEMMOVE(dest->ptr, first, n * sizeof(T));
+        } else {
+            size_type initialized_range = (dest->sz < n) ? dest->sz : n;
+            size_type uninitialized_range = n - initialized_range;
+            for (size_type i = 0; i < initialized_range; ++i, (void)++first) {
+                dest->ptr[i] = *first;
+            }
+
+            for (size_type i = 0; i < uninitialized_range; ++i, (void)++first) {
+                TM_PLACEMENT_NEW(&dest->ptr[initialized_range + i]) T(*first);
+            }
+
+            if constexpr (!std::is_trivially_destructible<T>::value) {
+                if (dest->sz > n) {
+                    for (size_type i = n, last_index = dest->sz; i < last_index; ++i) {
+                        dest->ptr[i].~T();
+                    }
+                }
+            }
+        }
+        dest->sz = n;
+    }
+    static void assign_unchecked(iterator first, size_type n, guts_t* dest) {
+        assign_unchecked(static_cast<const_iterator>(first), n, dest);
+    }
 };
-
-template <class T, tm_size_t N>
-class small_vector_sbo {
-   public:
-    alignas(alignof(T)) char sbo[N * sizeof(T)];
-
-    T* get_sbo() { return (T*)sbo; }
-};
-
-template <class T>
-class small_vector_sbo<T, 0> {
-   public:
-    T* get_sbo() { return nullptr; }
-};
-
-}  // namespace detail
-
-template <class T, class AllocatorTag = malloc_allocator_tag>
-class small_vector_base : public detail::small_vector_impl<T, AllocatorTag> {};
 
 template <class T, tm_size_t N, class AllocatorTag = malloc_allocator_tag>
-class small_vector : public small_vector_base<T, AllocatorTag>, private detail::small_vector_sbo<T, N> {
+class small_vector : public ::tml::small_vector_base<T, AllocatorTag>, private ::tml::detail::small_vector_sbo<T, N> {
 #ifdef TM_SIZE_T_IS_SIGNED
     static_assert(N >= 0, "N must be positive.");
 #endif
 
    private:
-    typedef detail::small_vector_impl<T> base;
-    typedef detail::small_vector_alloc<T, AllocatorTag> alloc_t;
+    typedef typename ::tml::detail::small_vector_guts<T> guts_t;
+    typedef typename ::tml::small_vector_base<T, AllocatorTag> base;
 
    public:
+    using base::base;
     small_vector() { this->make_guts_from_sbo_uninitialized(this->get_sbo(), N, 0); }
+    small_vector(const base& other) : small_vector() {
+        auto other_size = other.size();
+        if (!other_size) return;
 
+        if (N < other_size) {
+            guts_t new_guts = this->create(other_size);
+            if (new_guts.ptr) static_cast<guts_t&>(*this) = new_guts;
+        }
+        if (this->capacity() >= other_size) {
+            base::copy_uninitialized(this->ptr, other.ptr, other_size);
+            this->sz = other_size;
+        }
+    }
+    small_vector(base&& other) : small_vector() {
+        auto other_size = other.size();
+        auto other_guts = static_cast<guts_t*>(&other);
+        if (other_guts->is_sbo()) {
+            if (N < other_size) {
+                guts_t new_guts = this->create(other_size);
+                if (new_guts.ptr) static_cast<guts_t&>(*this) = new_guts;
+            }
+            if (this->capacity() >= other_size) {
+                base::copy_uninitialized(this->ptr, other.ptr, other_size);
+                this->sz = other_size;
+            }
+            // TODO: Should we clear on failure still? We expect that other is cleared after a move, but on failure we
+            // lose data.
+            other.clear();
+        } else {
+            // Don't take ownership of other if it is empty with less capacity.
+            if (other.sz == 0 && other.capacity() < this->capacity()) return;
+
+            // Take ownership of storage.
+            static_cast<guts_t&>(*this) = *other_guts;
+            other_guts->ptr = nullptr;
+            other_guts->sz = 0;
+            other_guts->cap_mask = 0;
+        }
+    }
+    small_vector(const small_vector& other) : small_vector(static_cast<const base&>(other)) {}
+    small_vector(small_vector&& other) : small_vector(static_cast<base&&>(other)) {}
+    small_vector& operator=(const base& other) {
+        if (this != &other) {
+            static_cast<base*>(this)->operator=(other);
+        }
+        return *this;
+    }
+    small_vector& operator=(base&& other) {
+        if (this != &other) {
+            static_cast<base*>(this)->operator=(::std::move(other));
+        }
+        return *this;
+    }
+    small_vector& operator=(const small_vector& other) { return this->operator=(static_cast<const base&>(other)); }
+    small_vector& operator=(small_vector&& other) { return this->operator=(static_cast<base&&>(other)); }
+
+    using typename base::swap;
     template <tm_size_t OTHER_N>
     bool swap(small_vector<T, OTHER_N>& other) {
         return this->base::swap(other);
     }
 
     void shrink_to_fit() {
-        detail::small_vector_impl<T, AllocatorTag>::shrink_to_fit();
+        this->base::shrink_to_fit();
         // Shrink to fit might release all memory.
         if (!this->ptr || this->capacity() == 0) {
             // In that case restore sbo.

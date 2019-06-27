@@ -111,8 +111,8 @@ bool equals(const small_vector<T, N0, AllocatorTag0>& lhs, const small_vector<T,
     }
     return true;
 }
-template <class T, tm_size_t N, class AllocatorTag>
-bool equals_list(const small_vector<T, N, AllocatorTag>& lhs, std::initializer_list<T> rhs) {
+template <class T, class AllocatorTag>
+bool equals_list(const small_vector_base<T, AllocatorTag>& lhs, std::initializer_list<T> rhs) {
     if (lhs.size() != (tm_size_t)rhs.size()) return false;
     auto p = rhs.begin();
     for (tm_size_t i = 0, count = lhs.size(); i < count; ++i) {
@@ -776,5 +776,135 @@ TEST_CASE_TEMPLATE("swap", T, int, non_trivial) {
         swap(a, b);
         REQUIRE(a.empty());
         REQUIRE(b.empty());
+    }
+}
+
+TEST_CASE_TEMPLATE("constructors and assignment", T, int, non_trivial) {
+    allocation_guard guard{};
+    non_trivial_guard non_trivial_destructors_guard{};
+
+    SUBCASE("copy assignment") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});                              // sbo
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        a = b;
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+    }
+
+    SUBCASE("move assignment") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});                              // sbo
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        a = std::move(b);
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(b.empty());
+    }
+
+    SUBCASE("copy construct") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        a.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        small_vector<T, 5> b(a);
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+    }
+
+    SUBCASE("move construct") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        a.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        small_vector<T, 5> b(std::move(a));
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        REQUIRE(a.empty());
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+    }
+}
+
+TEST_CASE_TEMPLATE("constructors and assignment with base vector", T, int, non_trivial) {
+    allocation_guard guard{};
+    non_trivial_guard non_trivial_destructors_guard{};
+
+    SUBCASE("copy assignment") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector_base<T> a;
+        small_vector_base<T> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});
+        a = b;
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+    }
+
+    SUBCASE("move assignment") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector_base<T> a;
+        small_vector_base<T> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});
+        a = std::move(b);
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(b.empty());
+    }
+
+    SUBCASE("copy construct") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector_base<T> a;
+        a.assign({T{1}, T{2}, T{3}, T{4}, T{5}});
+        small_vector_base<T> b(a);
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+    }
+
+    SUBCASE("move construct") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector_base<T> a;
+        a.assign({T{1}, T{2}, T{3}, T{4}, T{5}});
+        small_vector_base<T> b(std::move(a));
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        REQUIRE(a.empty());
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
     }
 }
