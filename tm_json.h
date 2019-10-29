@@ -1,5 +1,5 @@
 /*
-tm_json.h v0.4.1 - public domain - https://github.com/to-miz/tm
+tm_json.h v0.4.2 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -119,6 +119,7 @@ ISSUES
     - Json5 unquoted identifiers don't allow for \u unicode escape sequences or unicode letters.
 
 HISTORY
+    v0.4.2  29.10.19  Fixed a buffer overrun error in skipWhitespace.
     v0.4.1  29.10.19  Added JSON_READER_ALLOW_EXTENDED_WHITESPACE.
                       Fixed various issues with unquoted property names, escaped newlines and json5 string validation.
                       Parser is now tested against json5-tests (https://github.com/json5/json5-tests).
@@ -1172,7 +1173,7 @@ static void jsonAdvance(JsonReader* reader) {
 }
 static tm_size_t skipWhitespaceHelper(JsonReader* reader, const char* whitespace, size_t len) {
     const char* p;
-    while ((p = (const char*)TM_MEMCHR(whitespace, reader->data[0], len)) != TM_NULL) {
+    while (reader->size && (p = (const char*)TM_MEMCHR(whitespace, reader->data[0], len)) != TM_NULL) {
         if (reader->data[0] == '\n') {
             ++reader->line;
             reader->column = 0;
