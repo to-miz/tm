@@ -221,7 +221,7 @@ TEST_CASE("float conversion" * doctest::description("Test the fallback string to
             +0.01, +1.01,
             1e0, 1e10, -1e+10, 1e-10, +1e+10,
             1.01e0, 1.01e10, -1.01e+10, 1.01e-10, +1.01e+10,
-            infinity, nan, -infinity, -nan, +infinity, +nan
+            Infinity, NaN, -Infinity, -NaN, +Infinity, +NaN
         ])";
 
         const float float_values[] = {0,          -0,          1,       -1,           +0,       +1,           0.01f,
@@ -620,7 +620,7 @@ TEST_CASE("n_structure_100000_opening_arrays") {
     CHECK(check_json(buffer, JSON_READER_STRICT) == false);
     delete[] buffer;
 }
-#include "generated_tests.cpp"
+#include "generated_tests_json5.cpp"
 #include "comments_tests.cpp"
 
 TEST_CASE("json5_decimal_point") {
@@ -635,8 +635,8 @@ TEST_CASE("json5_decimal_point") {
         ]
     )";
     CHECK(check_json(json, JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
-    CHECK(check_json(".e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) == false);
-    CHECK(check_json("1.e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) == false);
+    CHECK(check_json(".e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
+    CHECK(check_json("1.e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
     CHECK(check_json("e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) == false);
 
     // Number parsing should also work on single value documents.
