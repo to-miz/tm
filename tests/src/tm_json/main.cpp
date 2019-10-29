@@ -385,7 +385,7 @@ bool check_json(const char* json, tm_size_t len, uint32_t flags) {
     auto json_copy = new char[len + 10];
     memcpy(json_copy, json, len);
     // Set last couple of chars to invalid chars to that buffer overruns are detected.
-    memset(json_copy + len, '\n', 10);
+    memset(json_copy + len, '\xfe', 10);
 
     AllocatedDocument pool = jsonAllocateDocument(json_copy, len, flags);
     AllocatedDocument ex_pool = jsonAllocateDocumentEx(json_copy, len, flags);
@@ -398,7 +398,7 @@ bool check_json_ex(const char* json, tm_size_t len, uint32_t flags) {
     auto json_copy = new char[len + 10];
     memcpy(json_copy, json, len);
     // Set last couple of chars to invalid chars to that buffer overruns are detected.
-    memset(json_copy + len, '%', 10);
+    memset(json_copy + len, '\xfe', 10);
     AllocatedDocument ex_pool = jsonAllocateDocumentEx(json_copy, len, flags);
     delete[] json_copy;
     return ex_pool.document.error.type == JSON_OK;

@@ -2986,6 +2986,7 @@ TMJ_DEF JsonDocument jsonMakeDocument(JsonStackAllocator* allocator, const char*
         }
     }
     if (reader.errorType == JSON_OK) jsonIsValidUntilEof(&reader);
+    TM_ASSERT(reader.size == 0 || reader.errorType != JSON_OK);
     if (reader.errorType != JSON_OK) {
         TM_MEMSET(&result, 0, sizeof(JsonDocument));
         result.error.type = reader.errorType;
@@ -3262,6 +3263,7 @@ TMJ_DEF JsonDocument jsonMakeDocumentEx(JsonStackAllocator* allocator, const cha
         }
     }
     if (reader.errorType == JSON_OK) jsonIsValidUntilEofEx(&reader);
+    TM_ASSERT(reader.size == 0 || reader.errorType != JSON_OK);
     if (reader.errorType != JSON_OK) {
         TM_MEMSET(&result, 0, sizeof(JsonDocument));
         result.error.type = reader.errorType;
