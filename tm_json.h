@@ -1,5 +1,5 @@
 /*
-tm_json.h v0.2.5 - public domain - https://github.com/to-miz/tm
+tm_json.h v0.4.0 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -116,6 +116,15 @@ ISSUES
       or not using the fallback string conversion routines at all (see SWITCHES and TMJ_TO_INT).
 
 HISTORY
+    v0.4.0  29.10.19  Fixed single line and block comments being incorrectly handled in allocated documents.
+                      Added new internal token type JTOK_PROPERTYCOLON to allow for comments between property
+                      names and colons.
+                      Added JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT for improved json5 parsing.
+                      Fixed some json5 parsing issues regarding number parsing.
+    v0.3.1  30.07.19  Fixed a logic error in readNumber (missing parenthesis around logical expression).
+    v0.3.0  03.07.19  Fixed strict parsing, parser now allows for root level values.
+                      Fixed false error reporting for some valid json files.
+                      Parser is now tested against JSONTestSuite (https://github.com/nst/JSONTestSuite).
     v0.2.5  13.04.19  Fixed macro argument names of TMJ_TO_INT etc. having wrong order.
     v0.2.4  25.02.19  Implemented Unicode escape sequences.
                       Fixed a bug with unescaped string copying.
@@ -351,8 +360,12 @@ typedef enum {
     JTOK_ARRAY_END,
     JTOK_VALUE,
     JTOK_COMMENT,
-    JTOK_COMMA,
 
+    // These two tokens will not be returned by jsonNextToken and similar, they are internal only.
+    JTOK_COMMA,
+    JTOK_PROPERTYCOLON,
+
+    // Returned on tokenizing error.
     JTOK_ERROR,
 } JsonTokenType;
 
@@ -389,7 +402,7 @@ typedef enum {
     */
     JSON_READER_ESCAPED_MULTILINE_STRINGS = (1u << 8u),
 
-    // allow c++0x style raw string literals
+    // allow C++0x style raw string literals
     // example
     // "property": R"delim(...)delim"
     // if both cpp style raw strings and python style raw strings are enabled,
@@ -401,13 +414,13 @@ typedef enum {
     // "property": r'...'
     JSON_READER_PYTHON_RAW_STRINGS = (1u << 10u),
 
-    // allow c style concatenated multiline strings after a property name
+    // allow C style concatenated multiline strings after a property name
     // example
     // "property":  "this is a multiline "
     //              "string"
     JSON_READER_CONCATENATED_STRINGS = (1u << 11u),
 
-    // allow c style concatenated multiline strings in arrays, errorprone in case a comma is
+    // allow C style concatenated multiline strings in arrays, errorprone in case a comma is
     // forgotten mistakenly
     JSON_READER_CONCATENATED_STRINGS_IN_ARRAYS = (1u << 12u),
 
@@ -420,11 +433,14 @@ typedef enum {
     // allow case insensitive true, false, null keywords and infinity etc in case of extended floats
     JSON_READER_IGNORE_CASE_KEYWORDS = (1u << 15u),
 
+    // allow decimal point to lead and trail numbers like .8 or 8.
+    JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT = (1u << 16u),
+
     // use these flags to parse json5 files
-    JSON_READER_JSON5 =
-        (JSON_READER_SINGLE_LINE_COMMENTS | JSON_READER_BLOCK_COMMENTS | JSON_READER_TRAILING_COMMA |
-         JSON_READER_UNQUOTED_PROPERTY_NAMES | JSON_READER_SINGLE_QUOTED_STRINGS | JSON_READER_EXTENDED_FLOATS |
-         JSON_READER_HEXADECIMAL | JSON_READER_ESCAPED_MULTILINE_STRINGS | JSON_READER_ALLOW_PLUS_SIGN),
+    JSON_READER_JSON5 = (JSON_READER_SINGLE_LINE_COMMENTS | JSON_READER_BLOCK_COMMENTS | JSON_READER_TRAILING_COMMA |
+                         JSON_READER_UNQUOTED_PROPERTY_NAMES | JSON_READER_SINGLE_QUOTED_STRINGS |
+                         JSON_READER_EXTENDED_FLOATS | JSON_READER_HEXADECIMAL | JSON_READER_ESCAPED_MULTILINE_STRINGS |
+                         JSON_READER_ALLOW_PLUS_SIGN | JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT),
 
     // all flags
     JSON_READER_ALL =
@@ -520,6 +536,7 @@ TMJ_DEF JsonReader jsonMakeReader(const char* data, tm_size_t size, JsonContextE
 //      - JSON_READER_ALLOW_EQUAL
 //      - JSON_READER_ESCAPED_MULTILINE_STRINGS
 //      - JSON_READER_ALLOW_PLUS_SIGN
+//      - JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT
 // since there are fewer special cases, it is slightly faster than jsonNextTokenEx and
 // jsonNextTokenImplicitEx
 TMJ_DEF JsonTokenType jsonNextTokenImplicit(JsonReader* reader, JsonContext currentContext);
@@ -534,7 +551,7 @@ TMJ_DEF JsonTokenType jsonNextTokenEx(JsonReader* reader);
 TMJ_DEF tm_bool jsonIsValidUntilEofEx(JsonReader* reader);
 
 // reads from json until root type is encountered
-TMJ_DEF JsonContext jsonReadRootType(JsonReader* reader);
+TMJ_DEF JsonTokenType jsonReadRootType(JsonReader* reader, tm_bool ex);
 // skips current context
 TMJ_DEF tm_bool jsonSkipCurrent(JsonReader* reader, JsonContext currentContext, tm_bool ex);
 
@@ -706,11 +723,22 @@ typedef struct JsonAllocatedDocumentStruct {
     size_t poolSize;
 } JsonAllocatedDocument;
 
+// parses json only accepting the following parsing flags:
+//      - JSON_READER_SINGLE_QUOTED_STRINGS
+//      - JSON_READER_SINGLE_LINE_COMMENTS
+//      - JSON_READER_TRAILING_COMMA
+//      - JSON_READER_STRICT
+//      - JSON_READER_ALLOW_EQUAL
+//      - JSON_READER_ESCAPED_MULTILINE_STRINGS
+//      - JSON_READER_ALLOW_PLUS_SIGN
+//      - JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT
+// since there are fewer special cases, it is slightly faster than jsonAllocateDocumentEx
 TMJ_DEF JsonAllocatedDocument jsonAllocateDocument(const char* data, tm_size_t size, unsigned int flags);
 TMJ_DEF void jsonFreeDocument(JsonAllocatedDocument* doc);
 TMJ_DEF JsonDocument jsonMakeDocument(JsonStackAllocator* allocator, const char* data, tm_size_t size,
                                       unsigned int flags);
 
+// parses json accepting all flags
 TMJ_DEF JsonAllocatedDocument jsonAllocateDocumentEx(const char* data, tm_size_t size, unsigned int flags);
 TMJ_DEF JsonDocument jsonMakeDocumentEx(JsonStackAllocator* allocator, const char* data, tm_size_t size,
                                         unsigned int flags);
@@ -1132,9 +1160,9 @@ static void jsonAdvance(JsonReader* reader) {
     --reader->size;
 }
 static tm_size_t skipWhitespace(JsonReader* reader) {
-    static const char* const whitespace = " \t\r\f\n\v";
+    static const char* const whitespace = " \t\r\n";
     const char* p;
-    while ((p = (const char*)TM_MEMCHR(whitespace, reader->data[0], 6)) != TM_NULL) {
+    while ((p = (const char*)TM_MEMCHR(whitespace, reader->data[0], 4)) != TM_NULL) {
         if (reader->data[0] == '\n') {
             ++reader->line;
             reader->column = 0;
@@ -1258,26 +1286,43 @@ static tm_bool tmj_is_char_unescaped(const char* first, const char* last) {
     return (preceding_escape_chars_count & 1) == 0;
 }
 
-static tm_bool tmj_is_valid_json_string(const char* first, tm_size_t size) {
-    /* Validate that \u is always followed by four hexadecimal digits. */
-    const char* start = first;
-    const char* p = TM_NULL;
-    while ((p = (const char*)TM_MEMCHR(first, '\\', size)) != TM_NULL) {
-        size -= (tm_size_t)(p - first + 1);
-        if (size) {
-            first = p + 1;
-
-            if (*first == 'u') {
-                ++first;
-                --size;
-
-                if (!tmj_is_char_unescaped(start, first - 1)) {
-                    uint32_t codepoint = 0;
-                    tm_size_t advance = tmj_get_codepoint(first, size, &codepoint);
-                    if (advance <= 0) return TM_FALSE;
-                    first += advance;
-                    size -= advance;
+static tm_bool tmj_is_valid_json_string(const char* first, tm_size_t size, tm_bool allow_escaped_newlines) {
+    for (tm_size_t i = 0; i < size; ++i) {
+        unsigned char c = (unsigned char)first[i];
+        /* Raw control characters are not valid json strings. */
+        if (c < 32) return TM_FALSE;
+        if (c == '\\') {
+            tm_size_t remaining = size - i;
+            if (!remaining) return TM_FALSE;
+            unsigned char next = (unsigned char)first[i + 1];
+            ++i;
+            switch (next) {
+                case '"':
+                case '\\':
+                case '/':
+                case 'b':
+                case 'f':
+                case 'n':
+                case 'r':
+                case 't':
+                case 'u': {
+                    break;
                 }
+                case '\n': {
+                    if (allow_escaped_newlines) break;
+                    return TM_FALSE;
+                }
+                default: {
+                    return TM_FALSE;
+                }
+            }
+            if (next == 'u') {
+                ++i;
+                /* Validate that \u is always followed by four hexadecimal digits. */
+                uint32_t codepoint = 0;
+                tm_size_t advance = tmj_get_codepoint(first + i, size - i, &codepoint);
+                if (advance <= 0) return TM_FALSE;
+                i += advance - 1;
             }
         }
     }
@@ -1309,16 +1354,12 @@ static tm_bool readQuotedString(JsonReader* reader) {
     reader->current.data = reader->data;
     reader->current.size = 0;
 
-    // TODO: profile to see which is faster, memchr twice over the string or go byte by byte once
+    /* TODO: Profile to see which is faster, memchr twice over the string or go byte by byte once. */
     const char* p = tmj_find_char_unescaped(reader->data, reader->size, quote);
     if (p) {
         reader->size -= (tm_size_t)(p + 1 - reader->data);
         reader->data = p + 1;
-        if (reader->size <= 0) {
-            setError(reader, JERR_UNEXPECTED_EOF);
-            return TM_FALSE;
-        }
-        // Unescaped quotation mark, we found the string.
+        /* Unescaped quotation mark, we found the string. */
         reader->current.size = (tm_size_t)(reader->data - reader->current.data - 1);
         if (reader->flags & JSON_READER_ESCAPED_MULTILINE_STRINGS) {
             const char* last = reader->current.data;
@@ -1337,16 +1378,10 @@ static tm_bool readQuotedString(JsonReader* reader) {
             }
             reader->column = size;
         } else {
-            /* No newlines in a quoted strings. */
-            if ((p = (const char*)TM_MEMCHR(reader->current.data, '\n', reader->current.size)) != TM_NULL) {
-                reader->errorType = JERR_ILLFORMED_STRING;
-                reader->current.data = p;
-                reader->current.size = 1;
-                return TM_FALSE;
-            }
             reader->column += reader->current.size + 1;
         }
-        if (!tmj_is_valid_json_string(reader->current.data, reader->current.size)) {
+        if (!tmj_is_valid_json_string(reader->current.data, reader->current.size,
+                                      (reader->flags & JSON_READER_ESCAPED_MULTILINE_STRINGS) != 0)) {
             reader->errorType = JERR_ILLFORMED_STRING;
             reader->current.data = p;
             reader->current.size = 1;
@@ -1366,6 +1401,11 @@ static tm_bool readQuotedString(JsonReader* reader) {
 }
 
 static tm_bool readNumber(JsonReader* reader) {
+    if (!reader->size) {
+        setError(reader, JERR_UNEXPECTED_EOF);
+        return TM_FALSE;
+    }
+
     reader->valueType = JVAL_UINT;
     reader->lastToken = JTOK_VALUE;
     reader->current.data = reader->data;
@@ -1378,11 +1418,16 @@ static tm_bool readNumber(JsonReader* reader) {
         reader->current.data = reader->data;
     }
 
+    if (!reader->size) {
+        setError(reader, JERR_UNEXPECTED_EOF);
+        return TM_FALSE;
+    }
+
     if (reader->data[0] == '0') {
         jsonAdvance(reader);
         if (!reader->size) {
-            setError(reader, JERR_UNEXPECTED_EOF);
-            return TM_FALSE;
+            reader->current.size = (tm_size_t)(reader->data - reader->current.data);
+            return TM_TRUE;
         }
 
         // hexadecimal
@@ -1398,39 +1443,51 @@ static tm_bool readNumber(JsonReader* reader) {
             }
             do {
                 jsonAdvance(reader);
-                if (!reader->size) {
-                    setError(reader, JERR_UNEXPECTED_EOF);
-                    return TM_FALSE;
-                }
-            } while (TM_ISXDIGIT((unsigned char)reader->data[0]));
+            } while (reader->size && TM_ISXDIGIT((unsigned char)reader->data[0]));
             reader->current.size = (tm_size_t)(reader->data - reader->current.data);
             return TM_TRUE;
         }
     } else if (TM_ISDIGIT((unsigned char)reader->data[0])) {
         do {
             jsonAdvance(reader);
-            if (!reader->size) {
-                setError(reader, JERR_UNEXPECTED_EOF);
-                return TM_FALSE;
-            }
+            if (!reader->size) return TM_TRUE;
         } while (TM_ISDIGIT((unsigned char)reader->data[0]));
-    } else {
+    } else if (!(reader->flags & JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) || reader->data[0] != '.') {
         setError(reader, JERR_UNEXPECTED_TOKEN);
         return TM_FALSE;
     }
 
-    if (reader->data[0] == '.') {
+    int has_trailing_digits = TM_FALSE;
+    int has_decimal_point = TM_FALSE;
+
+    if (reader->size && reader->data[0] == '.') {
+        has_decimal_point = TM_TRUE;
         reader->valueType = JVAL_FLOAT;
-        do {
-            jsonAdvance(reader);
-            if (!reader->size) {
-                setError(reader, JERR_UNEXPECTED_EOF);
+        jsonAdvance(reader);
+        if (!reader->size) {
+            if (reader->flags & JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) return TM_TRUE;
+            setError(reader, JERR_UNEXPECTED_EOF);
+            return TM_FALSE;
+        }
+        // At least one digit has to follow after '.' unless explicitly allowed.
+        has_trailing_digits = (TM_ISDIGIT((unsigned char)reader->data[0]) != 0);
+        if (!has_trailing_digits) {
+            if (!(reader->flags & JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT)) {
+                setError(reader, JERR_UNEXPECTED_TOKEN);
                 return TM_FALSE;
             }
-        } while (TM_ISDIGIT((unsigned char)reader->data[0]));
+        } else {
+            do {
+                jsonAdvance(reader);
+            } while (reader->size && TM_ISDIGIT((unsigned char)reader->data[0]));
+        }
     }
 
-    if (reader->data[0] == 'e' || reader->data[0] == 'E') {
+    if (reader->size && (reader->data[0] == 'e' || reader->data[0] == 'E')) {
+        if (has_decimal_point && !has_trailing_digits) {
+            setError(reader, JERR_UNEXPECTED_TOKEN);
+            return TM_FALSE;
+        }
         reader->valueType = JVAL_FLOAT;
         jsonAdvance(reader);
         if (reader->data[0] == '+' || reader->data[0] == '-') {
@@ -1442,17 +1499,9 @@ static tm_bool readNumber(JsonReader* reader) {
         }
         do {
             jsonAdvance(reader);
-            if (!reader->size) {
-                setError(reader, JERR_UNEXPECTED_EOF);
-                return TM_FALSE;
-            }
-        } while (TM_ISDIGIT((unsigned char)reader->data[0]));
+        } while (reader->size && TM_ISDIGIT((unsigned char)reader->data[0]));
     }
 
-    if (!reader->size) {
-        setError(reader, JERR_UNEXPECTED_EOF);
-        return TM_FALSE;
-    }
     reader->current.size = (tm_size_t)(reader->data - reader->current.data);
     return TM_TRUE;
 }
@@ -1461,10 +1510,6 @@ static JsonTokenType advanceValue(JsonReader* reader, tm_size_t size) {
     reader->current.size = size;
     reader->data += size;
     reader->size -= size;
-    if (!reader->size) {
-        setError(reader, JERR_UNEXPECTED_EOF);
-        return JTOK_ERROR;
-    }
     reader->lastToken = JTOK_VALUE;
     return JTOK_VALUE;
 }
@@ -1595,18 +1640,18 @@ inline static JsonContext jsonCurrentContext(JsonReader* reader) {
     return (JsonContext)reader->contextStack.data[reader->contextStack.size - 1].context;
 }
 static tm_bool jsonCanValueFollowLastToken(JsonReader* reader, JsonContext currentContext) {
-    // check whether a value can follow last token in current context
+    /* Check whether a value can follow last token in current context. */
     switch (currentContext) {
+        case JSON_CONTEXT_NULL: {
+            // A value can only exist at root level if no other value was parsed already.
+            return (reader->flags & TMJ_ROOT_ENTERED) == 0;
+        }
         case JSON_CONTEXT_OBJECT: {
-            if (reader->lastToken != JTOK_PROPERTYNAME) {
-                return TM_FALSE;
-            }
+            if (reader->lastToken != JTOK_PROPERTYCOLON) return TM_FALSE;
             break;
         }
         case JSON_CONTEXT_ARRAY: {
-            if (reader->lastToken != JTOK_ARRAY_START && reader->lastToken != JTOK_COMMA) {
-                return TM_FALSE;
-            }
+            if (reader->lastToken != JTOK_ARRAY_START && reader->lastToken != JTOK_COMMA) return TM_FALSE;
             break;
         }
         default: {
@@ -1627,7 +1672,8 @@ static tm_bool jsonCanEndBracketFollowLastToken(JsonReader* reader, JsonContext 
             }
             break;
         }
-        case JTOK_PROPERTYNAME: {
+        case JTOK_PROPERTYNAME:
+        case JTOK_PROPERTYCOLON: {
             return TM_FALSE;
         }
         default: {
@@ -1756,45 +1802,32 @@ static JsonTokenType jsonParseComment(JsonReader* reader) {
     setError(reader, JERR_UNEXPECTED_TOKEN);
     return JTOK_ERROR;
 }
-static tm_bool jsonParseColon(JsonReader* reader) {
-    if (!skipWhitespace(reader)) {
-        setError(reader, JERR_UNEXPECTED_EOF);
-        return TM_FALSE;
-    }
-    if (reader->data[0] == ':' || (reader->flags & JSON_READER_ALLOW_EQUAL && reader->data[0] == '=')) {
-        jsonAdvance(reader);
-        return TM_TRUE;
-    }
-    setError(reader, JERR_UNEXPECTED_TOKEN);
-    return TM_FALSE;
-}
 static JsonTokenType jsonParseQuotedString(JsonReader* reader, JsonContext currentContext) {
-    if (currentContext == JSON_CONTEXT_NULL) {
-        setError(reader, JERR_UNEXPECTED_TOKEN);
-        return JTOK_ERROR;
-    }
     if (!readQuotedString(reader)) {
         return JTOK_ERROR;
     }
+    JsonTokenType result = JTOK_VALUE;
     reader->valueType = JVAL_STRING;
+    if (currentContext == JSON_CONTEXT_NULL) {
+        reader->lastToken = result;
+        return result;
+    }
     if (!skipWhitespace(reader)) {
         setError(reader, JERR_UNEXPECTED_EOF);
         return JTOK_ERROR;
     }
     if (currentContext == JSON_CONTEXT_OBJECT &&
         (reader->lastToken == JTOK_OBJECT_START || reader->lastToken == JTOK_COMMA)) {
-        if (!jsonParseColon(reader)) {
-            return JTOK_ERROR;
-        }
-        reader->lastToken = JTOK_PROPERTYNAME;
+        result = JTOK_PROPERTYNAME;
     } else {
         if (!jsonCanValueFollowLastToken(reader, currentContext)) {
             setError(reader, JERR_UNEXPECTED_TOKEN);
             return JTOK_ERROR;
         }
-        reader->lastToken = JTOK_VALUE;
+        result = JTOK_VALUE;
     }
-    return reader->lastToken;
+    reader->lastToken = result;
+    return result;
 }
 static JsonTokenType jsonParseContextStart(JsonReader* reader, JsonContext currentContext, tm_bool isObject) {
     if (currentContext != JSON_CONTEXT_NULL) {
@@ -1863,7 +1896,22 @@ TMJ_DEF JsonTokenType jsonNextTokenImplicit(JsonReader* reader, JsonContext curr
             case ']': {
                 return jsonParseContextEnd(reader, currentContext, c == '}');
             }
+            case ':':
+            case '=': {
+                if (currentContext != JSON_CONTEXT_OBJECT || reader->lastToken != JTOK_PROPERTYNAME ||
+                    (c == '=' && !(reader->flags & JSON_READER_ALLOW_EQUAL))) {
+                    setError(reader, JERR_UNEXPECTED_TOKEN);
+                    return JTOK_ERROR;
+                }
+                jsonAdvance(reader);
+                reader->lastToken = JTOK_PROPERTYCOLON;
+                break;
+            }
             case ',': {
+                if (currentContext == JSON_CONTEXT_NULL) {
+                    setError(reader, JERR_UNEXPECTED_TOKEN);
+                    return JTOK_ERROR;
+                }
                 switch (reader->lastToken) {
                     case JTOK_OBJECT_END:
                     case JTOK_ARRAY_END:
@@ -1881,11 +1929,12 @@ TMJ_DEF JsonTokenType jsonNextTokenImplicit(JsonReader* reader, JsonContext curr
             }
             default: {
                 // json value case
-                if (currentContext == JSON_CONTEXT_NULL || !jsonCanValueFollowLastToken(reader, currentContext)) {
+                if (!jsonCanValueFollowLastToken(reader, currentContext)) {
                     setError(reader, JERR_UNEXPECTED_TOKEN);
                     return JTOK_ERROR;
                 }
 
+                reader->flags |= TMJ_ROOT_ENTERED;
                 return readValue(reader);
             }
         }
@@ -1898,6 +1947,8 @@ TMJ_DEF tm_bool jsonIsValidUntilEof(JsonReader* reader) {
     }
     JsonTokenType token;
     for (;;) {
+        const char* start_data = reader->data;
+        tm_size_t start_size = reader->size;
         token = jsonNextTokenImplicit(reader, JSON_CONTEXT_NULL);
         switch (token) {
             case JTOK_COMMENT: {
@@ -1907,6 +1958,11 @@ TMJ_DEF tm_bool jsonIsValidUntilEof(JsonReader* reader) {
                 return TM_TRUE;
             }
             default: {
+                if (reader->errorType == JSON_OK) {
+                    reader->data = start_data;
+                    reader->size = start_size;
+                    setError(reader, JERR_UNEXPECTED_TOKEN);
+                }
                 return TM_FALSE;
             }
         }
@@ -1968,7 +2024,7 @@ TMJ_DEF JsonTokenType jsonNextToken(JsonReader* reader) {
 
 static tm_bool jsonParseUnquotedPropertyName(JsonReader* reader, JsonContext currentContext) {
     if (currentContext == JSON_CONTEXT_OBJECT && (reader->flags & JSON_READER_UNQUOTED_PROPERTY_NAMES) &&
-        reader->lastToken != JTOK_PROPERTYNAME) {
+        reader->lastToken != JTOK_PROPERTYCOLON) {
         switch (reader->lastToken) {
             case JTOK_OBJECT_START:
             case JTOK_COMMA: {
@@ -1991,13 +2047,13 @@ static tm_bool jsonParseUnquotedPropertyName(JsonReader* reader, JsonContext cur
         }
         reader->current.size = (tm_size_t)(reader->data - reader->current.data);
         reader->lastToken = JTOK_PROPERTYNAME;
-        return jsonParseColon(reader);
+        return TM_TRUE;
     }
     return TM_FALSE;
 }
 
 static tm_bool jsonParsePythonRawString(JsonReader* reader, JsonContext currentContext) {
-    if ((currentContext == JSON_CONTEXT_ARRAY || reader->lastToken == JTOK_PROPERTYNAME) &&
+    if ((currentContext == JSON_CONTEXT_ARRAY || reader->lastToken == JTOK_PROPERTYCOLON) &&
         (reader->flags & JSON_READER_PYTHON_RAW_STRINGS)) {
         if (reader->data[0] == 'r' || reader->data[0] == 'R') {
             jsonAdvance(reader);
@@ -2021,7 +2077,7 @@ inline static tm_bool jsonIsValidDelimChar(char c) {
     return c != ')' && c != '(' && c != '\\' && !TM_ISSPACE((unsigned char)c);
 }
 static tm_bool jsonParseCppRawString(JsonReader* reader, JsonContext currentContext) {
-    if ((currentContext == JSON_CONTEXT_ARRAY || reader->lastToken == JTOK_PROPERTYNAME) &&
+    if ((currentContext == JSON_CONTEXT_ARRAY || reader->lastToken == JTOK_PROPERTYCOLON) &&
         (reader->flags & JSON_READER_CPP_RAW_STRINGS)) {
         JsonReader stateGuard = *reader;
 
@@ -2170,7 +2226,22 @@ TMJ_DEF JsonTokenType jsonNextTokenImplicitEx(JsonReader* reader, JsonContext cu
             case ']': {
                 return jsonParseContextEnd(reader, currentContext, c == '}');
             }
+            case ':':
+            case '=': {
+                if (currentContext != JSON_CONTEXT_OBJECT || reader->lastToken != JTOK_PROPERTYNAME ||
+                    (c == '=' && !(reader->flags & JSON_READER_ALLOW_EQUAL))) {
+                    setError(reader, JERR_UNEXPECTED_TOKEN);
+                    return JTOK_ERROR;
+                }
+                jsonAdvance(reader);
+                reader->lastToken = JTOK_PROPERTYCOLON;
+                break;
+            }
             case ',': {
+                if (currentContext == JSON_CONTEXT_NULL) {
+                    setError(reader, JERR_UNEXPECTED_TOKEN);
+                    return JTOK_ERROR;
+                }
                 switch (reader->lastToken) {
                     case JTOK_OBJECT_END:
                     case JTOK_ARRAY_END:
@@ -2187,31 +2258,27 @@ TMJ_DEF JsonTokenType jsonNextTokenImplicitEx(JsonReader* reader, JsonContext cu
                 break;
             }
             default: {
-                // check raw string cases
+                // Unqoted property name case.
+                if (jsonParseUnquotedPropertyName(reader, currentContext)) return JTOK_PROPERTYNAME;
+                // Check raw string cases.
                 switch (c) {
                     case 'r':
                     case 'R': {
-                        if (reader->lastToken == JTOK_PROPERTYNAME) {
-                            if (jsonParseCppRawString(reader, currentContext)) return reader->lastToken;
-                            if (reader->errorType != JSON_OK) return JTOK_ERROR;
-                            if (jsonParsePythonRawString(reader, currentContext)) return reader->lastToken;
-                            if (reader->errorType != JSON_OK) return JTOK_ERROR;
-                        }
+                        if (jsonParseCppRawString(reader, currentContext)) return reader->lastToken;
+                        if (reader->errorType != JSON_OK) return JTOK_ERROR;
+                        if (jsonParsePythonRawString(reader, currentContext)) return reader->lastToken;
+                        if (reader->errorType != JSON_OK) return JTOK_ERROR;
                         break;
                     }
                 }
-                if (currentContext == JSON_CONTEXT_NULL) {
-                    setError(reader, JERR_UNEXPECTED_TOKEN);
-                    return JTOK_ERROR;
-                }
-                if (jsonParseUnquotedPropertyName(reader, currentContext)) return JTOK_PROPERTYNAME;
                 if (reader->errorType != JSON_OK) return JTOK_ERROR;
-                // json value case
+
+                // Json value case.
                 if (!jsonCanValueFollowLastToken(reader, currentContext)) {
                     setError(reader, JERR_UNEXPECTED_TOKEN);
                     return JTOK_ERROR;
                 }
-
+                reader->flags |= TMJ_ROOT_ENTERED;
                 return readValueEx(reader);
             }
         }
@@ -2245,37 +2312,26 @@ TMJ_DEF JsonTokenType jsonNextTokenEx(JsonReader* reader) {
     return token;
 }
 
-TMJ_DEF JsonContext jsonReadRootType(JsonReader* reader) {
-    if (reader->contextStack.size) {
-        JsonContext current = (JsonContext)reader->contextStack.data[reader->contextStack.size - 1].context;
-        TM_ASSERT(current == JSON_CONTEXT_NULL);
-        if (current != JSON_CONTEXT_NULL) return JSON_CONTEXT_NULL;
-
-        for (;;) {
-            JsonTokenType token = jsonNextToken(reader);
-            switch (token) {
-                case JTOK_OBJECT_START:
-                    return JSON_CONTEXT_OBJECT;
-                case JTOK_ARRAY_START:
-                    return JSON_CONTEXT_ARRAY;
-                case JTOK_COMMENT:
-                    continue;
-                default:
-                    return JSON_CONTEXT_NULL;
-            }
+TMJ_DEF JsonTokenType jsonReadRootType(JsonReader* reader, tm_bool ex) {
+    for (;;) {
+        JsonTokenType token;
+        if (ex) {
+            token = jsonNextTokenImplicitEx(reader, JSON_CONTEXT_NULL);
+        } else {
+            token = jsonNextTokenImplicit(reader, JSON_CONTEXT_NULL);
         }
-    } else {
-        for (;;) {
-            JsonTokenType token = jsonNextTokenImplicit(reader, JSON_CONTEXT_NULL);
-            switch (token) {
-                case JTOK_OBJECT_START:
-                    return JSON_CONTEXT_OBJECT;
-                case JTOK_ARRAY_START:
-                    return JSON_CONTEXT_ARRAY;
-                case JTOK_COMMENT:
-                    continue;
-                default:
-                    return JSON_CONTEXT_NULL;
+        switch (token) {
+            case JTOK_OBJECT_START:
+            case JTOK_ARRAY_START:
+            case JTOK_VALUE: {
+                return token;
+            }
+            case JTOK_COMMENT: {
+                continue;
+            }
+            default: {
+                setError(reader, JERR_UNEXPECTED_TOKEN);
+                return JTOK_ERROR;
             }
         }
     }
@@ -2607,6 +2663,9 @@ static JsonErrorType jsonReadObject(JsonReader* reader, JsonStackAllocator* allo
                 run = 0;
                 break;
             }
+            case JTOK_COMMENT: {
+                break;
+            }
             default: {
                 if (reader->errorType != JSON_OK) {
                     return reader->errorType;
@@ -2807,20 +2866,28 @@ TMJ_DEF JsonDocument jsonMakeDocument(JsonStackAllocator* allocator, const char*
     TM_MEMSET(&result, 0, sizeof(JsonDocument));
 
     JsonReader reader = jsonMakeReader(data, size, TM_NULL, 0, flags);
-    JsonContext rootType = jsonReadRootType(&reader);
+    JsonTokenType rootType = jsonReadRootType(&reader, /*ex=*/TM_FALSE);
     switch (rootType) {
-        case JSON_CONTEXT_NULL: {
-            result.error.type = JERR_NO_ROOT;
+        case JTOK_ERROR: {
             break;
         }
-        case JSON_CONTEXT_OBJECT: {
+        case JTOK_OBJECT_START: {
             result.root.type = JVAL_OBJECT;
             result.error.type = jsonReadObject(&reader, allocator, &result.root.data.object);
             break;
         }
-        case JSON_CONTEXT_ARRAY: {
+        case JTOK_ARRAY_START: {
             result.root.type = JVAL_ARRAY;
             result.error.type = jsonReadArray(&reader, allocator, &result.root.data.array);
+            break;
+        }
+        case JTOK_VALUE: {
+            result.root.type = reader.valueType;
+            if (result.root.type == JVAL_STRING) {
+                result.root.data.content = jsonAllocateUnescapedString(allocator, reader.current);
+            } else {
+                result.root.data.content = reader.current;
+            }
             break;
         }
         default: {
@@ -2885,6 +2952,9 @@ static JsonErrorType jsonReadObjectEx(JsonReader* reader, JsonStackAllocator* al
             }
             case JTOK_OBJECT_END: {
                 run = 0;
+                break;
+            }
+            case JTOK_COMMENT: {
                 break;
             }
             default: {
@@ -3077,20 +3147,23 @@ TMJ_DEF JsonDocument jsonMakeDocumentEx(JsonStackAllocator* allocator, const cha
     TM_MEMSET(&result, 0, sizeof(JsonDocument));
 
     JsonReader reader = jsonMakeReader(data, size, TM_NULL, 0, flags);
-    JsonContext rootType = jsonReadRootType(&reader);
+    JsonTokenType rootType = jsonReadRootType(&reader, /*ex=*/TM_TRUE);
     switch (rootType) {
-        case JSON_CONTEXT_NULL: {
-            result.error.type = JERR_NO_ROOT;
+        case JTOK_ERROR: {
             break;
         }
-        case JSON_CONTEXT_OBJECT: {
+        case JTOK_OBJECT_START: {
             result.root.type = JVAL_OBJECT;
             result.error.type = jsonReadObjectEx(&reader, allocator, &result.root.data.object);
             break;
         }
-        case JSON_CONTEXT_ARRAY: {
+        case JTOK_ARRAY_START: {
             result.root.type = JVAL_ARRAY;
             result.error.type = jsonReadArrayEx(&reader, allocator, &result.root.data.array);
+            break;
+        }
+        case JTOK_VALUE: {
+            result.root = jsonAllocateValueEx(allocator, &reader);
             break;
         }
         default: {

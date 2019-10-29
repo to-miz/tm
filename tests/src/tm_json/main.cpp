@@ -73,7 +73,7 @@ bool str_equal(JsonStringView a, const char* b) {
     return strncmp(a.data, b, a.size) == 0;
 }
 
-std::ostream& operator<< (std::ostream& os, const JsonStringView& value) {
+std::ostream& operator<<(std::ostream& os, const JsonStringView& value) {
     os.write(value.data, value.size);
     return os;
 }
@@ -212,8 +212,7 @@ bool ulps_comparison(double a, double b) {
     return (bm - am) <= 1;
 }
 
-TEST_CASE("float conversion" *
-          doctest::description("Test the fallback string to float conversions.")) {
+TEST_CASE("float conversion" * doctest::description("Test the fallback string to float conversions.")) {
     auto do_test = []() {
         const char* json = R"([
             0, -0, 1, -1,
@@ -269,9 +268,7 @@ TEST_CASE("float conversion" *
         }
     };
 
-    SUBCASE("default locale") {
-        do_test();
-    }
+    SUBCASE("default locale") { do_test(); }
 
     // The fallback string to float conversion (strtod) is locale dependent, so these tests will fail.
     // There is just no reliable, threadsafe way to do string to float conversion other than implementing it yourself.
@@ -384,11 +381,18 @@ TEST_CASE("keywords") {
     CHECK(isnan(obj["NAN"].getFloat()));
 }
 
-bool check_json(const char* json, uint32_t flags) {
-    AllocatedDocument pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
-    auto& doc = pool.document;
-    return doc.error.type == JSON_OK;
+bool check_json(const char* json, tm_size_t len, uint32_t flags) {
+    AllocatedDocument pool = jsonAllocateDocument(json, len, flags);
+    AllocatedDocument ex_pool = jsonAllocateDocumentEx(json, len, flags);
+    return pool.document.error.type == JSON_OK && ex_pool.document.error.type == JSON_OK;
 }
+bool check_json(const char* json, uint32_t flags) { return check_json(json, (tm_size_t)strlen(json), flags); }
+
+bool check_json_ex(const char* json, tm_size_t len, uint32_t flags) {
+    AllocatedDocument ex_pool = jsonAllocateDocumentEx(json, len, flags);
+    return ex_pool.document.error.type == JSON_OK;
+}
+bool check_json_ex(const char* json, uint32_t flags) { return check_json_ex(json, (tm_size_t)strlen(json), flags); }
 
 AllocatedDocument json_doc(const char* json, uint32_t flags) {
     return jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), flags);
@@ -593,3 +597,120 @@ TEST_CASE("numbers") {}
 TEST_CASE("hex conversion") {}
 TEST_CASE("extended flags") {}
 TEST_CASE("invalid json") {}
+
+// These tests were taken from https://github.com/nst/JSONTestSuite (MIT License see tests/external/LICENSES.txt)
+TEST_CASE("n_structure_open_array_object") {
+    const char* structure = "[{\"\":";
+    char* buffer = new char[strlen(structure) * 50001];
+    char* p = buffer;
+    for (auto i = 0; i < 50000; ++i, ++p) {
+        *p = structure[i % 5];
+    }
+    *p = 0;
+    CHECK(check_json(buffer, JSON_READER_STRICT) == false);
+    delete[] buffer;
+}
+TEST_CASE("n_structure_100000_opening_arrays") {
+    char* buffer = new char[100001];
+    char* p = buffer;
+    for (auto i = 0; i < 100000; ++i, ++p) {
+        *p = '[';
+    }
+    *p = 0;
+    CHECK(check_json(buffer, JSON_READER_STRICT) == false);
+    delete[] buffer;
+}
+#include "generated_tests.cpp"
+#include "comments_tests.cpp"
+
+TEST_CASE("json5_decimal_point") {
+    const char* json = R"(
+        [
+            1,
+            1.,
+            .1,
+            1e+10,
+            .1e+10,
+            1.1e+10
+        ]
+    )";
+    CHECK(check_json(json, JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
+    CHECK(check_json(".e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) == false);
+    CHECK(check_json("1.e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) == false);
+    CHECK(check_json("e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) == false);
+
+    // Number parsing should also work on single value documents.
+    CHECK(check_json("1", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
+    CHECK(check_json("1.", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
+    CHECK(check_json("{1.", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT) == false);
+    CHECK(check_json(".1", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
+    CHECK(check_json("1e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
+    CHECK(check_json(".1e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
+    CHECK(check_json("1.1e+10", JSON_READER_ALLOW_LEADING_AND_TRAILING_DECIMALPOINT));
+}
+
+void print_indent(int amount) {
+    while (amount > 0) {
+        printf("  ");
+        --amount;
+    }
+}
+void print_value(JsonValue value, int indent = 0) {
+    switch(value.type) {
+        case JVAL_NULL:
+        case JVAL_STRING:
+        case JVAL_INT:
+        case JVAL_UINT:
+        case JVAL_BOOL:
+        case JVAL_FLOAT:
+        case JVAL_RAW_STRING:
+        case JVAL_CONCAT_STRING: {
+            printf("%.*s\n", (int)value.data.content.size, value.data.content.data);
+            break;
+        }
+        case JVAL_OBJECT: {
+            print_indent(indent);
+            printf("{\n");
+            for (auto node : value.getObject()) {
+                print_indent(indent + 1);
+                printf("\"%.*s\": ", (int)node.name.size, node.name.data);
+                print_value(node.value, indent + 1);
+            }
+            print_indent(indent);
+            printf("}\n");
+            break;
+        }
+        case JVAL_ARRAY: {
+            printf("[\n");
+            for (auto val : value.getArray()) {
+                print_indent(indent + 1);
+                print_value(val, indent + 1);
+            }
+            print_indent(indent);
+            printf("]\n");
+            break;
+        }
+    }
+}
+
+TEST_CASE("json5") {
+    // Example json5 document taken from https://json5.org/
+    const char* json = R"(
+        {
+          // comments
+          unquoted: 'and you can quote me on that',
+          singleQuotes: 'I can use "double quotes" here',
+          lineBreaks: "Look, Mom! \
+No \\n's!",
+          hexadecimal: 0xdecaf,
+          leadingDecimalPoint: .8675309, andTrailing: 8675309.,
+          positiveSign: +1,
+          trailingComma: 'in objects', andIn: ['arrays',],
+          "backwardsCompatible": "with JSON",
+        }
+    )";
+    CHECK(check_json_ex(json, JSON_READER_JSON5));
+
+    AllocatedDocument ex_pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), JSON_READER_JSON5);
+    REQUIRE(ex_pool.document.error.type == JSON_OK);
+}
