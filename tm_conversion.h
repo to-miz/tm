@@ -2034,7 +2034,7 @@ TMC_DEF tmc_conv_result print_decimal_u64_w(char* dest, tm_size_t maxlen, tm_siz
     result.size = width;
     char* p = dest + width - 1;
     while (value >= 100 TMC_CW(&& width >= 2)) {
-        uint32_t index = (value % 100) * 2;
+        uint32_t index = (uint32_t)(value % 100) * 2;
         TM_ASSERT(index < 200);
         value /= 100;
         *p = print_DoubleDigitsToCharTable[index + 1];

@@ -544,7 +544,7 @@ bool test_roundtrip(PrintFunc print_func, ScanFunc scan_func, ValueType min_val,
         const unsigned flags = PF_TRAILING_ZEROES;
 
         for (auto i = 0; i < steps; ++i) {
-            ValueType t = i / (ValueType)(steps - 1);
+            ValueType t = (ValueType)i / (ValueType)(steps - 1);
             ValueType value = lerp(t, min, max);
 
             char buffer[10000];
