@@ -1,5 +1,5 @@
 /*
-tm_async.h v0.0.1 - public domain - https://github.com/to-miz/tm
+tm_async.h v0.0.2 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -40,6 +40,7 @@ TODO
         - Write about in which order async jobs are executed in generally and when it doesn't hold.
 
 HISTORY     (DD.MM.YY)
+    v0.0.2   01.07.19 Removed duplicate typedef of tma_atomic_int.
     v0.0.1   31.05.19 Initial Commit.
 */
 

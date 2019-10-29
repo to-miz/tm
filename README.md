@@ -6,7 +6,7 @@ Current libraries
 Library | Desciption | Language | Current Version
 --- | --- | --- | ---
 tm_arrayview.h | Lightweight ArrayView and UninitializedArrayView classes for POD types, allows treating static arrays and memory regions like std containers with insertion/erase. No memory allocation/resizing, does not own memory. | C++11 | v1.2.0
-tm_async.h | Async library for single producer, multiple consumer asynchronous execution that uses an internal thread pool. Not yet first release, currently Windows only. | C99/C++11 | v.0.0.1
+tm_async.h | Async library for single producer, multiple consumer asynchronous execution that uses an internal thread pool. Not yet first release, currently Windows only. | C99/C++11 | v.0.0.2
 tm_bezier.h | Calculate bezier curve points with forward differencing using only floating point addition. | C99/C++ | v1.1
 tm_bin_packing.h | C port with minor modifications of the Guillotine and MaxRects algorithms originally written by [Jukka Jylänki](https://github.com/juj/RectangleBinPack) (also public domain). | C99/C++ | v1.0.7
 tm_cli.h | Commandline parser that is similar to getopt_long, but doesn't rely on globals and very lightweight. | C99/C++ | v0.2.3

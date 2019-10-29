@@ -1,6 +1,3 @@
-typedef long tma_int;
-typedef volatile long tma_atomic_int;
-
 #if defined(__GNUC__)
     #error Not implemented.
     // See https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html#g_t_005f_005fatomic-Builtins
