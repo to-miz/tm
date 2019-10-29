@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.5 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.1.6 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -70,6 +70,7 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY
+    v0.1.6  12.07.19 Fixed error in documentation.
     v0.1.5  30.05.19 Made error codes depend on <errno.h> by default.
     v0.1.4  02.04.19 Fixed gcc/clang compilation errors.
                      Implemented full case toggling.
@@ -420,7 +421,7 @@ TMU_DEF tm_size_t tmu_utf16_encode(uint32_t codepoint, tmu_char16* out, tm_size_
 /*
 Append codepoint to output stream.
 Calling append on a stream without capacity will increase the streams 'necessary' counter while setting
-ec to EOVERFLOW. The 'necessary' field can then be used to allocate a sufficiently large buffer.
+ec to ERANGE. The 'necessary' field can then be used to allocate a sufficiently large buffer.
 Params:
     codepoint: Must be a valid codepoint (tmu_is_valid_codepoint returns true).
     stream:    Output stream.

@@ -16,7 +16,7 @@ tm_polygon.h | Triangulation and clipping of polygons. Clipping supports union, 
 tm_print.h | Lightweight typesafe variadic print and snprint using C++11 and variadic templates. | C++11 | v0.0.21
 tm_small_vector.h | Dynamic array container similar to STL \<vector> with a template parameter for small buffer optimization. Uses a non customizable malloc allocator making use of realloc whenever possible. | C++11 | v0.0.2
 tm_stringutil.h | String utility functions, from matching, comparison to tokenizing. | C99/C++ | v0.3.4
-tm_unicode.h | A Utf-8 everywhere library with Utf-8/Utf-16 conversion, caseless comparison and system call wrappers for cross platform windows/linux Utf-8 support. | C99/C++ | v0.1.5
+tm_unicode.h | A Utf-8 everywhere library with Utf-8/Utf-16 conversion, caseless comparison and system call wrappers for cross platform windows/linux Utf-8 support. | C99/C++ | v0.1.6
 tm_utility.h | Utility and convenience functions, mainly for my personal use. | C++11 | v1.1.5
 
 These libraries follow the same guidelines as [stb](https://github.com/nothings/stb).

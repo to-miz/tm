@@ -129,7 +129,7 @@ TMU_DEF tm_size_t tmu_utf16_encode(uint32_t codepoint, tmu_char16* out, tm_size_
 /*
 Append codepoint to output stream.
 Calling append on a stream without capacity will increase the streams 'necessary' counter while setting
-ec to EOVERFLOW. The 'necessary' field can then be used to allocate a sufficiently large buffer.
+ec to ERANGE. The 'necessary' field can then be used to allocate a sufficiently large buffer.
 Params:
     codepoint: Must be a valid codepoint (tmu_is_valid_codepoint returns true).
     stream:    Output stream.
