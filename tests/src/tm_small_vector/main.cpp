@@ -12,6 +12,7 @@
 #endif
 // clang-format on
 
+#include <memory>
 #include <redirected_malloc.cpp>
 
 #include <tm_small_vector.h>
@@ -30,35 +31,76 @@ struct buffer_view {
 
 // Count how many non trivial objects exist to make sure that each constructor is correctly paired to a destructor.
 size_t non_trivials_exist = 0;
-struct non_trivial {
-    int value;
+template <int N>
+struct non_trivial_base {
+    int8_t values[N];
 
-    non_trivial() : value(-1) { ++non_trivials_exist; }
-    explicit non_trivial(int v) : value(v) { ++non_trivials_exist; }
-    non_trivial(non_trivial&& other) : value(other.value) {
-        other.value = -2;
+    non_trivial_base() {
+        set_value(-1);
         ++non_trivials_exist;
     }
-    non_trivial(const non_trivial& other) : value(other.value) { ++non_trivials_exist; }
-    ~non_trivial() {
-        value = -3;
+    explicit non_trivial_base(int v) {
+        set_value(v);
+        ++non_trivials_exist;
+    }
+    non_trivial_base(non_trivial_base&& other) {
+        memcpy(values, other.values, N * sizeof(int8_t));
+        other.set_value(-2);
+        ++non_trivials_exist;
+    }
+    non_trivial_base(const non_trivial_base& other) {
+        memcpy(values, other.values, N * sizeof(int8_t));
+        ++non_trivials_exist;
+    }
+    ~non_trivial_base() {
+        set_value(-3);
         --non_trivials_exist;
     }
-    non_trivial& operator=(non_trivial&& other) {
-        if (this != &other) std::swap(value, other.value);
+    non_trivial_base& operator=(non_trivial_base&& other) {
+        if (this != &other) {
+            int8_t temp[N];
+            memcpy(temp, values, N * sizeof(int8_t));
+            memcpy(values, other.values, N * sizeof(int8_t));
+            memcpy(other.values, temp, N * sizeof(int8_t));
+        }
         return *this;
     }
-    non_trivial& operator=(const non_trivial& other) {
-        if (this != &other) value = other.value;
+    non_trivial_base& operator=(const non_trivial_base& other) {
+        if (this != &other) memcpy(values, other.values, N * sizeof(int8_t));
         return *this;
     }
 
-    friend bool operator!=(non_trivial lhs, non_trivial rhs) { return lhs.value != rhs.value; }
-    friend bool operator!=(int lhs, non_trivial rhs) { return lhs != rhs.value; }
-    friend bool operator!=(non_trivial lhs, int rhs) { return lhs.value != rhs; }
+    void set_value(int v) {
+        for (auto& entry : values) {
+            entry = (int8_t)v;
+        }
+    }
+
+    friend bool operator!=(non_trivial_base lhs, non_trivial_base rhs) {
+        return memcmp(lhs.values, rhs.values, N * sizeof(int8_t)) != 0;
+    }
+    friend bool operator!=(int lhs, non_trivial_base rhs) {
+        for (auto entry : rhs.values) {
+            if (entry != lhs) return true;
+        }
+        return false;
+    }
+    friend bool operator!=(non_trivial_base lhs, int rhs) {
+        for (auto entry : lhs.values) {
+            if (entry != lhs) return true;
+        }
+        return false;
+    }
 };
-std::ostream& operator<<(std::ostream& o, non_trivial v) {
-    o << v.value;
+typedef non_trivial_base<4> non_trivial;
+typedef non_trivial_base<8> non_trivial8;
+typedef non_trivial_base<12> non_trivial12;
+typedef non_trivial_base<24> non_trivial24;
+typedef non_trivial_base<36> non_trivial36;
+typedef non_trivial_base<72> non_trivial72;
+template <int N>
+std::ostream& operator<<(std::ostream& o, non_trivial_base<N> v) {
+    o << v.values[0];
     return o;
 }
 TYPE_TO_STRING(non_trivial);
@@ -137,7 +179,8 @@ bool operator==(const small_vector<T, N, AllocatorTag>& lhs, const std::initiali
     return equals_list(lhs, rhs);
 }
 
-TEST_CASE_TEMPLATE("push_back", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("push_back", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -150,7 +193,8 @@ TEST_CASE_TEMPLATE("push_back", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("pop_back", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("pop_back", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -168,7 +212,8 @@ TEST_CASE_TEMPLATE("pop_back", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("insert end", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("insert end", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -236,7 +281,8 @@ TEST_CASE_TEMPLATE("insert end", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("insert beginning", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("insert beginning", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -311,7 +357,8 @@ TEST_CASE_TEMPLATE("insert beginning", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("insert middle", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("insert middle", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -392,7 +439,8 @@ TEST_CASE_TEMPLATE("insert middle", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("erase beginning", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("erase beginning", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -411,7 +459,8 @@ TEST_CASE_TEMPLATE("erase beginning", T, int, non_trivial) {
     }
     REQUIRE(equals_view(v, view));
 }
-TEST_CASE_TEMPLATE("erase last", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("erase last", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -429,7 +478,8 @@ TEST_CASE_TEMPLATE("erase last", T, int, non_trivial) {
     }
     REQUIRE(equals_view(v, view));
 }
-TEST_CASE_TEMPLATE("erase middle", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("erase middle", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -450,7 +500,8 @@ TEST_CASE_TEMPLATE("erase middle", T, int, non_trivial) {
     }
     REQUIRE(equals_view(v, view));
 }
-TEST_CASE_TEMPLATE("erase all", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("erase all", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -468,7 +519,8 @@ TEST_CASE_TEMPLATE("erase all", T, int, non_trivial) {
     REQUIRE(equals_view(v, view));
 }
 
-TEST_CASE_TEMPLATE("erase range", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("erase range", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -498,7 +550,8 @@ TEST_CASE_TEMPLATE("erase range", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("emplace_back", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("emplace_back", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -507,7 +560,8 @@ TEST_CASE_TEMPLATE("emplace_back", T, int, non_trivial) {
     CHECK(equals_list(v, {T{1}}));
 }
 
-TEST_CASE_TEMPLATE("emplace", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("emplace", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -573,7 +627,8 @@ TEST_CASE_TEMPLATE("emplace", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("resize", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("resize", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     SUBCASE("dynamic") {
         small_vector<T, 1> a;
         a.resize(5);                                       // Resize to dynamic.
@@ -606,7 +661,8 @@ TEST_CASE_TEMPLATE("resize", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("swap", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("swap", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24, non_trivial36,
+                   non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -779,7 +835,8 @@ TEST_CASE_TEMPLATE("swap", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("constructors and assignment", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("constructors and assignment", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24,
+                   non_trivial36, non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -844,7 +901,8 @@ TEST_CASE_TEMPLATE("constructors and assignment", T, int, non_trivial) {
     }
 }
 
-TEST_CASE_TEMPLATE("constructors and assignment with base vector", T, int, non_trivial) {
+TEST_CASE_TEMPLATE("constructors and assignment with base vector", T, int, non_trivial, non_trivial8, non_trivial12,
+                   non_trivial24, non_trivial36, non_trivial72) {
     allocation_guard guard{};
     non_trivial_guard non_trivial_destructors_guard{};
 
@@ -906,5 +964,388 @@ TEST_CASE_TEMPLATE("constructors and assignment with base vector", T, int, non_t
 
         REQUIRE(a.empty());
         REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+    }
+}
+
+struct TestMemory {
+    void* memory;
+    TestMemory() { memory = malloc(1024 * 1014); }
+    ~TestMemory() { free(memory); }
+};
+
+TestMemory memory;
+TEST_CASE_TEMPLATE("write outside of range test", T, int, non_trivial, non_trivial8, non_trivial12, non_trivial24,
+                   non_trivial36, non_trivial72) {
+    REQUIRE(memory.memory);
+    size_t remaining = 1024 * 1014;
+    void* current = memory.memory;
+    int allocation_id = 0xFF;
+    struct Allocation {
+        void* ptr;
+        size_t size;
+        size_t total_size;
+        int id;
+        bool freed;
+    };
+    Allocation allocations[32] = {};
+    int allocations_count = 0;
+
+    auto find_allocation = [&](void* ptr) -> Allocation* {
+        for (int i = 0; i < allocations_count; ++i) {
+            if (allocations[i].ptr == ptr) return &allocations[i];
+        }
+        return nullptr;
+    };
+
+    auto my_malloc = [&](size_t size) -> void* {
+        void* success = std::align(/*alignment=*/16, size * 2, current, remaining);
+        REQUIRE(success);
+        void* result = current;
+        current = (char*)current + size * 2;
+        remaining -= size * 2;
+        memset(result, allocation_id, size * 2);
+        REQUIRE(allocations_count < 32);
+        allocations[allocations_count++] = {result, size, size * 2, allocation_id, /*freed=*/false};
+        --allocation_id;
+        return result;
+    };
+    auto my_realloc = [&](void* ptr, size_t old_size, size_t new_size) -> void* {
+        auto result = my_malloc(new_size);
+        if (ptr) {
+            auto allocation = find_allocation(ptr);
+            REQUIRE(allocation);
+            REQUIRE(!allocation->freed);
+            REQUIRE(allocation->size == old_size);
+            allocation->freed = (new_size == 0);
+            if (result) {
+                allocation->freed = true;
+                size_t min_size = (new_size < old_size) ? new_size : old_size;
+                if (min_size) memcpy(result, ptr, min_size);
+            }
+            if (allocation->freed) {
+                memset(ptr, allocation->id, allocation->total_size);
+            }
+        }
+        return result;
+    };
+    auto my_realloc_in_place = [&](void* ptr, size_t old_size, size_t new_size) -> void* {
+        if (ptr && new_size < old_size) {
+            auto allocation = find_allocation(ptr);
+            REQUIRE(allocation);
+            REQUIRE(allocation->size == old_size);
+            REQUIRE(!allocation->freed);
+            memset((char*)ptr + new_size, allocation->id, old_size - new_size);
+            return ptr;
+        }
+        return nullptr;
+    };
+    auto my_free = [&](void* ptr, size_t size) -> void {
+        if (ptr) {
+            auto allocation = find_allocation(ptr);
+            REQUIRE(allocation);
+            REQUIRE(!allocation->freed);
+            REQUIRE(allocation->size == size);
+            memset(ptr, allocation->id, allocation->total_size);
+            allocation->freed = true;
+        }
+    };
+
+    auto not_clobbered = [&](small_vector_base<T>& v) {
+        if (!v.data()) return;
+        if (v.is_sbo()) return;
+
+        auto allocation = find_allocation(v.data());
+        REQUIRE(allocation);
+        REQUIRE(!allocation->freed);
+        // Test that all data outside of vector was never written to.
+        for (char *c = (char*)(v.data() + v.capacity()), *last = (char*)allocation->ptr + allocation->size; c < last;
+             ++c) {
+            REQUIRE(*c == allocation->id);
+        }
+    };
+
+    auto guard = redirect_guard{my_malloc, my_realloc, my_realloc_in_place, my_free};
+    allocation_guard alloc_guard{};
+    non_trivial_guard non_trivial_destructors_guard{};
+
+    SUBCASE("push_back") {
+        small_vector<T, 3> v;
+        T buffer[10];
+        for (int i = 0; i < 10; ++i) {
+            buffer[i] = T{i};
+            v.push_back(T{i});
+            REQUIRE(equals_view(v, buffer_view<T>{buffer, (tm_size_t)i + 1}));
+        }
+        not_clobbered(v);
+    }
+
+    SUBCASE("swap1") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 2> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({T{1}, T{2}});                                                   // sbo
+        b.assign({T{10}, T{9}, T{8}, T{7}, T{6}, T{5}, T{4}, T{3}, T{2}, T{1}});  // dynamic
+        swap(a, b);
+        REQUIRE(equals_list(a, {T{10}, T{9}, T{8}, T{7}, T{6}, T{5}, T{4}, T{3}, T{2}, T{1}}));
+        REQUIRE(equals_list(b, {T{1}, T{2}}));
+        swap(a, b);
+        REQUIRE(equals_list(a, {T{1}, T{2}}));
+        REQUIRE(equals_list(b, {T{10}, T{9}, T{8}, T{7}, T{6}, T{5}, T{4}, T{3}, T{2}, T{1}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("swap2") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 2> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({T{10}, T{9}, T{8}, T{7}, T{6}, T{5}, T{4}, T{3}, T{2}, T{1}});  // dynamic
+        b.assign({T{1}, T{2}});                                                   // sbo
+        swap(a, b);
+        REQUIRE(equals_list(a, {T{1}, T{2}}));
+        REQUIRE(equals_list(b, {T{10}, T{9}, T{8}, T{7}, T{6}, T{5}, T{4}, T{3}, T{2}, T{1}}));
+        swap(a, b);
+        REQUIRE(equals_list(b, {T{1}, T{2}}));
+        REQUIRE(equals_list(a, {T{10}, T{9}, T{8}, T{7}, T{6}, T{5}, T{4}, T{3}, T{2}, T{1}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("swap3") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 2> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({T{1}, T{2}});                    // sbo
+        b.assign({T{8}, T{7}, T{6}, T{5}, T{4}});  // sbo
+        swap(a, b);
+        REQUIRE(equals_list(a, {T{8}, T{7}, T{6}, T{5}, T{4}}));
+        REQUIRE(equals_list(b, {T{1}, T{2}}));
+        swap(a, b);
+        REQUIRE(equals_list(b, {T{8}, T{7}, T{6}, T{5}, T{4}}));
+        REQUIRE(equals_list(a, {T{1}, T{2}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("swap4") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({T{5}, T{4}, T{3}, T{2}, T{1}});  // sbo
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        swap(a, b);
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{5}, T{4}, T{3}, T{2}, T{1}}));
+        swap(a, b);
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(a, {T{5}, T{4}, T{3}, T{2}, T{1}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("swap5") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 1> a;
+        small_vector<T, 1> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({T{5}, T{4}, T{3}, T{2}, T{1}});  // dynamic
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // dynamic
+        swap(a, b);
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{5}, T{4}, T{3}, T{2}, T{1}}));
+        swap(a, b);
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(a, {T{5}, T{4}, T{3}, T{2}, T{1}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("swap6") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 0> a;
+        small_vector<T, 0> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({T{5}, T{4}, T{3}, T{2}, T{1}});  // dynamic
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // dynamic
+        swap(a, b);
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{5}, T{4}, T{3}, T{2}, T{1}}));
+        swap(a, b);
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(a, {T{5}, T{4}, T{3}, T{2}, T{1}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("swap7") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});                              // sbo
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        swap(a, b);
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(b.empty());
+        swap(a, b);
+        REQUIRE(a.empty());
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("swap8") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});  // sbo
+        b.assign({});  // sbo
+        swap(a, b);
+        REQUIRE(a.empty());
+        REQUIRE(b.empty());
+        swap(a, b);
+        REQUIRE(a.empty());
+        REQUIRE(b.empty());
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("swap9") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 0> a;
+        small_vector<T, 0> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});  // sbo
+        b.assign({});  // sbo
+        swap(a, b);
+        REQUIRE(a.empty());
+        REQUIRE(b.empty());
+        swap(a, b);
+        REQUIRE(a.empty());
+        REQUIRE(b.empty());
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("copy assignment") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});                              // sbo
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        a = b;
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("move assignment") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        small_vector<T, 5> b;
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        a.assign({});                              // sbo
+        b.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        a = std::move(b);
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(b.empty());
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("copy construct") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        a.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        small_vector<T, 5> b(a);
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        REQUIRE(equals_list(a, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
+    }
+
+    SUBCASE("move construct") {
+        allocation_guard sub_guard{};
+        non_trivial_guard sub_non_trivial_destructors_guard{};
+        small_vector<T, 5> a;
+        a.assign({T{1}, T{2}, T{3}, T{4}, T{5}});  // sbo
+        small_vector<T, 5> b(std::move(a));
+
+        CAPTURE(a);
+        CAPTURE(b);
+
+        REQUIRE(a.empty());
+        REQUIRE(equals_list(b, {T{1}, T{2}, T{3}, T{4}, T{5}}));
+
+        not_clobbered(a);
+        not_clobbered(b);
     }
 }

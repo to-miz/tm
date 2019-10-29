@@ -1,5 +1,5 @@
 /*
-tm_small_vector.h v0.0.2 - public domain - https://github.com/to-miz/tm
+tm_small_vector.h v0.0.7 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -32,6 +32,12 @@ ISSUES
     - Not yet first release.
 
 HISTORY     (DD.MM.YY)
+    v0.0.7   30.07.19 Added is_sbo method.
+    v0.0.6   13.07.19 Fixed resize returning true on noop.
+    v0.0.5   07.07.19 Changed push_back to return bool.
+                      Every iterator returning method that may allocate now returns nullptr when out of memory.
+    v0.0.4   01.07.19 Fixed move constructor and assignment so they actually move the elements instead of copying.
+    v0.0.3   28.06.19 Fixed faulty implementation of small_vector_alloc<T, no_allocator_tag>::grow_by.
     v0.0.2   27.06.19 Added copy/move constructors and assignment operators.
                       Refactored code such that memcpy/memmove is possible on insert/assign.
                       Renamed small_vector_impl to small_vector_base and moved it out of detail namespace.
@@ -510,8 +516,8 @@ struct small_vector_alloc<T, no_allocator_tag> : public small_vector_impl_base<T
     guts_t create(tm_size_t capacity) { return {}; }
     bool grow_by(guts_t* guts, tm_size_t amount) const {
         TM_ASSERT_VALID_SIZE(amount);
-        TM_ASSERT(guts->max_size() - guts->sz >= guts->amount);  // Check overflow.
-        return guts->sz + guts->amount <= guts->capacity();
+        TM_ASSERT(guts_t::max_count - guts->sz >= amount);  // Check overflow.
+        return guts->sz + amount <= guts->capacity();
     }
     void destroy(guts_t* guts) {
         if constexpr (!::std::is_trivially_destructible<T>::value) {
@@ -602,9 +608,16 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
             this->sz = count;
         }
     }
-
-   public:
     static void copy_uninitialized(T* dest, const T* src, size_type count) {
+        if constexpr (::std::is_trivially_copyable<T>::value) {
+            TM_MEMCPY(dest, src, count * sizeof(T));
+        } else {
+            for (size_type i = 0; i < count; ++i, (void)++src) {
+                TM_PLACEMENT_NEW(&dest[i]) T(*src);
+            }
+        }
+    }
+    static void move_uninitialized(T* dest, T* src, size_type count) {
         if constexpr (::std::is_trivially_copyable<T>::value) {
             TM_MEMCPY(dest, src, count * sizeof(T));
         } else {
@@ -614,6 +627,7 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
         }
     }
 
+   public:
     small_vector_base() = default;
     small_vector_base(const small_vector_base& other) {
         size_type other_size = other.size();
@@ -629,7 +643,7 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
             size_type other_size = other.size();
             static_cast<guts_t&>(*this) = this->create(other_size);
             if (this->capacity() >= other_size) {
-                copy_uninitialized(this->ptr, other.ptr, other_size);
+                move_uninitialized(this->ptr, other.ptr, other_size);
                 this->sz = other_size;
             }
             // TODO: Should we clear on failure still? We expect that other is cleared after a move, but on failure we
@@ -657,7 +671,65 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
     small_vector_base& operator=(small_vector_base&& other) {
         if (this != &other) {
             if (other.is_sbo()) {
-                assign(other.begin(), other.end());
+                iterator first = other.begin();
+                iterator last = other.end();
+                size_type n = (size_type)::std::distance(first, last);
+                TM_ASSERT_VALID_SIZE(n);
+                TM_ASSERT_VALID_SIZE(sz);
+
+                if (n <= 0) {
+                    clear();
+                    other.clear();
+                    return *this;
+                }
+
+                guts_t* guts = this;
+                guts_t new_guts = {};
+                if (n > capacity()) {
+                    if (!owns(first)) {
+                        // We can safely free memory before allocation.
+                        // We don't use realloc, since we don't need to keep old memory around.
+                        this->destroy(this);
+                    }
+                    new_guts = this->create(n);
+                    guts = &new_guts;
+                    if (!new_guts.ptr) {
+                        other.clear();
+                        return *this;
+                    }
+                }
+
+                TM_ASSERT(guts->ptr);
+                if constexpr (::std::is_trivially_copyable<T>::value) {
+                    // We use memmove instead of memcpy since guts->ptr and first are allowed to overlap.
+                    TM_MEMMOVE(guts->ptr, first, n * sizeof(T));
+                } else {
+                    size_type initialized_range = (guts->sz < n) ? guts->sz : n;
+                    size_type uninitialized_range = n - initialized_range;
+                    for (size_type i = 0; i < initialized_range; ++i, (void)++first) {
+                        guts->ptr[i] = ::std::move(*first);
+                    }
+
+                    for (size_type i = 0; i < uninitialized_range; ++i, (void)++first) {
+                        TM_PLACEMENT_NEW(&guts->ptr[initialized_range + i]) T(::std::move(*first));
+                    }
+
+                    if constexpr (!std::is_trivially_destructible<T>::value) {
+                        if (guts->sz > n) {
+                            for (size_type i = n, last_index = guts->sz; i < last_index; ++i) {
+                                guts->ptr[i].~T();
+                            }
+                        }
+                    }
+                }
+                guts->sz = n;
+
+                if (guts == &new_guts) {
+                    this->destroy(this);
+
+                    static_cast<guts_t&>(*this) = new_guts;
+                }
+
                 other.clear();
             } else {
                 base::destroy(this);
@@ -674,6 +746,8 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
     }
     // Named constructors.
     ~small_vector_base() { base::destroy(this); }
+
+    bool is_sbo() const { return static_cast<const guts_t*>(this)->is_sbo(); }
 
     iterator insert(const_iterator pos, size_type n, const T& value) {
         if (!owns(value)) {
@@ -701,26 +775,27 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
         }
     }
 
-    void push_back(const T& value) {
+    bool push_back(const T& value) {
         if (!owns(value)) {
-            insert_value_impl(end(), value);
+            return insert_value_impl(end(), value) != nullptr;
         } else {
             T temp{value};
-            insert_value_impl(end(), temp);
+            return insert_value_impl(end(), temp) != nullptr;
         }
     }
-    void push_back(T&& value) {
+    bool push_back(T&& value) {
         if (!owns(value)) {
-            insert_value_impl(end(), ::std::move(value));
+            return insert_value_impl(end(), ::std::move(value)) != nullptr;
         } else {
             T temp{std::move(value)};
-            insert_value_impl(end(), ::std::move(temp));
+            return insert_value_impl(end(), ::std::move(temp)) != nullptr;
         }
     }
 
     bool resize(size_type count) { return resize(count, T{}); }
     bool resize(size_type count, const value_type& value) {
         TM_ASSERT_VALID_SIZE(count);
+        if (sz == count) return true;
         size_type old_size = sz;
         if (sz > count) {
             this->erase(ptr + count, ptr + sz);
@@ -787,8 +862,9 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
                     TM_PLACEMENT_NEW(room.first_uninitialized) T(std::forward<Args>(args)...);
                 }
             }
+            return ptr + prefix_count;
         }
-        return ptr + prefix_count;
+        return nullptr;
     }
 
     template <class... Args>
@@ -925,8 +1001,9 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
                     TM_PLACEMENT_NEW(room.first_uninitialized) T(value);
                 }
             }
+            return ptr + prefix_count;
         }
-        return ptr + prefix_count;
+        return nullptr;
     }
     iterator insert_value_impl(const_iterator pos, T&& value) {
         TM_ASSERT(owns(pos));
@@ -945,8 +1022,9 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
                     TM_PLACEMENT_NEW(room.first_uninitialized) T(std::move(value));
                 }
             }
+            return ptr + prefix_count;
         }
-        return ptr + prefix_count;
+        return nullptr;
     }
 
     iterator insert_n_impl(const_iterator pos, size_type n, const T& value) {
@@ -973,8 +1051,9 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
                     TM_PLACEMENT_NEW(dest) T(value);
                 }
             }
+            return ptr + prefix_count;
         }
-        return ptr + prefix_count;
+        return nullptr;
     }
 
     template <class InputIt>
@@ -990,8 +1069,9 @@ class small_vector_base : public ::tml::detail::small_vector_alloc<T, AllocatorT
         room_result room = {};
         if (make_room(pos, n, &room)) {
             copy_unchecked(first, room, /*dest_end=*/ptr + prefix_count + n);
+            return ptr + prefix_count;
         }
-        return ptr + prefix_count;
+        return nullptr;
     }
 
     template <class InputIt>
@@ -1209,7 +1289,7 @@ class small_vector : public ::tml::small_vector_base<T, AllocatorTag>, private :
                 if (new_guts.ptr) static_cast<guts_t&>(*this) = new_guts;
             }
             if (this->capacity() >= other_size) {
-                base::copy_uninitialized(this->ptr, other.ptr, other_size);
+                base::move_uninitialized(this->ptr, other.ptr, other_size);
                 this->sz = other_size;
             }
             // TODO: Should we clear on failure still? We expect that other is cleared after a move, but on failure we
