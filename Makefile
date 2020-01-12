@@ -45,6 +45,9 @@ include src/tm_async/tm_async.mk
 include src/tm_small_vector/tm_small_vector.mk
 include tests/src/tm_small_vector/tm_small_vector.mk
 
+include src/tm_allocator/tm_allocator.mk
+include tests/src/tm_allocator/tm_allocator.mk
+
 # Combined
 
 merge.all.deps := tm_conversion.h tm_print.h tm_json.h tm_cli.h

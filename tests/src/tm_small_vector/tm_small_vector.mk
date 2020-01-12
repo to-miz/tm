@@ -27,6 +27,6 @@ tests.tm_small_vector.run: ${tests.tm_small_vector.all_config_deps}
 	${hide}echo Running Test: ${tests.tm_small_vector.signed_size_t.out}.
 	${hide}${tests.tm_small_vector.signed_size_t.out}
 
-tests: test.tm_small_vector
+tests: tests.tm_small_vector
 
 tests.run: tests.tm_small_vector.run

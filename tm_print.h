@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.21 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.22 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -84,6 +84,7 @@ ISSUES
     - Types that are implicitly convertible to string_view produce errors currently.
 
 HISTORY
+    v0.0.22 30.05.19 Fixed linking error due to missing inline specifier.
     v0.0.21 30.05.19 Made error codes depend on <errno.h> by default.
     v0.0.20 03.05.19 Added static asserts to sanity check tm_conversion.h backend print flags compatibility.
     v0.0.19 14.04.19 Fixed tmp_has_custom_printer detecting wrong signature for custom snprint functions.
@@ -179,6 +180,7 @@ HISTORY
         #include <cstdlib>
         #define TM_MALLOC(size, alignment) std::malloc((size))
         #define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) std::realloc((ptr), (new_size))
+        // #define TM_REALLOC_IN_PLACE(ptr, old_size, old_alignment, new_size, new_alignment) // Optional
         #define TM_FREE(ptr, size, alignment) std::free((ptr))
     #endif
 
@@ -259,7 +261,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_14E73C89_58CA_4CC4_9D19_99F0A3D7EA07_
 #define _TM_PRINT_H_INCLUDED_14E73C89_58CA_4CC4_9D19_99F0A3D7EA07_
 
-#define TMP_VERSION 0x00000015u
+#define TMP_VERSION 0x00000016u
 
 /* assert */
 #ifndef TM_ASSERT
@@ -811,7 +813,7 @@ void fill_print_arg_list(PrintArgList*, const T&, const Types&...) {
     static_assert(tmp_type_flags<T>::value == 0, "");  // this function is not allowed to be instantiated
 }
 #endif
-void fill_print_arg_list(PrintArgList*) {}
+inline void fill_print_arg_list(PrintArgList*) {}
 
 template <class... Types>
 void make_print_arg_list(PrintArgList* list, size_t capacity, const Types&... args) {

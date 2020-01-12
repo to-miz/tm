@@ -158,7 +158,7 @@ DEFINES.release := NDEBUG ${windows_defines}
 
 # clang
 
-warnings.clang := -Wall -Wextra -Werror -pedantic -pedantic-errors
+warnings.clang := -Wall -Wextra -Werror -pedantic -pedantic-errors -Wno-gnu-zero-variadic-macro-arguments
 sanitize.clang ?= -fsanitize=address
 
 options.clang.debug   := -fstack-protector-all -g -ggdb -fno-omit-frame-pointer ${sanitize.clang}

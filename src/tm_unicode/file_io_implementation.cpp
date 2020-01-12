@@ -50,4 +50,13 @@ static FILE* tmu_freopen_t(const tmu_tchar* filename, const tmu_tchar* mode, FIL
 
 #endif /* defined(TMU_IMPLEMENT_CRT) */
 
+#if defined(TMU_USE_CONSOLE) && defined(TMU_USE_CRT)
+TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f) {
+    if (f == stdin) return tmu_console_in;
+    if (f == stdout) return tmu_console_out;
+    if (f == stderr) return tmu_console_err;
+    return tmu_console_invalid;
+}
+#endif /* defined(TMU_USE_CONSOLE) && defined(TMU_USE_CRT) */
+
 #include "common_implementation.cpp"

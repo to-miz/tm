@@ -5,6 +5,8 @@
 #define TM_STRING_VIEW_SIZE(x) (x).size()
 #endif
 
+#define TMU_USE_CONSOLE
+
 #if defined(_WIN32) && 0
 #define TMU_USE_WINDOWS_H
 #else

@@ -1,0 +1,3 @@
+#ifndef TM_DEFAULT_ALIGNMENT
+    #define TM_DEFAULT_ALIGNMENT 8
+#endif

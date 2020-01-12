@@ -79,3 +79,21 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     if (result.ec == TM_OK) tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_TRUE);
     return result;
 }
+
+#if defined(TMU_USE_CONSOLE)
+
+TMU_DEF void tmu_console_output_init() {}
+TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str) {
+    TM_ASSERT(str);
+    return tmu_console_output_n(handle, str, TMU_STRLEN(str));
+}
+TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len) {
+    TM_ASSERT(str || len == 0);
+    if (handle <= tmu_console_in || handle > tmu_console_err) return TM_FALSE;
+    if (!len) return TM_TRUE;
+
+    FILE* files[3] = {stdin, stdout, stderr};
+    return fwritef(str, sizeof(char), len, files[handle]) == (size_t)len;
+}
+
+#endif

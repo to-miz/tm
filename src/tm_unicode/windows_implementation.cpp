@@ -461,6 +461,7 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     return result;
 }
 
+#if !defined(TMU_NO_SHELLAPI)
 TMU_DEF tmu_utf8_command_line_result tmu_utf8_winapi_get_command_line() {
     tmu_utf8_command_line_result result = {{TM_NULL, 0, TM_NULL, 0}, TM_OK};
 
@@ -494,3 +495,73 @@ TMU_DEF tmu_utf8_command_line_managed_result tmu_utf8_winapi_get_command_line_ma
     return result;
 }
 #endif /* defined(__cplusplus) */
+
+#endif /* !defined(TMU_NO_SHELLAPI) */
+
+#if defined(TMU_USE_CONSOLE)
+
+struct tmu_console_state_t {
+    HANDLE handle;
+    tm_bool is_redirected_to_file;
+};
+
+static struct tmu_console_state_t tmu_console_state[3];
+
+TMU_DEF void tmu_console_output_init() {
+    DWORD mode = 0;
+    DWORD handle_ids[3] = {STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
+    for (int i = tmu_console_in; i <= tmu_console_err; ++i) {
+        tmu_console_state[i].handle = GetStdHandle(handle_ids[i]);
+        tmu_console_state[i].is_redirected_to_file = !GetConsoleMode(tmu_console_state[i].handle, &mode);
+    }
+
+    // See https://docs.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
+    const DWORD Utf16Codepage = 1200;
+    SetConsoleOutputCP(Utf16Codepage);
+    SetConsoleCP(Utf16Codepage);
+}
+TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str) {
+    TM_ASSERT(str);
+    return tmu_console_output_n(handle, str, TMU_STRLEN(str));
+}
+TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len) {
+    TM_ASSERT(str || len == 0);
+    if (handle <= tmu_console_in || handle > tmu_console_err) return TM_FALSE;
+    if (!len) return TM_TRUE;
+
+    DWORD written = 0;
+    if (tmu_console_state[handle].is_redirected_to_file) {
+        BOOL result = WriteFile(tmu_console_state[handle].handle, str, (DWORD)len, &written, /*overlapped=*/TM_NULL);
+        if (!result) return TM_FALSE;
+        return written == (DWORD)len;
+    }
+
+    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
+    tmu_conversion_result conv_result =
+        tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                               /*replace_str_len=*/0,
+                               /*nullterminate=*/TM_FALSE, /*out=*/TM_NULL, /*out_len=*/0);
+    if (conv_result.ec != TM_ERANGE) return conv_result.ec == TM_OK;
+
+    tmu_char16 sbo[TMU_SBO_SIZE];
+    tmu_char16* wide = sbo;
+    if (conv_result.size > TMU_SBO_SIZE) {
+        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        if (!wide) return TM_FALSE;
+    }
+
+    conv_result = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                                         /*replace_str_len=*/0,
+                                         /*nullterminate=*/TM_FALSE, wide, conv_result.size);
+    if (conv_result.ec == TM_OK) {
+        BOOL result = WriteConsoleW(tmu_console_state[handle].handle, wide, (DWORD)conv_result.size, &written, TM_NULL);
+        if (!result) written = 0;
+    }
+
+    if (wide != sbo) {
+        TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+    }
+    return written == (DWORD)conv_result.size;
+}
+
+#endif /* defined(TMU_USE_CONSOLE) */

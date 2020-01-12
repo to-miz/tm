@@ -305,7 +305,7 @@ void fill_print_arg_list(PrintArgList*, const T&, const Types&...) {
     static_assert(tmp_type_flags<T>::value == 0, "");  // this function is not allowed to be instantiated
 }
 #endif
-void fill_print_arg_list(PrintArgList*) {}
+inline void fill_print_arg_list(PrintArgList*) {}
 
 template <class... Types>
 void make_print_arg_list(PrintArgList* list, size_t capacity, const Types&... args) {

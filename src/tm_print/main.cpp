@@ -1,5 +1,5 @@
 /*
-tm_print.h v0.0.21 - public domain - https://github.com/to-miz/tm
+tm_print.h v0.0.22 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -84,6 +84,7 @@ ISSUES
     - Types that are implicitly convertible to string_view produce errors currently.
 
 HISTORY
+    v0.0.22 30.05.19 Fixed linking error due to missing inline specifier.
     v0.0.21 30.05.19 Made error codes depend on <errno.h> by default.
     v0.0.20 03.05.19 Added static asserts to sanity check tm_conversion.h backend print flags compatibility.
     v0.0.19 14.04.19 Fixed tmp_has_custom_printer detecting wrong signature for custom snprint functions.
@@ -157,7 +158,7 @@ HISTORY
 #ifndef _TM_PRINT_H_INCLUDED_14E73C89_58CA_4CC4_9D19_99F0A3D7EA07_
 #define _TM_PRINT_H_INCLUDED_14E73C89_58CA_4CC4_9D19_99F0A3D7EA07_
 
-#define TMP_VERSION 0x00000015u
+#define TMP_VERSION 0x00000016u
 
 #include "dependencies_header.h"
 

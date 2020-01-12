@@ -87,10 +87,11 @@ TMU_DEF tmu_utf8_command_line_result tmu_utf8_command_line_from_utf16(tmu_char16
                                                                       int utf16_args_count);
 TMU_DEF void tmu_utf8_destroy_command_line(tmu_utf8_command_line* command_line);
 
-#if defined(TMU_USE_WINDOWS_H)
+#if defined(TMU_USE_WINDOWS_H) && !defined(TMU_NO_SHELLAPI)
 /*
 Winapi only extension, get command line directly without supplying the Utf-16 arguments.
 Result must still be destroyed using tmu_utf8_destroy_command_line.
+Requires to link against Shell32.lib.
 */
 TMU_DEF tmu_utf8_command_line_result tmu_utf8_winapi_get_command_line();
 #endif
@@ -98,6 +99,59 @@ TMU_DEF tmu_utf8_command_line_result tmu_utf8_winapi_get_command_line();
 #if defined(TMU_USE_CRT)
 TMU_DEF FILE* tmu_fopen(const char* filename, const char* mode);
 TMU_DEF FILE* tmu_freopen(const char* filename, const char* mode, FILE* current);
+#endif
+
+#if defined(TMU_USE_CONSOLE)
+/*
+Utf-8 console output wrappers.
+Utf-8 console output on Windows is not very straightforward.
+There are two ways to accomplish it:
+    Using Microsoft CRT extensions and wprintf:
+        _setmode(_fileno(stdout), _O_U16TEXT);
+        wprintf(...);
+
+        These only work reliably with MSVC, MinGw might have issues with it.
+        The other issue is when output is redirected to a file, Powershell doesn't detect the mode as Utf-16 and
+        reencodes the output.
+        Another big issue is that this disables using printf in any part of the code. Using printf will trigger an
+        assertion. It is recommended to define TMU_USE_WINDOWS_H and use Winapi when TMU_USE_CONSOLE is defined.
+        This method only exists for completeness.
+
+    Using Winapi console functions:
+        SetConsoleOutputCP(...);
+        SetConsoleCP(...);
+        ConsoleWriteW(...); // When output is on console.
+        WriteFile(...);     // When output is redirected to a file.
+
+Thus the best method seems to be using the Winapi functions directly, which requires Windows headers.
+
+These wrappers will do the following:
+    On Linux they just wrap fwritef.
+    On Windows:
+        If TMU_USE_WINDOWS_H is defined, will use Winapi functions.
+            ConsoleWriteW with Utf-8 to Utf-16 conversion on console output.
+            WriteFile with Utf-8 on file output.
+        If TMU_USE_CRT is defined, will use Microsoft CRT extensions.
+        Otherwise they just wrap fwritef.
+*/
+
+typedef enum {
+    tmu_console_invalid = -1,
+    tmu_console_in = 0,
+    tmu_console_out,
+    tmu_console_err
+} tmu_console_handle;
+/*
+Initializes console output. Not thread-safe. Must be called before any output.
+*/
+TMU_DEF void tmu_console_output_init();
+TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str);
+TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len);
+
+#if defined(TMU_USE_CRT)
+TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f);
+#endif
+
 #endif
 
 #if defined(__cplusplus)
@@ -141,7 +195,7 @@ struct tmu_utf8_command_line_managed_result {
 TMU_DEF tmu_utf8_command_line_managed_result
 tmu_utf8_command_line_from_utf16_managed(tmu_char16 const* const* utf16_args, int utf16_args_count);
 
-#if defined(TMU_USE_WINDOWS_H)
+#if defined(TMU_USE_WINDOWS_H) && !defined(TMU_NO_SHELLAPI)
 /*
 Winapi only extension, get command line directly without supplying the Utf-16 arguments.
 Result must still be destroyed using tmu_utf8_destroy_command_line.

@@ -1,5 +1,5 @@
 #if !defined(TMU_TESTING_CHAR16_DEFINED)
-	#if defined(TMU_USE_WINDOWS_H)
+	#if defined(TMU_USE_WINDOWS_H) && !defined(TMU_USE_CRT)
 		typedef WCHAR tmu_char16;
 	#else
 		#include <wchar.h>

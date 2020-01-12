@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.6 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.1.8 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -56,8 +56,30 @@ SWITCHES
         Both TMU_USE_CRT and TMU_USE_WINDOWS_H can be defined at the same time.
         This allows CRT file IO to be accessible even with the Winapi backend.
 
+    TMU_NO_SHELLAPI:
+        Disables tmu_utf8_winapi_get_command_line on Windows, since that requires Shellapi.h
+        and linking against Shell32.lib.
+
     TMU_NO_FILE_IO
         As the name suggests, if this is defined, no file IO functions are supplied.
+
+    TMU_USE_CONSOLE:
+        Enables tmu_console_output for Utf-8 console output. Needs file io.
+        On Windows it is recommended to use Winapi (TMU_USE_WINDOWS_H) when using console output.
+        See tmu_console_output documentation.
+
+    TMU_DEFINE_MAIN:
+        The implementation will define the main function.
+        If UNICODE or _UNICODE is defined, the implementation uses wmain to then convert
+        argv into Utf-8. Then tmu_main is called with the Utf-8 arguments.
+        If UNICODE or _UNICODE is not defined, main just calls into tmu_main as is.
+        Note when using Mingw on Windows, you need to pass -municode so that wmain is used.
+
+        If TMU_USE_CONSOLE is also defined, tmu_console_output_init() will be called before
+        entering tmu_main.
+
+        tmu_main has to be supplied by the usage code. It has the signature:
+            int tmu_main(int argc, const char *const * argv)
 
 ISSUES
     - No locale support for case folding (some locales case fold differently,
@@ -70,6 +92,8 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY
+    v0.1.8  01.01.20 Added TMU_USE_CONSOLE and TMU_NO_SHELLAPI.
+    v0.1.7  01.01.20 Added TMU_DEFINE_MAIN.
     v0.1.6  12.07.19 Fixed error in documentation.
     v0.1.5  30.05.19 Made error codes depend on <errno.h> by default.
     v0.1.4  02.04.19 Fixed gcc/clang compilation errors.

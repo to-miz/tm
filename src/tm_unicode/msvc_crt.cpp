@@ -106,3 +106,54 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     free(dir); /* _wgetcwd calls specifically malloc, we need to directly use free instead of TMU_FREE.*/
     return result;
 }
+
+#if defined(TMU_USE_CONSOLE)
+
+#include <fcntl.h>
+#include <io.h>
+
+TMU_DEF void tmu_console_output_init() {
+    _setmode(_fileno(stdout), _O_U16TEXT);
+    _setmode(_fileno(stderr), _O_U16TEXT);
+}
+TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str) {
+    TM_ASSERT(str);
+    return tmu_console_output_n(handle, str, TMU_STRLEN(str));
+}
+TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len) {
+    TM_ASSERT(str || len == 0);
+    if (handle <= tmu_console_in || handle > tmu_console_err) return TM_FALSE;
+    if (!len) return TM_TRUE;
+
+    FILE* files[3] = {stdin, stdout, stderr};
+
+    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
+    tmu_conversion_result conv_result =
+        tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                               /*replace_str_len=*/0,
+                               /*nullterminate=*/TM_TRUE, /*out=*/TM_NULL, /*out_len=*/0);
+    if (conv_result.ec != TM_ERANGE) return conv_result.ec == TM_OK;
+
+    tm_size_t written = 0;
+    tmu_char16 sbo[TMU_SBO_SIZE];
+    tmu_char16* wide = sbo;
+    if (conv_result.size > TMU_SBO_SIZE) {
+        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        if (!wide) return TM_FALSE;
+    }
+
+    conv_result = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                                         /*replace_str_len=*/0,
+                                         /*nullterminate=*/TM_TRUE, wide, conv_result.size);
+    if (conv_result.ec == TM_OK) {
+        int print_result = fwprintf(files[handle], L"%ls", wide);
+        if (print_result >= 0) written = (tm_size_t)print_result;
+    }
+
+    if (wide != sbo) {
+        TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+    }
+    return written == conv_result.size;
+}
+
+#endif

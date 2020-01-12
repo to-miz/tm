@@ -1821,3 +1821,30 @@ TMU_DEF int tmu_utf8_human_compare(const char* a, tm_size_t a_len, const char* b
 #endif /* TMU_UCD_HAS_FULL_CASE_FOLD */
 
 #endif /* defined(TMU_UCD_HAS_CASE_INFO) */
+
+#ifdef TMU_DEFINE_MAIN
+extern int tmu_main(int argc, const char* const* argv);
+
+#if defined(UNICODE) || defined(_UNICODE)
+int wmain(int argc, wchar_t const* argv[]) {
+    tmu_utf8_command_line_result utf8_cl = tmu_utf8_command_line_from_utf16(argv, argc);
+    if (utf8_cl.ec != TM_OK) return -1;
+#if defined(TMU_USE_CONSOLE)
+    tmu_console_output_init();
+#endif
+    int tmu_main_result = tmu_main(utf8_cl.command_line.args_count, utf8_cl.command_line.args);
+    tmu_utf8_destroy_command_line(&utf8_cl.command_line);
+    return tmu_main_result;
+}
+
+#else /* defined(UNICODE) || defined(_UNICODE) */
+int main(int argc, char const* argv[]) {
+#if defined(TMU_USE_CONSOLE)
+    tmu_console_output_init();
+#endif
+    return tmu_main(argc, argv);
+}
+
+#endif /* defined(UNICODE) || defined(_UNICODE) */
+
+#endif /* TMU_DEFINE_MAIN */

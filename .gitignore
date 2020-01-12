@@ -17,10 +17,5 @@ config.mk
 *.sublime-workspace
 
 # Misc test files.
-src/experimental/*
+# src/experimental/*
 tools/merge/tests/*
-
-# Some files that aren't ready to push.
-tm_regex.h
-tm_string_matching.h
-tm_file.h

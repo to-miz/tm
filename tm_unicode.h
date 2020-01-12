@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.6 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.1.8 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2019
 
 No warranty; use at your own risk.
@@ -56,8 +56,30 @@ SWITCHES
         Both TMU_USE_CRT and TMU_USE_WINDOWS_H can be defined at the same time.
         This allows CRT file IO to be accessible even with the Winapi backend.
 
+    TMU_NO_SHELLAPI:
+        Disables tmu_utf8_winapi_get_command_line on Windows, since that requires Shellapi.h
+        and linking against Shell32.lib.
+
     TMU_NO_FILE_IO
         As the name suggests, if this is defined, no file IO functions are supplied.
+
+    TMU_USE_CONSOLE:
+        Enables tmu_console_output for Utf-8 console output. Needs file io.
+        On Windows it is recommended to use Winapi (TMU_USE_WINDOWS_H) when using console output.
+        See tmu_console_output documentation.
+
+    TMU_DEFINE_MAIN:
+        The implementation will define the main function.
+        If UNICODE or _UNICODE is defined, the implementation uses wmain to then convert
+        argv into Utf-8. Then tmu_main is called with the Utf-8 arguments.
+        If UNICODE or _UNICODE is not defined, main just calls into tmu_main as is.
+        Note when using Mingw on Windows, you need to pass -municode so that wmain is used.
+
+        If TMU_USE_CONSOLE is also defined, tmu_console_output_init() will be called before
+        entering tmu_main.
+
+        tmu_main has to be supplied by the usage code. It has the signature:
+            int tmu_main(int argc, const char *const * argv)
 
 ISSUES
     - No locale support for case folding (some locales case fold differently,
@@ -70,6 +92,8 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY
+    v0.1.8  01.01.20 Added TMU_USE_CONSOLE and TMU_NO_SHELLAPI.
+    v0.1.7  01.01.20 Added TMU_DEFINE_MAIN.
     v0.1.6  12.07.19 Fixed error in documentation.
     v0.1.5  30.05.19 Made error codes depend on <errno.h> by default.
     v0.1.4  02.04.19 Fixed gcc/clang compilation errors.
@@ -275,7 +299,7 @@ TMU_UCD_DEF tmu_ucd_case_info_enum tmu_ucd_get_case_info(uint32_t codepoint);
 #endif /* defined(TMU_USE_STL) && defined(__cplusplus) */
 
 #if !defined(TMU_TESTING_CHAR16_DEFINED)
-	#if defined(TMU_USE_WINDOWS_H)
+	#if defined(TMU_USE_WINDOWS_H) && !defined(TMU_USE_CRT)
 		typedef WCHAR tmu_char16;
 	#else
 		#include <wchar.h>
@@ -677,10 +701,11 @@ TMU_DEF tmu_utf8_command_line_result tmu_utf8_command_line_from_utf16(tmu_char16
                                                                       int utf16_args_count);
 TMU_DEF void tmu_utf8_destroy_command_line(tmu_utf8_command_line* command_line);
 
-#if defined(TMU_USE_WINDOWS_H)
+#if defined(TMU_USE_WINDOWS_H) && !defined(TMU_NO_SHELLAPI)
 /*
 Winapi only extension, get command line directly without supplying the Utf-16 arguments.
 Result must still be destroyed using tmu_utf8_destroy_command_line.
+Requires to link against Shell32.lib.
 */
 TMU_DEF tmu_utf8_command_line_result tmu_utf8_winapi_get_command_line();
 #endif
@@ -688,6 +713,59 @@ TMU_DEF tmu_utf8_command_line_result tmu_utf8_winapi_get_command_line();
 #if defined(TMU_USE_CRT)
 TMU_DEF FILE* tmu_fopen(const char* filename, const char* mode);
 TMU_DEF FILE* tmu_freopen(const char* filename, const char* mode, FILE* current);
+#endif
+
+#if defined(TMU_USE_CONSOLE)
+/*
+Utf-8 console output wrappers.
+Utf-8 console output on Windows is not very straightforward.
+There are two ways to accomplish it:
+    Using Microsoft CRT extensions and wprintf:
+        _setmode(_fileno(stdout), _O_U16TEXT);
+        wprintf(...);
+
+        These only work reliably with MSVC, MinGw might have issues with it.
+        The other issue is when output is redirected to a file, Powershell doesn't detect the mode as Utf-16 and
+        reencodes the output.
+        Another big issue is that this disables using printf in any part of the code. Using printf will trigger an
+        assertion. It is recommended to define TMU_USE_WINDOWS_H and use Winapi when TMU_USE_CONSOLE is defined.
+        This method only exists for completeness.
+
+    Using Winapi console functions:
+        SetConsoleOutputCP(...);
+        SetConsoleCP(...);
+        ConsoleWriteW(...); // When output is on console.
+        WriteFile(...);     // When output is redirected to a file.
+
+Thus the best method seems to be using the Winapi functions directly, which requires Windows headers.
+
+These wrappers will do the following:
+    On Linux they just wrap fwritef.
+    On Windows:
+        If TMU_USE_WINDOWS_H is defined, will use Winapi functions.
+            ConsoleWriteW with Utf-8 to Utf-16 conversion on console output.
+            WriteFile with Utf-8 on file output.
+        If TMU_USE_CRT is defined, will use Microsoft CRT extensions.
+        Otherwise they just wrap fwritef.
+*/
+
+typedef enum {
+    tmu_console_invalid = -1,
+    tmu_console_in = 0,
+    tmu_console_out,
+    tmu_console_err
+} tmu_console_handle;
+/*
+Initializes console output. Not thread-safe. Must be called before any output.
+*/
+TMU_DEF void tmu_console_output_init();
+TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str);
+TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len);
+
+#if defined(TMU_USE_CRT)
+TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f);
+#endif
+
 #endif
 
 #if defined(__cplusplus)
@@ -731,7 +809,7 @@ struct tmu_utf8_command_line_managed_result {
 TMU_DEF tmu_utf8_command_line_managed_result
 tmu_utf8_command_line_from_utf16_managed(tmu_char16 const* const* utf16_args, int utf16_args_count);
 
-#if defined(TMU_USE_WINDOWS_H)
+#if defined(TMU_USE_WINDOWS_H) && !defined(TMU_NO_SHELLAPI)
 /*
 Winapi only extension, get command line directly without supplying the Utf-16 arguments.
 Result must still be destroyed using tmu_utf8_destroy_command_line.
@@ -5149,6 +5227,33 @@ TMU_DEF int tmu_utf8_human_compare(const char* a, tm_size_t a_len, const char* b
 
 #endif /* defined(TMU_UCD_HAS_CASE_INFO) */
 
+#ifdef TMU_DEFINE_MAIN
+extern int tmu_main(int argc, const char* const* argv);
+
+#if defined(UNICODE) || defined(_UNICODE)
+int wmain(int argc, wchar_t const* argv[]) {
+    tmu_utf8_command_line_result utf8_cl = tmu_utf8_command_line_from_utf16(argv, argc);
+    if (utf8_cl.ec != TM_OK) return -1;
+#if defined(TMU_USE_CONSOLE)
+    tmu_console_output_init();
+#endif
+    int tmu_main_result = tmu_main(utf8_cl.command_line.args_count, utf8_cl.command_line.args);
+    tmu_utf8_destroy_command_line(&utf8_cl.command_line);
+    return tmu_main_result;
+}
+
+#else /* defined(UNICODE) || defined(_UNICODE) */
+int main(int argc, char const* argv[]) {
+#if defined(TMU_USE_CONSOLE)
+    tmu_console_output_init();
+#endif
+    return tmu_main(argc, argv);
+}
+
+#endif /* defined(UNICODE) || defined(_UNICODE) */
+
+#endif /* TMU_DEFINE_MAIN */
+
 #if !defined(TMU_NO_FILE_IO)
 
 /* clang-format off */
@@ -5700,6 +5805,7 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     return result;
 }
 
+#if !defined(TMU_NO_SHELLAPI)
 TMU_DEF tmu_utf8_command_line_result tmu_utf8_winapi_get_command_line() {
     tmu_utf8_command_line_result result = {{TM_NULL, 0, TM_NULL, 0}, TM_OK};
 
@@ -5733,6 +5839,76 @@ TMU_DEF tmu_utf8_command_line_managed_result tmu_utf8_winapi_get_command_line_ma
     return result;
 }
 #endif /* defined(__cplusplus) */
+
+#endif /* !defined(TMU_NO_SHELLAPI) */
+
+#if defined(TMU_USE_CONSOLE)
+
+struct tmu_console_state_t {
+    HANDLE handle;
+    tm_bool is_redirected_to_file;
+};
+
+static struct tmu_console_state_t tmu_console_state[3];
+
+TMU_DEF void tmu_console_output_init() {
+    DWORD mode = 0;
+    DWORD handle_ids[3] = {STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
+    for (int i = tmu_console_in; i <= tmu_console_err; ++i) {
+        tmu_console_state[i].handle = GetStdHandle(handle_ids[i]);
+        tmu_console_state[i].is_redirected_to_file = !GetConsoleMode(tmu_console_state[i].handle, &mode);
+    }
+
+    // See https://docs.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
+    const DWORD Utf16Codepage = 1200;
+    SetConsoleOutputCP(Utf16Codepage);
+    SetConsoleCP(Utf16Codepage);
+}
+TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str) {
+    TM_ASSERT(str);
+    return tmu_console_output_n(handle, str, TMU_STRLEN(str));
+}
+TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len) {
+    TM_ASSERT(str || len == 0);
+    if (handle <= tmu_console_in || handle > tmu_console_err) return TM_FALSE;
+    if (!len) return TM_TRUE;
+
+    DWORD written = 0;
+    if (tmu_console_state[handle].is_redirected_to_file) {
+        BOOL result = WriteFile(tmu_console_state[handle].handle, str, (DWORD)len, &written, /*overlapped=*/TM_NULL);
+        if (!result) return TM_FALSE;
+        return written == (DWORD)len;
+    }
+
+    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
+    tmu_conversion_result conv_result =
+        tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                               /*replace_str_len=*/0,
+                               /*nullterminate=*/TM_FALSE, /*out=*/TM_NULL, /*out_len=*/0);
+    if (conv_result.ec != TM_ERANGE) return conv_result.ec == TM_OK;
+
+    tmu_char16 sbo[TMU_SBO_SIZE];
+    tmu_char16* wide = sbo;
+    if (conv_result.size > TMU_SBO_SIZE) {
+        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        if (!wide) return TM_FALSE;
+    }
+
+    conv_result = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                                         /*replace_str_len=*/0,
+                                         /*nullterminate=*/TM_FALSE, wide, conv_result.size);
+    if (conv_result.ec == TM_OK) {
+        BOOL result = WriteConsoleW(tmu_console_state[handle].handle, wide, (DWORD)conv_result.size, &written, TM_NULL);
+        if (!result) written = 0;
+    }
+
+    if (wide != sbo) {
+        TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+    }
+    return written == (DWORD)conv_result.size;
+}
+
+#endif /* defined(TMU_USE_CONSOLE) */
 
 #elif defined(TMU_USE_CRT)
 
@@ -5846,6 +6022,57 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     return result;
 }
 
+#if defined(TMU_USE_CONSOLE)
+
+#include <fcntl.h>
+#include <io.h>
+
+TMU_DEF void tmu_console_output_init() {
+    _setmode(_fileno(stdout), _O_U16TEXT);
+    _setmode(_fileno(stderr), _O_U16TEXT);
+}
+TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str) {
+    TM_ASSERT(str);
+    return tmu_console_output_n(handle, str, TMU_STRLEN(str));
+}
+TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len) {
+    TM_ASSERT(str || len == 0);
+    if (handle <= tmu_console_in || handle > tmu_console_err) return TM_FALSE;
+    if (!len) return TM_TRUE;
+
+    FILE* files[3] = {stdin, stdout, stderr};
+
+    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
+    tmu_conversion_result conv_result =
+        tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                               /*replace_str_len=*/0,
+                               /*nullterminate=*/TM_TRUE, /*out=*/TM_NULL, /*out_len=*/0);
+    if (conv_result.ec != TM_ERANGE) return conv_result.ec == TM_OK;
+
+    tm_size_t written = 0;
+    tmu_char16 sbo[TMU_SBO_SIZE];
+    tmu_char16* wide = sbo;
+    if (conv_result.size > TMU_SBO_SIZE) {
+        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        if (!wide) return TM_FALSE;
+    }
+
+    conv_result = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                                         /*replace_str_len=*/0,
+                                         /*nullterminate=*/TM_TRUE, wide, conv_result.size);
+    if (conv_result.ec == TM_OK) {
+        int print_result = fwprintf(files[handle], L"%ls", wide);
+        if (print_result >= 0) written = (tm_size_t)print_result;
+    }
+
+    if (wide != sbo) {
+        TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+    }
+    return written == conv_result.size;
+}
+
+#endif
+
 #else
 #error tm_unicode.h needs either TMU_USE_WINDOWS_H or TMU_USE_CRT to be defined.
 #endif /* defined(TMU_USE_WINDOWS_H) || defined(TMU_USE_CRT) */
@@ -5939,6 +6166,24 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     if (result.ec == TM_OK) tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_TRUE);
     return result;
 }
+
+#if defined(TMU_USE_CONSOLE)
+
+TMU_DEF void tmu_console_output_init() {}
+TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str) {
+    TM_ASSERT(str);
+    return tmu_console_output_n(handle, str, TMU_STRLEN(str));
+}
+TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len) {
+    TM_ASSERT(str || len == 0);
+    if (handle <= tmu_console_in || handle > tmu_console_err) return TM_FALSE;
+    if (!len) return TM_TRUE;
+
+    FILE* files[3] = {stdin, stdout, stderr};
+    return fwritef(str, sizeof(char), len, files[handle]) == (size_t)len;
+}
+
+#endif
 
 #else
 #error Not implemented on this platform.
@@ -6220,7 +6465,17 @@ static tm_errc tmu_delete_directory_t(const tmu_tchar* dir) {
 #undef TMU_FOPEN_READ
 #undef TMU_FOPEN_WRITE
 
+
 #endif /* defined(TMU_IMPLEMENT_CRT) */
+
+#if defined(TMU_USE_CONSOLE) && defined(TMU_USE_CRT)
+TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f) {
+    if (f == stdin) return tmu_console_in;
+    if (f == stdout) return tmu_console_out;
+    if (f == stderr) return tmu_console_err;
+    return tmu_console_invalid;
+}
+#endif /* defined(TMU_USE_CONSOLE) && defined(TMU_USE_CRT) */
 
 static void tmu_to_tmu_path(struct tmu_contents_struct* path, tm_bool is_dir) {
     TM_ASSERT(path);
