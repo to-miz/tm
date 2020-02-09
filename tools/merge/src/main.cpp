@@ -344,6 +344,27 @@ void indent_range(std::vector<char>& data, std::vector<char>::iterator first, st
     }
 }
 
+void process_definitions(std::vector<char>& data, const std::vector<merge_definition>& definitions) {
+    for (auto& def : definitions) {
+        // Replace all occurences of def.name with def.value.
+        auto pos = data.begin();
+        for (;;) {
+            pos = std::search(pos, data.end(), def.name, def.name + def.name_len);
+            if (pos == data.end()) break;
+            auto last = pos + def.name_len;
+            // Only replace if we matched to a whole identifier and not a substr.
+            if ((pos != data.begin() && isalnum((unsigned char)*(pos - 1))) ||
+                (last != data.end() && isalnum((unsigned char)*last))) {
+                pos = last;
+                continue;
+            }
+            pos = data.erase(pos, last);
+            pos = data.insert(pos, def.value, def.value + def.value_len);
+            pos += def.value_len;
+        }
+    }
+}
+
 merge_error_t merge_include_statement(stream_t* stream, const char* dir, size_t dir_len,
                                       const std::vector<merge_definition>& definitions,
                                       const std::vector<std::string>& already_included, merge_result& out) {
@@ -378,25 +399,8 @@ merge_error_t merge_include_statement(stream_t* stream, const char* dir, size_t 
     }
 
     erase_undef_statements(file.data, definitions);
+    process_definitions(file.data, definitions);
 
-    for (auto& def : definitions) {
-        // Replace all occurences of def.name with def.value.
-        auto pos = file.data.begin();
-        for (;;) {
-            pos = std::search(pos, file.data.end(), def.name, def.name + def.name_len);
-            if (pos == file.data.end()) break;
-            auto last = pos + def.name_len;
-            // Only replace if we matched to a whole identifier and not a substr.
-            if ((pos != file.data.begin() && isalnum((unsigned char)*(pos - 1))) ||
-                (last != file.data.end() && isalnum((unsigned char)*last))) {
-                pos = last;
-                continue;
-            }
-            pos = file.data.erase(pos, last);
-            pos = file.data.insert(pos, def.value, def.value + def.value_len);
-            pos += def.value_len;
-        }
-    }
     if (std::find(out.merged_files.begin(), out.merged_files.end(), name) == out.merged_files.end()) {
         out.merged_files.emplace_back(std::move(name));
     }
@@ -435,12 +439,16 @@ merge_result merge(const std::vector<char>& in, const char* dir, const std::vect
         auto token = next_token(&stream);
         if (token.type != tok_eof && prev != token.str) {
             // output everything that comes before the token
-            result.data.insert(result.data.end(), prev, token.str);
+            std::vector<char> cur(prev, token.str);
+            process_definitions(cur, definitions);
+            result.data.insert(result.data.end(), cur.begin(), cur.end());
             prev = token.str;
         }
         switch (token.type) {
             case tok_eof: {
-                result.data.insert(result.data.end(), prev, stream.end - 1);
+                std::vector<char> cur(prev, stream.end - 1);
+                process_definitions(cur, definitions);
+                result.data.insert(result.data.end(), cur.begin(), cur.end());
                 result.merged_files.insert(result.merged_files.end(), already_included.begin(), already_included.end());
                 result.success = true;
                 return result;
@@ -468,7 +476,9 @@ merge_result merge(const std::vector<char>& in, const char* dir, const std::vect
             }
             default: { break; }
         }
-        result.data.insert(result.data.end(), prev, stream.p);
+        std::vector<char> cur(prev, stream.p);
+        process_definitions(cur, definitions);
+        result.data.insert(result.data.end(), cur.begin(), cur.end());
     }
 }
 
