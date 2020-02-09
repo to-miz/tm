@@ -48,6 +48,9 @@ include tests/src/tm_small_vector/tm_small_vector.mk
 include src/tm_allocator/tm_allocator.mk
 include tests/src/tm_allocator/tm_allocator.mk
 
+include src/tm_uint128/tm_uint128.mk
+include tests/src/tm_uint128/tm_uint128.mk
+
 # Combined
 
 merge.all.deps := tm_conversion.h tm_print.h tm_json.h tm_cli.h

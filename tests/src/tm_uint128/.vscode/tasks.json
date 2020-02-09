@@ -1,0 +1,43 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "make tests.tm_uint128.default",
+            "type": "shell",
+            "command": "make tests.tm_uint128.default",
+            "options": {
+                "cwd": "${workspaceFolder}/../../../"
+            },
+            "group": "build",
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        },
+        {
+            "label": "make tests.tm_uint128.default.run",
+            "type": "shell",
+            "command": "make tests.tm_uint128.default.run",
+            "options": {
+                "cwd": "${workspaceFolder}/../../../"
+            },
+            "group": "build",
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        },
+        {
+            "label": "make tests.tm_uint128.run",
+            "type": "shell",
+            "command": "make tests.tm_uint128.run",
+            "options": {
+                "cwd": "${workspaceFolder}/../../../"
+            },
+            "group": "build",
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        }
+    ]
+}
