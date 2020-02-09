@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.9.7 - public domain - https://github.com/to-miz/tm
+tm_conversion.h v0.9.9.8 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -96,6 +96,7 @@ ISSUES
     - print_double, print_float need 64 bit arithmetic
 
 HISTORY
+    v0.9.9.8   16.01.20 Added print_hex_bytes.
     v0.9.9.7   30.05.19 Made error codes depend on <errno.h> by default.
     v0.9.9.6   14.01.19 Improved TM_STRING_VIEW and tm_errc support.
     v0.9.9.5   06.10.18 Fixed compilation errors when TMC_CPP_OVERLOADS is defined.
@@ -529,7 +530,7 @@ Return: Returns number of bytes printed and error code if any.
         TM_OK            No error, size has number of bytes printed.
         TM_EOVERFLOW     If buffer denoted by dest and maxlen was not enough.
                          Returned size equals maxlen.
-                         Output parameter dest is not safe to read, depending on the function it was't written into.
+                         Output parameter dest is not safe to read, depending on the function it wasn't written into.
 */
 TMC_DEF tmc_conv_result print_i32(char* dest, tm_size_t maxlen, int32_t value, int32_t base, tm_bool lowercase);
 TMC_DEF tmc_conv_result print_u32(char* dest, tm_size_t maxlen, uint32_t value, int32_t base, tm_bool lowercase);
@@ -550,16 +551,31 @@ TMC_DEF tmc_conv_result print_decimal_u64(char* dest, tm_size_t maxlen, uint64_t
 /*
 Prints base 16 number and returns length, does not prepend 0x before the number.
 Params:
-    dest:   Destination buffer.
-    maxlen: Max length of buffer.
-    lower:  Whether to use lowercase or uppercase to output hexadecimal digits A-F.
-    value:  Value to be printed.
+    dest:      Destination buffer.
+    maxlen:    Max length of buffer.
+    lower:     Whether to use lowercase or uppercase to output hexadecimal digits A-F.
+    value:     Value to be printed.
+    lowercase: Whether to print lowercase or uppercase hex digits.
 Return: Returns number of bytes printed and error code if any.
 */
 TMC_DEF tmc_conv_result print_hex_i32(char* dest, tm_size_t maxlen, int32_t value, tm_bool lowercase);
 TMC_DEF tmc_conv_result print_hex_u32(char* dest, tm_size_t maxlen, uint32_t value, tm_bool lowercase);
 TMC_DEF tmc_conv_result print_hex_i64(char* dest, tm_size_t maxlen, int64_t value, tm_bool lowercase);
 TMC_DEF tmc_conv_result print_hex_u64(char* dest, tm_size_t maxlen, uint64_t value, tm_bool lowercase);
+
+/*
+Prints base 16 number and returns length, does not preped 0x before the number.
+It will print each byte individually, with leading zeroes if needed.
+Params:
+    dest:      Destination buffer.
+    maxlen:    Max length of buffer.
+    bytes:     Input bytes to be converted into hex.
+    size:      Size of bytes in bytes.
+    lowercase: Whether to print lowercase or uppercase hex digits.
+Return. Returns number of bytes printed and error code if any.
+*/
+TMC_DEF tmc_conv_result print_hex_bytes(char* dest, tm_size_t maxlen, const void* bytes, tm_size_t size,
+                                        tm_bool lowercase);
 
 /* Get how many digits will be printed for a given number when printed in decimal or hex */
 TMC_DEF tm_size_t get_digits_count_decimal_u64(uint64_t number);
@@ -2264,6 +2280,35 @@ TMC_DEF tmc_conv_result print_hex_u64_w(char* dest, tm_size_t maxlen, tm_size_t 
     if (value) {
         *p = table[value & 0x0F];
     }
+    return result;
+}
+
+TMC_DEF tmc_conv_result print_hex_bytes(char* dest, tm_size_t maxlen, const void* bytes, tm_size_t size,
+                                        tm_bool lowercase) {
+    TM_ASSERT_VALID_SIZE(maxlen);
+    TM_ASSERT(dest || maxlen == 0);
+    TM_ASSERT_VALID_SIZE(size);
+    TM_ASSERT(bytes || size == 0);
+    tmc_conv_result result = {0, TM_OK};
+    tm_size_t needed_size = size * 2;
+    if (needed_size > maxlen TMC_CW(|| needed_size < 0)) {
+        result.size = maxlen;
+        result.ec = TM_EOVERFLOW;
+        return result;
+    }
+    result.size = needed_size;
+
+    const char* table = (lowercase) ? (print_NumberToCharTableLower) : (print_NumberToCharTableUpper);
+    const char* first = (const char*)bytes;
+    const char* last = first + size;
+    while (first < last) {
+        uint8_t value = (uint8_t)*first;
+        *(dest + 1) = table[value & 0x0F];
+        *dest = table[(value >> 4) & 0x0F];
+        dest += 2;
+        ++first;
+    }
+
     return result;
 }
 
