@@ -6,6 +6,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <ctime>
 
 struct commandline_params {
     const char* in;
@@ -421,6 +422,13 @@ merge_result merge(const std::vector<char>& in, const char* dir, const std::vect
     result.data.reserve((size_t)(stream.end - stream.p));
 
     std::vector<merge_definition> definitions;
+    std::string year;
+    {
+        std::time_t time_value = std::time(nullptr);
+        auto local_time = std::localtime(&time_value);
+        year = std::to_string(local_time->tm_year + 1900);
+        definitions.push_back({"MERGE_YEAR", year.c_str(), 10, static_cast<int>(year.size())});
+    }
 
     for (;;) {
         auto prev = stream.p;
@@ -441,7 +449,7 @@ merge_result merge(const std::vector<char>& in, const char* dir, const std::vect
                 switch (merge_include_statement(&stream, dir, dir_len, definitions, already_included, result)) {
                     case merge_ok:
                         result.changed = true;
-                        definitions.clear();
+                        definitions.resize(1);
                         continue;
                     case merge_error:
                         return result;
