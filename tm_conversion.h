@@ -1,5 +1,5 @@
 /*
-tm_conversion.h v0.9.9.8 - public domain - https://github.com/to-miz/tm
+tm_conversion.h v0.9.9.9 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2016
 
 no warranty; use at your own risk
@@ -96,6 +96,10 @@ ISSUES
     - print_double, print_float need 64 bit arithmetic
 
 HISTORY
+    v0.9.9.9   15.02.20 Added checks for INT32_MIN and INT64_MIN to avoid undefined behavior
+                        when applying unary minus.
+    v0.9.9.8a  10.02.20 Added guards around print_NumberToCharTableUpper so that the tables can be
+                        shared when compiled with other tm libraries in the same translation unit.
     v0.9.9.8   16.01.20 Added print_hex_bytes.
     v0.9.9.7   30.05.19 Made error codes depend on <errno.h> by default.
     v0.9.9.6   14.01.19 Improved TM_STRING_VIEW and tm_errc support.
@@ -798,8 +802,14 @@ extern "C" {
 
 #ifdef TMC_CHECKED_WIDTH
     #define TMC_CW(x) x
+    #if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
+        #define TMC_CW_SIGNED_SIZE_T(x) x
+    #else
+        #define TMC_CW_SIGNED_SIZE_T(x)
+    #endif
 #else
     #define TMC_CW(x)
+    #define TMC_CW_SIGNED_SIZE_T(x)
 #endif
 
 #if !defined(TMC_NO_DEBUG) && (defined(_DEBUG) || defined(TM_DEBUG)) && !defined(NDEBUG)
@@ -1854,12 +1864,15 @@ TMC_DEF tmc_conv_result print_bool(char* dest, tm_size_t maxlen, tm_bool value, 
     }
 }
 
+#ifndef TMC_PRINT_NUMBERTOCHARTABLE_DEFINED
+#define TMC_PRINT_NUMBERTOCHARTABLE_DEFINED
 static const char print_NumberToCharTableUpper[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B',
                                                     'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
                                                     'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'};
 static const char print_NumberToCharTableLower[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b',
                                                     'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
                                                     'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
+#endif
 
 /* table of double digit chars from 00 to 99 */
 static const char print_DoubleDigitsToCharTable[200] = {
@@ -1993,7 +2006,7 @@ TMC_DEF tmc_conv_result print_decimal_u32_w(char* dest, tm_size_t maxlen, tm_siz
     TM_ASSERT(width == get_digits_count_decimal_u32(value));
 
     tmc_conv_result result = {0, TM_OK};
-    if (width > maxlen TMC_CW(|| width <= 0)) {
+    if (width > maxlen TMC_CW_SIGNED_SIZE_T(|| width <= 0)) {
         result.size = maxlen;
         result.ec = TM_EOVERFLOW;
         return result;
@@ -2041,7 +2054,7 @@ TMC_DEF tmc_conv_result print_decimal_u64_w(char* dest, tm_size_t maxlen, tm_siz
     TM_ASSERT(width == get_digits_count_decimal_u64(value));
 
     tmc_conv_result result = {0, TM_OK};
-    if (width > maxlen TMC_CW(|| width <= 0)) {
+    if (width > maxlen TMC_CW_SIGNED_SIZE_T(|| width <= 0)) {
         result.size = maxlen;
         result.ec = TM_EOVERFLOW;
         return result;
@@ -2094,7 +2107,8 @@ TMC_DEF tmc_conv_result print_decimal_i32(char* dest, tm_size_t maxlen, int32_t 
         TM_ASSERT(maxlen > 0);
         *dest++ = '-';
         --maxlen;
-        value = -value;
+        if (value != INT32_MIN) /* Avoid overflow. The conversion to unsigned will still be valid. */
+            value = -value;
         ++result.size;
     }
 
@@ -2118,7 +2132,8 @@ TMC_DEF tmc_conv_result print_decimal_i64(char* dest, tm_size_t maxlen, int64_t 
         TM_ASSERT(maxlen > 0);
         *dest++ = '-';
         --maxlen;
-        value = -value;
+        if (value != INT64_MIN) /* Avoid overflow. The conversion to unsigned will still be valid. */
+            value = -value;
         ++result.size;
     }
 
@@ -2196,7 +2211,7 @@ TMC_DEF tmc_conv_result print_hex_u32_w(char* dest, tm_size_t maxlen, tm_size_t 
     TM_ASSERT(width == get_digits_count_hex_u32(value));
 
     tmc_conv_result result = {0, TM_OK};
-    if (width > maxlen TMC_CW(|| width <= 0)) {
+    if (width > maxlen TMC_CW_SIGNED_SIZE_T(|| width <= 0)) {
         result.size = maxlen;
         result.ec = TM_EOVERFLOW;
         return result;
@@ -2244,7 +2259,7 @@ TMC_DEF tmc_conv_result print_hex_u64_w(char* dest, tm_size_t maxlen, tm_size_t 
     TM_ASSERT(width == get_digits_count_hex_u64(value));
 
     tmc_conv_result result = {0, TM_OK};
-    if (width > maxlen TMC_CW(|| width <= 0)) {
+    if (width > maxlen TMC_CW_SIGNED_SIZE_T(|| width <= 0)) {
         result.size = maxlen;
         result.ec = TM_EOVERFLOW;
         return result;
@@ -2291,7 +2306,7 @@ TMC_DEF tmc_conv_result print_hex_bytes(char* dest, tm_size_t maxlen, const void
     TM_ASSERT(bytes || size == 0);
     tmc_conv_result result = {0, TM_OK};
     tm_size_t needed_size = size * 2;
-    if (needed_size > maxlen TMC_CW(|| needed_size < 0)) {
+    if (needed_size > maxlen TMC_CW_SIGNED_SIZE_T(|| needed_size < 0)) {
         result.size = maxlen;
         result.ec = TM_EOVERFLOW;
         return result;
@@ -2325,7 +2340,8 @@ TMC_DEF tmc_conv_result print_hex_i32(char* dest, tm_size_t maxlen, int32_t valu
         TM_ASSERT(maxlen > 0);
         *dest++ = '-';
         --maxlen;
-        value = -value;
+        if (value != INT32_MIN) /* Avoid overflow. The conversion to unsigned will still be valid. */
+            value = -value;
         ++result.size;
     }
 
@@ -2349,7 +2365,8 @@ TMC_DEF tmc_conv_result print_hex_i64(char* dest, tm_size_t maxlen, int64_t valu
         TM_ASSERT(maxlen > 0);
         *dest++ = '-';
         --maxlen;
-        value = -value;
+        if (value != INT64_MIN) /* Avoid overflow. The conversion to unsigned will still be valid. */
+            value = -value;
         ++result.size;
     }
 
@@ -2375,7 +2392,8 @@ TMC_DEF tmc_conv_result print_i32(char* dest, tm_size_t maxlen, int32_t value, i
         TM_ASSERT(maxlen > 0);
         *dest++ = '-';
         --maxlen;
-        value = -value;
+        if (value != INT32_MIN) /* Avoid overflow. The conversion to unsigned will still be valid. */
+            value = -value;
         ++result.size;
     }
 
@@ -2455,7 +2473,8 @@ TMC_DEF tmc_conv_result print_i64(char* dest, tm_size_t maxlen, int64_t value, i
         TM_ASSERT(maxlen > 0);
         *dest++ = '-';
         --maxlen;
-        value = -value;
+        if (value != INT64_MIN) /* Avoid overflow. The conversion to unsigned will still be valid. */
+            value = -value;
         ++result.size;
     }
 
