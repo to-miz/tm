@@ -3,6 +3,7 @@
 #endif
 
 #define TMI_NO_MUL128
+#define TMI_NO_SHIFT128
 
 #if __has_builtin(__builtin_clz)
     TMI_DEF uint32_t tmi_fls_u32(uint32_t v) {

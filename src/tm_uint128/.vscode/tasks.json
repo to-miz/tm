@@ -26,6 +26,30 @@
             "problemMatcher": [
                 "$msCompile"
             ]
+        },
+        {
+            "label": "make default test",
+            "type": "shell",
+            "command": "make tests.tm_uint128.default",
+            "options": {
+                "cwd": "${workspaceFolder}/../../"
+            },
+            "group": "build",
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        },
+        {
+            "label": "run tests",
+            "type": "shell",
+            "command": "make tests.tm_uint128.run",
+            "options": {
+                "cwd": "${workspaceFolder}/../../"
+            },
+            "group": "build",
+            "problemMatcher": [
+                "$msCompile"
+            ]
         }
     ]
 }

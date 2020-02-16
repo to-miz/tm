@@ -1,4 +1,5 @@
 #define TMI_NO_MUL128
+#define TMI_NO_SHIFT128
 
 TMI_DEF uint32_t tmi_fls_u32(uint32_t v) {
     TM_ASSERT(v);

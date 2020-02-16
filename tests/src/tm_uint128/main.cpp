@@ -29,4 +29,40 @@ bool operator==(const tmi_bytes& lhs, const tmi_bytes& rhs) {
     return true;
 }
 
+TEST_CASE("float and double tests") {
+    CHECK(tml::to_string(tmi_from_double(0.0), 10) == "0");
+    CHECK(tml::to_string(tmi_from_double(0.1), 10) == "0");
+    CHECK(tml::to_string(tmi_from_double(0.1256), 10) == "0");
+    CHECK(tml::to_string(tmi_from_double(0.9948121), 10) == "0");
+    CHECK(tml::to_string(tmi_from_double(1.0), 10) == "1");
+    CHECK(tml::to_string(tmi_from_double(1.1), 10) == "1");
+    CHECK(tml::to_string(tmi_from_double(1.1256), 10) == "1");
+    CHECK(tml::to_string(tmi_from_double(1.9948121), 10) == "1");
+    CHECK(tml::to_string(tmi_from_double(2.0), 10) == "2");
+    CHECK(tml::to_string(tmi_from_double(2.1), 10) == "2");
+    CHECK(tml::to_string(tmi_from_double(2.1256), 10) == "2");
+    CHECK(tml::to_string(tmi_from_double(2.9948121), 10) == "2");
+    CHECK(tml::to_string(tmi_from_double(365.0), 10) == "365");
+    CHECK(tml::to_string(tmi_from_double(365.1), 10) == "365");
+    CHECK(tml::to_string(tmi_from_double(365.1256), 10) == "365");
+    CHECK(tml::to_string(tmi_from_double(365.9948121), 10) == "365");
+
+    CHECK(tml::to_string(tmi_from_float(0.0f), 10) == "0");
+    CHECK(tml::to_string(tmi_from_float(0.1f), 10) == "0");
+    CHECK(tml::to_string(tmi_from_float(0.1256f), 10) == "0");
+    CHECK(tml::to_string(tmi_from_float(0.9948121f), 10) == "0");
+    CHECK(tml::to_string(tmi_from_float(1.0f), 10) == "1");
+    CHECK(tml::to_string(tmi_from_float(1.1f), 10) == "1");
+    CHECK(tml::to_string(tmi_from_float(1.1256f), 10) == "1");
+    CHECK(tml::to_string(tmi_from_float(1.9948121f), 10) == "1");
+    CHECK(tml::to_string(tmi_from_float(2.0f), 10) == "2");
+    CHECK(tml::to_string(tmi_from_float(2.1f), 10) == "2");
+    CHECK(tml::to_string(tmi_from_float(2.1256f), 10) == "2");
+    CHECK(tml::to_string(tmi_from_float(2.9948121f), 10) == "2");
+    CHECK(tml::to_string(tmi_from_float(365.0f), 10) == "365");
+    CHECK(tml::to_string(tmi_from_float(365.1f), 10) == "365");
+    CHECK(tml::to_string(tmi_from_float(365.1256f), 10) == "365");
+    CHECK(tml::to_string(tmi_from_float(365.9948121f), 10) == "365");
+}
+
 #include "generated_tests.cpp"

@@ -1,10 +1,12 @@
 unmerged.tm_uint128.out := ${build_dir}unmerged.tm_uint128${exe_ext}
 unmerged.tm_uint128.c.out := ${build_dir}unmerged.tm_uint128.c${exe_ext}
 
+${unmerged.tm_uint128.out}: private link_libs.gcc += -lm
 ${unmerged.tm_uint128.out}: src/tm_uint128/*.cpp src/tm_uint128/*.h
 	${hide}echo Compiling $@.
 	${hide}$(call cxx_compile_and_link, src/tm_uint128/test.cpp, $@, src/tm_uint128 .)
 
+${unmerged.tm_uint128.c.out}: private link_libs.gcc += -lm
 ${unmerged.tm_uint128.c.out}: src/tm_uint128/test.c src/tm_uint128/*.cpp src/tm_uint128/*.h
 	${hide}echo Compiling $@.
 	${hide}$(call c_compile_and_link, src/tm_uint128/test.c, $@, src/tm_uint128 .)

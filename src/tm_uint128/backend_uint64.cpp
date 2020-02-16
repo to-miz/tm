@@ -119,6 +119,8 @@ TMI_DEF tmi_uint128_t tmi_shr(tmi_uint128_t_arg lhs, tmi_uint128_t_arg rhs) {
     TM_ASSERT(TMI_HIGH(rhs) == 0 && TMI_LOW(rhs) < 128);
     return tmi_shr_u64(lhs, TMI_LOW(rhs));
 }
+
+#ifdef TMI_NO_SHIFT128
 TMI_DEF tmi_uint128_t tmi_shl_u64(tmi_uint128_t_arg lhs, uint64_t shift_amount) {
     TM_ASSERT(shift_amount < 128);
     if (shift_amount == 0) return lhs;
@@ -151,6 +153,7 @@ TMI_DEF tmi_uint128_t tmi_shr_u64(tmi_uint128_t_arg lhs, uint64_t shift_amount) 
     }
     return result;
 }
+#endif
 
 TMI_DEF tmi_uint128_t_arg tmi_set_bit(tmi_uint128_t_arg v, uint64_t bit_position) {
     tmi_uint128_t_arg result = TMI_DEREF(v);

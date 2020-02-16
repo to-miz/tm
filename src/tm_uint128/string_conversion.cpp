@@ -144,12 +144,16 @@ TMI_DEF tm_size_t tmi_get_digits_count_u128(tmi_uint128_t number, int32_t base) 
     }
 }
 
+// Use TMC macro to share tables with tm_conversion if compiled in the same translation unit.
+#ifndef TMC_PRINT_NUMBERTOCHARTABLE_DEFINED
+#define TMC_PRINT_NUMBERTOCHARTABLE_DEFINED
 static const char print_NumberToCharTableUpper[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B',
                                                     'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
                                                     'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'};
 static const char print_NumberToCharTableLower[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b',
                                                     'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
                                                     'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
+#endif
 
 TMI_DEF tmi_conv_result tmi_print_u128_w(char* dest, tm_size_t maxlen, tm_size_t width, tmi_uint128_t value,
                                          int32_t base, tm_bool lowercase) {

@@ -1,3 +1,4 @@
+// __extension__ so we don't get a warning about using gcc/clang extension.
 __extension__ typedef unsigned __int128 tmi_u128;
 
 TMI_DEF tmi_uint128_t tmi_make(uint64_t low, uint64_t high) { return {(tmi_u128)low | (((tmi_u128)high) << 64)}; }

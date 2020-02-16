@@ -1,5 +1,5 @@
 /*
-tm_uint128.h v0.0.1 - public domain - https://github.com/to-miz/tm
+tm_uint128.h v0.0.4 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
@@ -16,8 +16,11 @@ USAGE
 DESCRIPTION
     A uint128 type that has a number of available backends.
     See SWITCHES for how to select a backend.
+    Implements both a C API and a C++ wrapper if compiled in cpp mode.
 
 SWITCHES
+    #define any of the switches below before including this file to change the configuration.
+
     TMI_BACKEND_UINT64
         A backend that uses uint64_t as the underlying type to implement tmi_uint128_t.
         Its primary focus is portability and correctness.
@@ -32,11 +35,27 @@ SWITCHES
         This will also automatically use compiler intrinsics.
 
     TMI_NO_STL
-        Define this if you want to avoid including optional STL headers. This will improve compile times, but some APIs
-        become unavailable:
+        Define this if you want to avoid including optional STL headers. This will improve
+        compile times, but some APIs become unavailable:
             std::string returning tml::to_string functions.
         These headers will not be included:
             <string>
+
+    TMI_ARGS_BY_POINTER
+        Whether the arguments should by passed as pointers or by value for the C API.
+        In the C++ wrapper determines, whether the arguments are passed by reference or by value.
+        Can be used to benchmark performance of pointer passing vs value passing.
+
+    TMI_NO_IEEE_754
+        On platforms with no IEEE_754 floats this should be defined, so that tmi_to_float etc is
+        disabled. Those are currently only implemented for IEEE_754 floats.
+
+    TM_FEGETROUND
+        By default tmi_to_float and tmi_to_double use fegetround to get the currently
+        set rounding mode. To override this behavior, you can define it as follows:
+            #define TM_FEGETROUND() FE_TONEAREST
+        Another alternative is to use tmi_to_float_rm, it allows the rounding mode to
+        be specified explicitly.
 
 NOTES
     If you want to use this in conjunction with tm_conversion.h, include tm_conversion.h first.
@@ -50,6 +69,10 @@ TODO
     - SSE2 backend.
 
 HISTORY     (DD.MM.YY)
+    v0.0.4   16.02.20 Added tmi_to_float*, tmi_from_float*, tmi_to_float*, tmi_from_double*.
+    v0.0.3   12.02.20 The msvc intrinsics path now also uses __shiftleft128 and __shiftright128.
+                      Added safe tmi_ffs_s and tmi_fls_s.
+    v0.0.2   10.02.20 Updated some documentation.
     v0.0.1   09.02.20 Initial Commit.
 */
 
@@ -64,6 +87,59 @@ HISTORY     (DD.MM.YY)
         #define TM_ISUPPER isupper
         #define TM_ISLOWER islower
         #define TM_TOUPPER toupper
+    #endif
+
+    #ifndef TMI_NO_IEEE_754
+        /* string.h dependency */
+        #ifndef TM_MEMCPY
+            #include <string.h>
+            #define TM_MEMCPY memcpy
+        #endif
+
+        /* float.h dependency */
+        #if !defined(TM_FLT_MAX) || !defined(TM_DBL_MAX)
+            #include <float.h>
+            #ifndef TM_FLT_MAX
+                #define TM_FLT_MAX FLT_MAX
+            #endif
+            #ifndef TM_DBL_MAX
+                #define TM_DBL_MAX DBL_MAX
+            #endif
+        #endif
+
+        /* fenv.h dependency */
+        #if !defined(TM_FE_DOWNWARD) || !defined(TM_FE_TONEAREST) \
+            || !defined(TM_FE_TOWARDZERO) || !defined(TM_FE_UPWARD) || !defined(TM_FEGETROUND)
+            #include <fenv.h>
+            #ifndef TM_FE_DOWNWARD
+                #define TM_FE_DOWNWARD FE_DOWNWARD
+            #endif
+            #ifndef TM_FE_TONEAREST
+                #define TM_FE_TONEAREST FE_TONEAREST
+            #endif
+            #ifndef TM_FE_TOWARDZERO
+                #define TM_FE_TOWARDZERO FE_TOWARDZERO
+            #endif
+            #ifndef TM_FE_UPWARD
+                #define TM_FE_UPWARD FE_UPWARD
+            #endif
+            #ifndef TM_FEGETROUND
+                // NOTE: On gcc you might need to link against libm.so by including -lm in the commandline
+                // If you get undefined reference to symbol 'fegetround@@GLIBC_2.2.5' or similar.
+                // Otherwise
+                //  #define TM_FEGETROUND() FE_TONEAREST
+                // also works, if you don't ever change rounding modes.
+                #define TM_FEGETROUND fegetround
+            #endif
+        #endif
+
+        /* math.h dependency */
+        #if !defined(TM_ISFINITE)
+            #include <math.h>
+            #ifndef TM_ISFINITE
+                #define TM_ISFINITE isfinite
+            #endif
+        #endif
     #endif
 #endif
 
@@ -86,6 +162,10 @@ HISTORY     (DD.MM.YY)
    Examples of possible override values are static or __declspec(dllexport). */
 #ifndef TMI_DEF
     #define TMI_DEF extern
+#endif
+
+#if !defined(TMI_BACKEND_GCC_UINT128) && !defined(TMI_BACKEND_UINT64)
+    #error Please select a backend. See SWITCHES at the top of <tm_uint128.h>.
 #endif
 
 // Check availability of gcc __int128, otherwise fallback to uint64_t implementation.
@@ -158,6 +238,7 @@ HISTORY     (DD.MM.YY)
 #else
 
 #define TMI_NO_MUL128
+#define TMI_NO_SHIFT128
 #define TMI_NO_FFS32
 #define TMI_NO_FFS64
 #define TMI_NO_FLS32
@@ -171,6 +252,7 @@ HISTORY     (DD.MM.YY)
 
 #ifndef TMI_USE_INTRINSICS
     #define TMI_NO_MUL128
+    #define TMI_NO_SHIFT128
     #define TMI_NO_FFS32
     #define TMI_NO_FFS64
     #define TMI_NO_FLS32
@@ -190,6 +272,8 @@ HISTORY     (DD.MM.YY)
 #endif /* defined(TMI_BACKEND_GCC_UINT128) */
 
 #include "bittwiddling.cpp"
+
+#include "common.cpp"
 
 #include "string_conversion.cpp"
 
