@@ -1,6 +1,6 @@
 /*
 tm_cli.h v0.2.3 - public domain - https://github.com/to-miz/tm
-author: Tolga Mizrak 2018
+author: Tolga Mizrak 2020
 
 no warranty; use at your own risk
 
@@ -743,7 +743,7 @@ There are two licenses you can freely choose from - MIT or Public Domain
 ---------------------------------------------------------------------------
 
 MIT License:
-Copyright (c) 2018 Tolga Mizrak
+Copyright (c) 2020 Tolga Mizrak
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

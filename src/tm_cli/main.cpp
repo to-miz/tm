@@ -1,6 +1,6 @@
 /*
 tm_cli.h v0.2.3 - public domain - https://github.com/to-miz/tm
-author: Tolga Mizrak 2018
+author: Tolga Mizrak MERGE_YEAR
 
 no warranty; use at your own risk
 
@@ -234,5 +234,4 @@ TMCLI_DEF tmcli_args tmcli_get_remaining_args(const tmcli_parser* parser);
 #include "implementation.c"
 #endif /* defined(TM_CLI_IMPLEMENTATION) */
 
-#define MERGE_YEAR 2018
 #include "../common/LICENSE.inc"

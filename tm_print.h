@@ -1,6 +1,6 @@
 /*
 tm_print.h v0.0.22 - public domain - https://github.com/to-miz/tm
-Author: Tolga Mizrak 2016
+Author: Tolga Mizrak 2020
 
 No warranty; use at your own risk.
 
@@ -2274,7 +2274,7 @@ There are two licenses you can freely choose from - MIT or Public Domain
 ---------------------------------------------------------------------------
 
 MIT License:
-Copyright (c) 2016 Tolga Mizrak
+Copyright (c) 2020 Tolga Mizrak
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

@@ -1,6 +1,6 @@
 /*
 tm_async.h v0.0.2 - public domain - https://github.com/to-miz/tm
-Author: Tolga Mizrak 2019
+Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
 
@@ -243,5 +243,4 @@ extern "C" {
 
 #endif /* defined(TM_ASYNC_IMPLEMENTATION) */
 
-#define MERGE_YEAR 2019
 #include "../common/LICENSE.inc"

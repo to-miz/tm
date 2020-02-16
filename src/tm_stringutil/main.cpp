@@ -1,6 +1,6 @@
 /*
 tm_stringutil.h v0.3.4 - public domain - https://github.com/to-miz/tm
-author: Tolga Mizrak 2018
+author: Tolga Mizrak MERGE_YEAR
 
 no warranty; use at your own risk
 
@@ -357,5 +357,4 @@ extern "C" {
 
 #endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
 
-#define MERGE_YEAR 2018
 #include "../common/LICENSE.inc"

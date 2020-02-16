@@ -1,6 +1,6 @@
 /*
 tm_print.h v0.0.22 - public domain - https://github.com/to-miz/tm
-Author: Tolga Mizrak 2016
+Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
 
@@ -351,5 +351,4 @@ TMP_DEF ::std::string tmp_string_format(const char* format, size_t format_len, c
 #include "implementation.cpp"
 #endif  // TM_PRINT_IMPLEMENTATION
 
-#define MERGE_YEAR 2016
 #include "../common/LICENSE.inc"
