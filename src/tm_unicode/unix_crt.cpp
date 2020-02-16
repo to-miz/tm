@@ -93,7 +93,7 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
     if (!len) return TM_TRUE;
 
     FILE* files[3] = {stdin, stdout, stderr};
-    return fwritef(str, sizeof(char), len, files[handle]) == (size_t)len;
+    return fwrite(str, sizeof(char), len, files[handle]) == (size_t)len;
 }
 
 #endif

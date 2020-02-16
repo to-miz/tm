@@ -1,6 +1,6 @@
 /*
-tm_unicode.h v0.1.8 - public domain - https://github.com/to-miz/tm
-Author: Tolga Mizrak 2019
+tm_unicode.h v0.1.9 - public domain - https://github.com/to-miz/tm
+Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
 
@@ -91,7 +91,8 @@ ISSUES
       calculating the width of display glyphs.
     - Grapheme break detection not implemented yet.
 
-HISTORY
+HISTORY    (DD.MM.YY)
+    v0.1.9  01.01.20 Fixed compilation error on unix.
     v0.1.8  01.01.20 Added TMU_USE_CONSOLE and TMU_NO_SHELLAPI.
     v0.1.7  01.01.20 Added TMU_DEFINE_MAIN.
     v0.1.6  12.07.19 Fixed error in documentation.
@@ -187,5 +188,4 @@ HISTORY
 
 #endif /* defined(TM_UNICODE_IMPLEMENTATION) */
 
-#define MERGE_YEAR 2019
 #include "../common/LICENSE.inc"

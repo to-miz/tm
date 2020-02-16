@@ -1,6 +1,6 @@
 /*
-tm_unicode.h v0.1.8 - public domain - https://github.com/to-miz/tm
-Author: Tolga Mizrak 2019
+tm_unicode.h v0.1.9 - public domain - https://github.com/to-miz/tm
+Author: Tolga Mizrak 2020
 
 No warranty; use at your own risk.
 
@@ -91,7 +91,8 @@ ISSUES
       calculating the width of display glyphs.
     - Grapheme break detection not implemented yet.
 
-HISTORY
+HISTORY    (DD.MM.YY)
+    v0.1.9  01.01.20 Fixed compilation error on unix.
     v0.1.8  01.01.20 Added TMU_USE_CONSOLE and TMU_NO_SHELLAPI.
     v0.1.7  01.01.20 Added TMU_DEFINE_MAIN.
     v0.1.6  12.07.19 Fixed error in documentation.
@@ -6180,7 +6181,7 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
     if (!len) return TM_TRUE;
 
     FILE* files[3] = {stdin, stdout, stderr};
-    return fwritef(str, sizeof(char), len, files[handle]) == (size_t)len;
+    return fwrite(str, sizeof(char), len, files[handle]) == (size_t)len;
 }
 
 #endif
@@ -7212,7 +7213,7 @@ There are two licenses you can freely choose from - MIT or Public Domain
 ---------------------------------------------------------------------------
 
 MIT License:
-Copyright (c) 2019 Tolga Mizrak
+Copyright (c) 2020 Tolga Mizrak
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
