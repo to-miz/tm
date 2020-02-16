@@ -87,7 +87,7 @@ struct non_trivial_base {
     }
     friend bool operator!=(non_trivial_base lhs, int rhs) {
         for (auto entry : lhs.values) {
-            if (entry != lhs) return true;
+            if (entry != rhs) return true;
         }
         return false;
     }

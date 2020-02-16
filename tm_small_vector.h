@@ -1,6 +1,6 @@
 /*
-tm_small_vector.h v0.0.7 - public domain - https://github.com/to-miz/tm
-Author: Tolga Mizrak 2019
+tm_small_vector.h v0.0.8 - public domain - https://github.com/to-miz/tm
+Author: Tolga Mizrak 2020
 
 No warranty; use at your own risk.
 
@@ -32,6 +32,7 @@ ISSUES
     - Not yet first release.
 
 HISTORY     (DD.MM.YY)
+    v0.0.8   16.02.20 Fixed clang and x86 compilation errors.
     v0.0.7   30.07.19 Added is_sbo method.
     v0.0.6   13.07.19 Fixed resize returning true on noop.
     v0.0.5   07.07.19 Changed push_back to return bool.
@@ -81,6 +82,7 @@ HISTORY     (DD.MM.YY)
     #include <stdlib.h>
     #define TM_MALLOC(size, alignment) malloc((size))
     #define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) realloc((ptr), (new_size))
+    // #define TM_REALLOC_IN_PLACE(ptr, old_size, old_alignment, new_size, new_alignment) // Optional
     #define TM_FREE(ptr, size, alignment) free((ptr))
 #endif
 
@@ -170,7 +172,7 @@ class small_vector_impl_base : protected small_vector_guts<T> {
     using guts_t::cap_mask;
     using guts_t::ptr;
     using guts_t::sz;
-    using guts_t::usize_type;
+    using typename guts_t::usize_type;
 
    public:
     // STL container type definitions.
@@ -333,7 +335,7 @@ class small_vector_impl_base : protected small_vector_guts<T> {
         return it >= begin() && it <= end();
     }
     template <class It>
-    bool owns(It it) const {
+    bool owns(It) const {
         return false;
     }
     bool owns(const T& value) const {
@@ -361,7 +363,7 @@ struct small_vector_alloc {
 template <class T>
 struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_base<T> {
    protected:
-    small_vector_guts<T> create(tm_size_t capacity) {
+    static small_vector_guts<T> create(tm_size_t capacity) {
         TM_ASSERT_VALID_SIZE(capacity);
         small_vector_guts<T> result = {};
         void* new_data = TM_MALLOC(sizeof(T) * capacity, alignof(T));
@@ -371,7 +373,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_ba
         }
         return result;
     }
-    bool grow_by(small_vector_guts<T>* guts, tm_size_t amount) {
+    static bool grow_by(small_vector_guts<T>* guts, tm_size_t amount) {
         TM_ASSERT_VALID_SIZE(amount);
         TM_ASSERT(small_vector_guts<T>::max_count - guts->sz >= amount);  // Check overflow.
         if (!guts->ptr) {
@@ -439,7 +441,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_ba
         guts->set_capacity(new_capacity);
         return true;
     }
-    void destroy(small_vector_guts<T>* guts) {
+    static void destroy(small_vector_guts<T>* guts) {
         if constexpr (!::std::is_trivially_destructible<T>::value) {
             T* ptr = guts->ptr;
             for (tm_size_t i = 0, count = guts->sz; i < count; ++i) {
@@ -513,13 +515,13 @@ struct small_vector_alloc<T, no_allocator_tag> : public small_vector_impl_base<T
     typedef small_vector_guts<T> guts_t;
 
     // static constexpr const bool has_state = true;
-    guts_t create(tm_size_t capacity) { return {}; }
-    bool grow_by(guts_t* guts, tm_size_t amount) const {
+    static guts_t create(tm_size_t /*capacity*/) { return {}; }
+    static bool grow_by(guts_t* guts, tm_size_t amount) {
         TM_ASSERT_VALID_SIZE(amount);
         TM_ASSERT(guts_t::max_count - guts->sz >= amount);  // Check overflow.
         return guts->sz + amount <= guts->capacity();
     }
-    void destroy(guts_t* guts) {
+    static void destroy(guts_t* guts) {
         if constexpr (!::std::is_trivially_destructible<T>::value) {
             T* ptr = guts->ptr;
             for (tm_size_t i = 0, count = guts->sz; i < count; ++i) {
@@ -1323,7 +1325,6 @@ class small_vector : public ::tml::small_vector_base<T, AllocatorTag>, private :
     small_vector& operator=(const small_vector& other) { return this->operator=(static_cast<const base&>(other)); }
     small_vector& operator=(small_vector&& other) { return this->operator=(static_cast<base&&>(other)); }
 
-    using typename base::swap;
     template <tm_size_t OTHER_N>
     bool swap(small_vector<T, OTHER_N>& other) {
         return this->base::swap(other);
@@ -1353,7 +1354,7 @@ There are two licenses you can freely choose from - MIT or Public Domain
 ---------------------------------------------------------------------------
 
 MIT License:
-Copyright (c) 2019 Tolga Mizrak
+Copyright (c) 2020 Tolga Mizrak
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
