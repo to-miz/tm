@@ -1,5 +1,5 @@
 /*
-tm_allocator.h v0.0.2 - public domain - https://github.com/to-miz/tm
+tm_allocator.h v0.0.2a - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
@@ -84,6 +84,7 @@ TODO
     - Write documentation.
 
 HISTORY     (DD.MM.YY)
+    v0.0.2a  23.02.20 Fixed typo.
     v0.0.2   04.01.20 Added tml::MonotonicAllocator::current_stack_allocator.
     v0.0.1   21.12.19 Initial Commit.
 */

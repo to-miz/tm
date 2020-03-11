@@ -1,5 +1,5 @@
 /*
-tm_allocator.h v0.0.2 - public domain - https://github.com/to-miz/tm
+tm_allocator.h v0.0.2a - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2020
 
 No warranty; use at your own risk.
@@ -84,6 +84,7 @@ TODO
     - Write documentation.
 
 HISTORY     (DD.MM.YY)
+    v0.0.2a  23.02.20 Fixed typo.
     v0.0.2   04.01.20 Added tml::MonotonicAllocator::current_stack_allocator.
     v0.0.1   21.12.19 Initial Commit.
 */
@@ -825,7 +826,7 @@ struct MallocAllocator {
                                    size_t alignment = TM_DEFAULT_ALIGNMENT);
     void free_bytes(void* ptr, size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
 
-    inline static bool isValid(const MallocAllocator* /*allocator*/) { return true; }
+    inline static bool is_valid(const MallocAllocator* /*allocator*/) { return true; }
 };
 
 /*!

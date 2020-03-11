@@ -9,5 +9,5 @@ struct MallocAllocator {
                                    size_t alignment = TM_DEFAULT_ALIGNMENT);
     void free_bytes(void* ptr, size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
 
-    inline static bool isValid(const MallocAllocator* /*allocator*/) { return true; }
+    inline static bool is_valid(const MallocAllocator* /*allocator*/) { return true; }
 };

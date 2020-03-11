@@ -5,7 +5,7 @@ Current libraries
 
 Library | Desciption | Language | Current Version
 --- | --- | --- | ---
-tm_allocator.h | An allocator collection for C++ | C++17 | v0.0.2
+tm_allocator.h | An allocator collection for C++ | C++17 | v0.0.2a
 tm_arrayview.h | Lightweight ArrayView and UninitializedArrayView classes for POD types, allows treating static arrays and memory regions like std containers with insertion/erase. No memory allocation/resizing, does not own memory. | C++11 | v1.2.0
 tm_async.h | Async library for single producer, multiple consumer asynchronous execution that uses an internal thread pool. Not yet first release, currently Windows only. | C99/C++11 | v.0.0.2
 tm_bezier.h | Calculate bezier curve points with forward differencing using only floating point addition. | C99/C++ | v1.1
