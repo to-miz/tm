@@ -13,3 +13,5 @@ tm_small_vector.h: ${merge.out} ${unmerged.tm_small_vector.out}
 	${hide}${merge.out} src/tm_small_vector/main.cpp $@ src/tm_small_vector -r
 
 merge.tm_small_vector: tm_small_vector.h;
+
+merge.all: tm_small_vector.h
