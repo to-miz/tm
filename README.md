@@ -18,7 +18,7 @@ tm_print.h | Lightweight typesafe variadic print and snprint using C++11 and var
 tm_small_vector.h | Dynamic array container similar to STL \<vector> with a template parameter for small buffer optimization. Uses a non customizable malloc allocator making use of realloc whenever possible. | C++11 | v0.0.8
 tm_stringutil.h | String utility functions, from matching, comparison to tokenizing. | C99/C++ | v0.3.4
 tm_uint128.h | A uint128 type with a couple of backends to choose. | C99/C++11 | v0.0.4
-tm_unicode.h | A Utf-8 everywhere library with Utf-8/Utf-16 conversion, caseless comparison and system call wrappers for cross platform windows/linux Utf-8 support. | C99/C++ | v0.1.9
+tm_unicode.h | A Utf-8 everywhere library with Utf-8/Utf-16 conversion, caseless comparison and system call wrappers for cross platform windows/linux Utf-8 support. | C99/C++ | v0.9.0
 tm_utility.h | Utility and convenience functions, mainly for my personal use. | C++11 | v1.1.5
 
 These libraries follow the same guidelines as [stb](https://github.com/nothings/stb).

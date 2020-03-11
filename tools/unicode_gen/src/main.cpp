@@ -858,8 +858,20 @@ void parse_special_casing(const char* special_casing_contents, vector<char>* buf
     }
 }
 
-void parse_case_folding(const char* case_folding_contents, vector<char>* buffer, vector<data_entry>* out) {
+void parse_case_folding(const char* case_folding_contents, vector<char>* buffer, vector<data_entry>* out,
+                        string_segment* out_version) {
     assert(case_folding_contents);
+    assert(out);
+    assert(out_version);
+
+    // Try to extract version first.
+        // First line should look like "# CaseFolding-13.0.0.txt"
+    if (strncmp(case_folding_contents, "# CaseFolding-", 14) == 0) {
+        auto p = case_folding_contents + 14;
+        while (isdigit((uint8_t)*p) || *p == '.') ++p;
+        if (*(p - 1) == '.') --p;
+        *out_version = {case_folding_contents + 14, p};
+    }
 
     string_segment line = {};
     while (get_line(&case_folding_contents, &line)) {
@@ -992,6 +1004,7 @@ static void append_range(vector<codepoint_range>* ranges, codepoint_range range)
 struct parsed_data {
     vector<data_entry> data_entries;
     vector<codepoint_range> width_ranges[width_count];
+    string_segment version;
 };
 
 void parse_east_asian_width(const char* east_asian_width_contents, vector<char>* buffer, parsed_data* out) {
@@ -1046,7 +1059,7 @@ parsed_data parse_all(uint32_t flags, const char* unicode_data_contents, const c
     parsed_data result;
     vector<char> buffer;
     parse_unicode_data(unicode_data_contents, &buffer, &result.data_entries);
-    parse_case_folding(case_folding_contents, &buffer, &result.data_entries);
+    parse_case_folding(case_folding_contents, &buffer, &result.data_entries, &result.version);
     parse_special_casing(special_casing_contents, &buffer, &result.data_entries);
     parse_grapheme_break(grapheme_break_contents, &buffer, &result.data_entries);
     if (flags & generate_flags_width) parse_east_asian_width(east_asian_width_contents, &buffer, &result);
@@ -1311,7 +1324,8 @@ struct ucd_min_sizes {
     pair simple_case_toggle_offset;
     pair simple_case_fold_offset;
 
-    pair stage_one;
+    pair stage_one_table;
+    pair stage_one_function;
     pair stage_two;
 
     pair full_upper_array;
@@ -1732,13 +1746,21 @@ struct unique_ucd {
         }
 
         // Staged tables sizes.
-        auto get_staged_tables_sizes = [](const vector<int32_t>& stage_one, const vector<ucd_block>& stage_two,
-                                          pair* stage_one_size, pair* stage_two_size) {
-            *stage_one_size = {0, 0};
+        auto get_staged_tables_sizes = [](const vector<int32_t>& stage_one, size_t stage_one_count,
+                                          const vector<ucd_block>& stage_two, pair* stage_one_table_size,
+                                          pair* stage_one_function_size, pair* stage_two_size) {
+            *stage_one_table_size = {0, 0};
+            *stage_one_function_size = {0, 0};
             *stage_two_size = {0, 0};
+            for (size_t i = 0; i < stage_one_count; ++i) {
+                auto entry = stage_one[i];
+                stage_one_table_size->min = min(stage_one_table_size->min, entry);
+                stage_one_table_size->max = max(stage_one_table_size->max, entry);
+            }
+
             for (auto& entry : stage_one) {
-                stage_one_size->min = min(stage_one_size->min, entry);
-                stage_one_size->max = max(stage_one_size->max, entry);
+                stage_one_function_size->min = min(stage_one_function_size->min, entry);
+                stage_one_function_size->max = max(stage_one_function_size->max, entry);
             }
 
             for (auto& block : stage_two) {
@@ -1748,9 +1770,12 @@ struct unique_ucd {
                 }
             }
         };
-        pair stage_one_size = {0, 0};
+        pair stage_one_table_size = {0, 0};
+        pair stage_one_function_size = {0, 0};
         pair stage_two_size = {0, 0};
-        get_staged_tables_sizes(stage_one, stage_two, &stage_one_size, &stage_two_size);
+        get_staged_tables_sizes(stage_one,
+                                (flags & generate_flags_prune_stage_one) ? pruned_stage_one_size : stage_one.size(),
+                                stage_two, &stage_one_table_size, &stage_one_function_size, &stage_two_size);
 
         // Arrays.
         auto get_codepoint_run_sizes = [](const vector<codepoint_run>& run) -> pair {
@@ -1815,7 +1840,8 @@ struct unique_ucd {
         min_sizes.simple_case_toggle_offset = value_to_size(simple_case_toggle_offset);
         min_sizes.simple_case_fold_offset = value_to_size(simple_case_fold_offset);
 
-        min_sizes.stage_one = value_to_size(stage_one_size);
+        min_sizes.stage_one_table = value_to_size(stage_one_table_size);
+        min_sizes.stage_one_function = value_to_size(stage_one_function_size);
         min_sizes.stage_two = value_to_size(stage_two_size);
 
         min_sizes.full_upper_array = value_to_size(full_upper_pair);

@@ -52,15 +52,15 @@ void generate_multistage_table_based(const unique_ucd& ucd, size_t pruned_stage_
     size_t stage_one_size = ucd.stage_one.size();
     if (flags & generate_flags_prune_stage_one) stage_one_size = pruned_stage_one_size;
 
-    auto stage_one_type = get_type_from_size(ucd.min_sizes.stage_one);
+    auto stage_one_table_type = get_type_from_size(ucd.min_sizes.stage_one_table);
     auto stage_two_type = get_type_from_size(ucd.min_sizes.stage_two);
 
     fprintf(f,
             "/* Unicode data stage one: %zu bytes. */\n"
             "static const size_t %sucd_stage_one_size = %zu;\n"
             "static const %s %sucd_stage_one[%zu] = {\n",
-            stage_one_size * (ucd.min_sizes.stage_one.size / 8), prefix, stage_one_size,
-            stage_one_type.data, prefix, stage_one_size);
+            stage_one_size * (ucd.min_sizes.stage_one_table.size / 8), prefix, stage_one_size,
+            stage_one_table_type.data, prefix, stage_one_size);
     print_block(f, ucd.stage_one.data(), stage_one_size, /*last*/true);
     fprintf(f, "};\n\n");
 
@@ -219,17 +219,25 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
     auto ucd_entry_size = ucd.min_sizes.ucd_entry_size(flags);
 
     size_t overall_size = codepoints_count * (ucd.min_sizes.all_arrays.size / 8) + ucd.entries.size() * ucd_entry_size +
-                          grapheme_break_transitions_size + stage_one_size * (ucd.min_sizes.stage_one.size / 8) +
+                          grapheme_break_transitions_size + stage_one_size * (ucd.min_sizes.stage_one_table.size / 8) +
                           stage_two_size * (ucd.min_sizes.stage_two.size / 8);
     fprintf(f,
             "/* This file was generated using tools/unicode_gen from\n"
             "   https://github.com/to-miz/tm. Do not modify by hand.\n"
             "   Around %zu bytes (%.2f kilobytes) of data for lookup tables\n"
-            "   are generated. */\n\n"
+            "   are generated. ",
+            overall_size, overall_size / 1024.0);
+
+    if (parsed.version.first < parsed.version.last) {
+        fprintf(f, "It was generated using version %.*s of Unicode.", (int)(parsed.version.last - parsed.version.first),
+                parsed.version.first);
+    }
+
+    fprintf(f,
+            "*/\n\n"
             "#ifdef __cplusplus\n"
             "extern \"C\" {\n"
-            "#endif\n\n",
-            overall_size, overall_size / 1024.0);
+            "#endif\n\n");
 
     // Generate full uppercase, titlecase, lowercase, canonical and compatibility mapping array.
     auto print_runs = [](FILE* f, const char* name, const vector<codepoint_run>& runs, bool first) {
@@ -251,7 +259,8 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
         }
     };
 
-    auto stage_one_type = get_type_from_size(ucd.min_sizes.stage_one);
+    auto stage_one_table_type = get_type_from_size(ucd.min_sizes.stage_one_table);
+    auto stage_one_function_type = get_type_from_size(ucd.min_sizes.stage_one_function);
     auto stage_two_type = get_type_from_size(ucd.min_sizes.stage_two);
 
     if (ucd.min_sizes.all_arrays.size > 0) {
@@ -471,7 +480,7 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
     }
 
     // Generate stage one accessor function.
-    fprintf(f, "static %s %sget_stage_one_value_internal(uint32_t index) {\n", stage_one_type.data, prefix);
+    fprintf(f, "static %s %sget_stage_one_value_internal(uint32_t index) {\n", stage_one_function_type.data, prefix);
     bool all_are_default = true;
     for (size_t i = pruned_stage_one_size, count = ucd.stage_one.size(); i < count; i++) {
         if (ucd.stage_one[i] != default_block_pos) {
@@ -689,7 +698,7 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
             "    %s block_index = %sget_stage_one_value_internal(stage_one_index);\n"
             "    %s entry_index =\n"
             "        %sget_stage_two_value_internal(block_index, stage_two_index);\n\n",
-            block_size, block_size, stage_one_type.data, prefix, stage_two_type.data, prefix);
+            block_size, block_size, stage_one_function_type.data, prefix, stage_two_type.data, prefix);
 
     if (assert_name) fprintf(f, "    %s(entry_index < %sucd_entries_size);\n", assert_name, prefix);
     fprintf(f, "    return &%sucd_entries[entry_index];\n}\n\n", prefix);

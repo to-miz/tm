@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.9 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.9.0 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
@@ -92,6 +92,7 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY    (DD.MM.YY)
+    v0.9.0  11.03.20 Updated generated Unicode data to Unicode Version 13.0.0.
     v0.1.9  01.01.20 Fixed compilation error on unix.
     v0.1.8  01.01.20 Added TMU_USE_CONSOLE and TMU_NO_SHELLAPI.
     v0.1.7  01.01.20 Added TMU_DEFINE_MAIN.
