@@ -42,7 +42,8 @@ tml::MonotonicAllocator::~MonotonicAllocator() {
     }
 }
 
-void* tml::MonotonicAllocator::allocate_bytes_throws(size_t size, size_t alignment /*= TM_DEFAULT_ALIGNMENT*/) {
+tml::MemoryBlock tml::MonotonicAllocator::allocate_bytes_throws(size_t size,
+                                                                size_t alignment /*= TM_DEFAULT_ALIGNMENT*/) {
     auto result = allocate_bytes(size, alignment);
     if (!result) {
 #ifndef TMAL_NO_STL
@@ -53,14 +54,14 @@ void* tml::MonotonicAllocator::allocate_bytes_throws(size_t size, size_t alignme
     }
     return result;
 }
-void* tml::MonotonicAllocator::allocate_bytes(size_t size, size_t alignment /*= TM_DEFAULT_ALIGNMENT*/) {
+tml::MemoryBlock tml::MonotonicAllocator::allocate_bytes(size_t size, size_t alignment /*= TM_DEFAULT_ALIGNMENT*/) {
     TM_ASSERT(allocators);
-    if (void* result = allocators[current].allocate_bytes(size, alignment)) return result;
+    if (auto result = allocators[current].allocate_bytes(size, alignment)) return result;
 
     auto new_capacity = capacity + 1;
     auto new_allocators = TM_REALLOC(allocators, capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT,
                                      new_capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
-    if (!new_allocators) return nullptr;
+    if (!new_allocators) return {};
     allocators = (StackAllocator*)new_allocators;
     capacity = new_capacity;
 
@@ -79,7 +80,7 @@ void* tml::MonotonicAllocator::allocate_bytes(size_t size, size_t alignment /*= 
     }
 
     void* block = tmal_mmap(allocation_size);
-    if (!block) return nullptr;
+    if (!block) return {};
     allocators[allocator_index] = {block, allocation_size};
     return allocators[allocator_index].allocate_bytes(size, alignment);
 }

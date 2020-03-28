@@ -1,5 +1,5 @@
 /*
-tm_allocator.h v0.0.2a - public domain - https://github.com/to-miz/tm
+tm_allocator.h v0.0.3 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2020
 
 No warranty; use at your own risk.
@@ -79,11 +79,16 @@ SWITCHES
 
 ISSUES
     - Not yet first release.
+    - TMAL_ALLOCATION_HELPERS_LEVEL not properly implemented.
 
 TODO
     - Write documentation.
 
 HISTORY     (DD.MM.YY)
+    v0.0.3   28.03.20 Changed the allocate_bytes and reallocate_bytes to return a MemoryBlock,
+                      allowing for more efficient allocations for allocators, that use fixed size blocks.
+                      Added create_at_least to allocate arrays with a minimum required size.
+                      The resulting array might be bigger, resulting in fewer reallocations for dynamic arrays when growing.
     v0.0.2a  23.02.20 Fixed typo.
     v0.0.2   04.01.20 Added tml::MonotonicAllocator::current_stack_allocator.
     v0.0.1   21.12.19 Initial Commit.
@@ -268,6 +273,40 @@ struct LockGuard {
 };
 
 /*!
+ * @brief The result of an allocation, ptr points to uninitialized memory.
+ */
+template <class T>
+struct AllocationResult {
+    T* ptr;
+    size_t size;
+
+    inline explicit operator bool() const { return ptr; }
+};
+
+/*!
+ * @brief Different from AllocationResult, ptr points to constructed objects ready to use.
+ */
+template <class T>
+struct CreateResult {
+    T* ptr;
+    size_t size;
+
+    inline explicit operator bool() const { return ptr; }
+};
+
+struct MemoryBlock {
+    void* ptr;
+    size_t size;
+
+    inline explicit operator bool() const { return ptr; }
+
+    template <class T>
+    AllocationResult<T> as() {
+        return {static_cast<T*>(ptr), size / sizeof(T)};
+    }
+};
+
+/*!
  * @brief A stack allocator that grows and shrinks in a linear fashion on a contiguous block of memory.
  * Note that the StackAllocator does not allocate or free its internal memory, it is designed to use any buffer given to
  * it as its memory pool.
@@ -285,8 +324,8 @@ struct StackAllocator {
     StackAllocator(StackAllocator&& other) = default;
     StackAllocator& operator=(StackAllocator&& other) = default;
 
-    void* allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
-    void* reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment = TM_DEFAULT_ALIGNMENT);
     bool reallocate_bytes_in_place(void* ptr, size_t old_size, size_t new_size,
                                    size_t alignment = TM_DEFAULT_ALIGNMENT);
     void free_bytes(void* ptr, size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
@@ -356,7 +395,7 @@ size_t get_capacity_for(StackAllocator* allocator) {
  *    returning, but on success you can keep allocated memory by dismissing the guard.
  *  - Use the allocator as temporary memory and free allocated memory at the end of the scope.
  *
- * @example
+ * example:
  *      StackAllocator allocator = ...
  *      int* single_int = allocate_storage(&allocator, int, 1); // Allocate a single int.
  *      {
@@ -407,17 +446,19 @@ class MonotonicAllocator {
      * @brief Allocates memory.
      * @param size[IN] Size of the memory region to be allocated in bytes.
      * @param alignment[IN] Alignment of the memory region. Default is at least TM_DEFAULT_ALIGNMENT(8).
-     * @return Pointer to the allocated memory region, nullptr if out of memory.
+     * @return MemoryBlock to the allocated memory region, result.ptr == nullptr if out of memory.
+     * When freeing, either size or result.size can be used.
      */
-    void* allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
     /*!
      * @brief Allocates memory. Same as allocate_bytes, but throws if out of memory.
      * @param size[IN] Size of the memory region to be allocated in bytes.
      * @param alignment[IN] Alignment of the memory region. Default is at least TM_DEFAULT_ALIGNMENT(8).
      * @return Pointer to the allocated memory region.
      * @throw Throws std::bad_alloc (or nullptr_t if TMAL_NO_STL is defined) if out of memory.
+     * When freeing, either size or result.size can be used.
      */
-    void* allocate_bytes_throws(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock allocate_bytes_throws(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
     /*!
      * @brief Returns whether the given pointer was allocated using this allocator.
      */
@@ -762,11 +803,11 @@ class LockingAllocator {
     LockingAllocator(LockingAllocator&& other) = default;
     LockingAllocator& operator=(LockingAllocator&& other) = default;
 
-    void* allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT) {
+    MemoryBlock allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT) {
         LockGuard guard{mut};
         return allocator.allocate_bytes(size, alignment);
     }
-    void* reallocate_bytes(void* ptr, size_t oldSize, size_t newSize, size_t alignment = TM_DEFAULT_ALIGNMENT) {
+    MemoryBlock reallocate_bytes(void* ptr, size_t oldSize, size_t newSize, size_t alignment = TM_DEFAULT_ALIGNMENT) {
         LockGuard guard{mut};
         return allocator.reallocate_bytes(ptr, oldSize, newSize, alignment);
     }
@@ -820,8 +861,8 @@ class LockingAllocator {
  * This way all the allocation APIs can be used with the global heap.
  */
 struct MallocAllocator {
-    void* allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
-    void* reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment = TM_DEFAULT_ALIGNMENT);
     bool reallocate_bytes_in_place(void* ptr, size_t old_size, size_t new_size,
                                    size_t alignment = TM_DEFAULT_ALIGNMENT);
     void free_bytes(void* ptr, size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
@@ -957,16 +998,17 @@ void free_storage_impl(Allocator* allocator, const char* file, size_t line, T* p
 // Allocation helpers will just delegate.
 
 template <class T, class Allocator>
-T* allocate_storage_impl(Allocator* allocator, size_t count = 1, size_t alignment = TypeSizes<T>::alignment) {
+AllocationResult<T> allocate_storage_impl(Allocator* allocator, size_t count = 1,
+                                          size_t alignment = TypeSizes<T>::alignment) {
     TM_ASSERT(Allocator::is_valid(allocator));
-    return (T*)allocator->allocate_bytes(count * TypeSizes<T>::size, alignment);
+    return allocator->allocate_bytes(count * TypeSizes<T>::size, alignment).as<T>();
 }
 template <class T, class Allocator>
-T* reallocate_storage_impl(Allocator* allocator, T* ptr, size_t old_count, size_t new_count,
-                           size_t alignment = TypeSizes<T>::alignment) {
+AllocationResult<T> reallocate_storage_impl(Allocator* allocator, T* ptr, size_t old_count, size_t new_count,
+                                            size_t alignment = TypeSizes<T>::alignment) {
     TM_ASSERT(Allocator::is_valid(allocator));
-    return (T*)allocator->reallocate_bytes(ptr, old_count * TypeSizes<T>::size, new_count * TypeSizes<T>::size,
-                                           alignment);
+    return allocator->reallocate_bytes(ptr, old_count * TypeSizes<T>::size, new_count * TypeSizes<T>::size, alignment)
+        .as<T>();
 }
 template <class T, class Allocator>
 bool reallocate_storage_in_place_impl(Allocator* allocator, T* ptr, size_t old_count, size_t new_count,
@@ -995,23 +1037,45 @@ void free_storage_impl(Allocator* allocator, T* ptr, size_t count = 1, size_t al
 
 template <class T, class Allocator>
 T* create_default_init(Allocator* allocator, size_t count = 1, size_t alignment = alignof(T)) {
-    T* storage = allocate_storage(allocator, T, count, alignment);
+    auto storage = allocate_storage(allocator, T, count, alignment);
     if (storage) {
         for (size_t i = 0; i < count; ++i) {
-            TM_PLACEMENT_NEW(&storage[i]) T();
+            TM_PLACEMENT_NEW(&storage.ptr[i]) T();
         }
     }
-    return storage;
+    return storage.ptr;
+}
+
+/*!
+ * @brief Creates an array of with a minimum required size. The returned array might be bigger than requested.
+ * Call like this: create_at_least<int[]>(allocator, 12);
+ *
+ * @param allocator[IN,OUT] The allocator to use.
+ * @param count[IN] The minimum required element count of the array.
+ * @param alignment[IN] The alignment of the array.
+ * @result An array with default constructed elements, or result.ptr == nullptr if out of memory.
+ * The actually allocated element count is in result.size, which is at least as big as count on success.
+ */
+template <class T, class Allocator>
+CreateResult<::std::remove_extent_t<T>> create_at_least(Allocator* allocator, size_t count,
+                                                        size_t alignment = alignof(T)) {
+    auto storage = allocate_storage(allocator, ::std::remove_extent_t<T>, count, alignment);
+    if (storage) {
+        for (size_t i = 0; i < storage.size; ++i) {
+            TM_PLACEMENT_NEW(&storage.ptr[i])::std::remove_pointer_t<::std::remove_extent_t<T>>();
+        }
+    }
+    return {storage.ptr, storage.size};
 }
 
 #ifndef TMAL_NO_STL
 template <class T, class Allocator, class... Args, ::std::enable_if_t<!::std::is_array_v<T>, int> = 0>
 T* create(Allocator* allocator, Args&&... args) {
-    T* storage = allocate_storage(allocator, T, 1, alignof(T));
+    auto storage = allocate_storage(allocator, T, 1, alignof(T));
     if (storage) {
-        TM_PLACEMENT_NEW(storage) T(::std::forward<Args>(args)...);
+        TM_PLACEMENT_NEW(storage.ptr) T(::std::forward<Args>(args)...);
     }
-    return storage;
+    return storage.ptr;
 }
 
 template <class T, class Allocator, ::std::enable_if_t<::std::is_array_v<T>&& ::std::extent_v<T> == 0, int> = 0>
@@ -1019,10 +1083,10 @@ template <class T, class Allocator, ::std::enable_if_t<::std::is_array_v<T>&& ::
     auto storage = allocate_storage(allocator, ::std::remove_extent_t<T>, count, alignment);
     if (storage) {
         for (size_t i = 0; i < count; ++i) {
-            TM_PLACEMENT_NEW(&storage[i]) ::std::remove_pointer_t<::std::remove_extent_t<T>>();
+            TM_PLACEMENT_NEW(&storage.ptr[i]) ::std::remove_pointer_t<::std::remove_extent_t<T>>();
         }
     }
-    return storage;
+    return storage.ptr;
 }
 
 template <class T, class... Args, ::std::enable_if_t<::std::extent_v<T> != 0, int> = 0>
@@ -1470,33 +1534,33 @@ tml::StackAllocator::StackAllocator(void* ptr, size_t capacity) : p((char*)ptr),
     TM_ASSERT(ptr || capacity == 0);
 }
 
-void* tml::StackAllocator::allocate_bytes(size_t size, size_t alignment /* = DEF_ALIGN*/) {
-    if (!size) return nullptr;
+tml::MemoryBlock tml::StackAllocator::allocate_bytes(size_t size, size_t alignment /* = DEF_ALIGN*/) {
+    if (!size) return {};
 
     auto offset = alignment_offset(end(), alignment);
-    if (sz + offset + size > cap) return nullptr;
+    if (sz + offset + size > cap) return {};
 
     auto result = end() + offset;
     sz += offset + size;
     TM_ASSERT(is_pointer_aligned(result, alignment));
     last_popped_alignment = 1;
-    return result;
+    return {result, size};
 }
-void* tml::StackAllocator::reallocate_bytes(void* ptr, size_t old_size, size_t new_size,
-                                            size_t alignment /* = DEF_ALIGN*/) {
+tml::MemoryBlock tml::StackAllocator::reallocate_bytes(void* ptr, size_t old_size, size_t new_size,
+                                                       size_t alignment /* = DEF_ALIGN*/) {
     TM_ASSERT(is_valid(this));
     if (is_most_recent_allocation(ptr, old_size)) {
-        if (sz + (new_size - old_size) > cap) return nullptr;
+        if (sz + (new_size - old_size) > cap) return {};
         sz += new_size - old_size;
-        return ptr;
+        return {ptr, new_size};
     } else if (new_size < old_size) {
         // no reallocation needed, but returning ptr here means we leak (old_size - new_size) bytes
-        return ptr;
+        return {ptr, old_size};
     }
 
     auto result = allocate_bytes(new_size, alignment);
     if (result) {
-        TM_MEMCPY(result, ptr, (old_size < new_size) ? (old_size) : (new_size));
+        TM_MEMCPY(result.ptr, ptr, (old_size < new_size) ? (old_size) : (new_size));
         // free_bytes(ptr, old_size, alignment); // this free will fail, basically we are leaking old_size bytes
     }
     return result;
@@ -1645,7 +1709,8 @@ tml::MonotonicAllocator::~MonotonicAllocator() {
     }
 }
 
-void* tml::MonotonicAllocator::allocate_bytes_throws(size_t size, size_t alignment /*= TM_DEFAULT_ALIGNMENT*/) {
+tml::MemoryBlock tml::MonotonicAllocator::allocate_bytes_throws(size_t size,
+                                                                size_t alignment /*= TM_DEFAULT_ALIGNMENT*/) {
     auto result = allocate_bytes(size, alignment);
     if (!result) {
 #ifndef TMAL_NO_STL
@@ -1656,14 +1721,14 @@ void* tml::MonotonicAllocator::allocate_bytes_throws(size_t size, size_t alignme
     }
     return result;
 }
-void* tml::MonotonicAllocator::allocate_bytes(size_t size, size_t alignment /*= TM_DEFAULT_ALIGNMENT*/) {
+tml::MemoryBlock tml::MonotonicAllocator::allocate_bytes(size_t size, size_t alignment /*= TM_DEFAULT_ALIGNMENT*/) {
     TM_ASSERT(allocators);
-    if (void* result = allocators[current].allocate_bytes(size, alignment)) return result;
+    if (auto result = allocators[current].allocate_bytes(size, alignment)) return result;
 
     auto new_capacity = capacity + 1;
     auto new_allocators = TM_REALLOC(allocators, capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT,
                                      new_capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
-    if (!new_allocators) return nullptr;
+    if (!new_allocators) return {};
     allocators = (StackAllocator*)new_allocators;
     capacity = new_capacity;
 
@@ -1682,7 +1747,7 @@ void* tml::MonotonicAllocator::allocate_bytes(size_t size, size_t alignment /*= 
     }
 
     void* block = tmal_mmap(allocation_size);
-    if (!block) return nullptr;
+    if (!block) return {};
     allocators[allocator_index] = {block, allocation_size};
     return allocators[allocator_index].allocate_bytes(size, alignment);
 }
@@ -1982,16 +2047,18 @@ tml::FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator++(int) {
     return previous;
 }
 
-void* tml::MallocAllocator::allocate_bytes(size_t size, size_t alignment) {
+tml::MemoryBlock tml::MallocAllocator::allocate_bytes(size_t size, size_t alignment) {
     TM_MAYBE_UNUSED(alignment);
-    return TM_MALLOC(size, alignment);
+    void* ptr = TM_MALLOC(size, alignment);
+    return {ptr, (ptr) ? size : 0};
 }
-void* tml::MallocAllocator::reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment) {
+tml::MemoryBlock tml::MallocAllocator::reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment) {
     TM_MAYBE_UNUSED(old_size);
     TM_MAYBE_UNUSED(alignment);
     TM_MAYBE_UNUSED(new_size);
     TM_MAYBE_UNUSED(alignment);
-    return TM_REALLOC(ptr, old_size, alignment, new_size, alignment);
+    void* new_ptr = TM_REALLOC(ptr, old_size, alignment, new_size, alignment);
+    return {new_ptr, (new_ptr) ? new_size : 0};
 }
 bool tml::MallocAllocator::reallocate_bytes_in_place(void* ptr, size_t old_size, size_t new_size, size_t alignment) {
     TM_MAYBE_UNUSED(ptr);

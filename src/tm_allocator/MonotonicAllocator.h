@@ -22,17 +22,19 @@ class MonotonicAllocator {
      * @brief Allocates memory.
      * @param size[IN] Size of the memory region to be allocated in bytes.
      * @param alignment[IN] Alignment of the memory region. Default is at least TM_DEFAULT_ALIGNMENT(8).
-     * @return Pointer to the allocated memory region, nullptr if out of memory.
+     * @return MemoryBlock to the allocated memory region, result.ptr == nullptr if out of memory.
+     * When freeing, either size or result.size can be used.
      */
-    void* allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
     /*!
      * @brief Allocates memory. Same as allocate_bytes, but throws if out of memory.
      * @param size[IN] Size of the memory region to be allocated in bytes.
      * @param alignment[IN] Alignment of the memory region. Default is at least TM_DEFAULT_ALIGNMENT(8).
      * @return Pointer to the allocated memory region.
      * @throw Throws std::bad_alloc (or nullptr_t if TMAL_NO_STL is defined) if out of memory.
+     * When freeing, either size or result.size can be used.
      */
-    void* allocate_bytes_throws(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock allocate_bytes_throws(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
     /*!
      * @brief Returns whether the given pointer was allocated using this allocator.
      */

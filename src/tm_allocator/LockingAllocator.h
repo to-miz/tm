@@ -12,11 +12,11 @@ class LockingAllocator {
     LockingAllocator(LockingAllocator&& other) = default;
     LockingAllocator& operator=(LockingAllocator&& other) = default;
 
-    void* allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT) {
+    MemoryBlock allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT) {
         LockGuard guard{mut};
         return allocator.allocate_bytes(size, alignment);
     }
-    void* reallocate_bytes(void* ptr, size_t oldSize, size_t newSize, size_t alignment = TM_DEFAULT_ALIGNMENT) {
+    MemoryBlock reallocate_bytes(void* ptr, size_t oldSize, size_t newSize, size_t alignment = TM_DEFAULT_ALIGNMENT) {
         LockGuard guard{mut};
         return allocator.reallocate_bytes(ptr, oldSize, newSize, alignment);
     }

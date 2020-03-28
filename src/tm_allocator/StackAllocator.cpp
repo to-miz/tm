@@ -2,33 +2,33 @@ tml::StackAllocator::StackAllocator(void* ptr, size_t capacity) : p((char*)ptr),
     TM_ASSERT(ptr || capacity == 0);
 }
 
-void* tml::StackAllocator::allocate_bytes(size_t size, size_t alignment /* = DEF_ALIGN*/) {
-    if (!size) return nullptr;
+tml::MemoryBlock tml::StackAllocator::allocate_bytes(size_t size, size_t alignment /* = DEF_ALIGN*/) {
+    if (!size) return {};
 
     auto offset = alignment_offset(end(), alignment);
-    if (sz + offset + size > cap) return nullptr;
+    if (sz + offset + size > cap) return {};
 
     auto result = end() + offset;
     sz += offset + size;
     TM_ASSERT(is_pointer_aligned(result, alignment));
     last_popped_alignment = 1;
-    return result;
+    return {result, size};
 }
-void* tml::StackAllocator::reallocate_bytes(void* ptr, size_t old_size, size_t new_size,
-                                            size_t alignment /* = DEF_ALIGN*/) {
+tml::MemoryBlock tml::StackAllocator::reallocate_bytes(void* ptr, size_t old_size, size_t new_size,
+                                                       size_t alignment /* = DEF_ALIGN*/) {
     TM_ASSERT(is_valid(this));
     if (is_most_recent_allocation(ptr, old_size)) {
-        if (sz + (new_size - old_size) > cap) return nullptr;
+        if (sz + (new_size - old_size) > cap) return {};
         sz += new_size - old_size;
-        return ptr;
+        return {ptr, new_size};
     } else if (new_size < old_size) {
         // no reallocation needed, but returning ptr here means we leak (old_size - new_size) bytes
-        return ptr;
+        return {ptr, old_size};
     }
 
     auto result = allocate_bytes(new_size, alignment);
     if (result) {
-        TM_MEMCPY(result, ptr, (old_size < new_size) ? (old_size) : (new_size));
+        TM_MEMCPY(result.ptr, ptr, (old_size < new_size) ? (old_size) : (new_size));
         // free_bytes(ptr, old_size, alignment); // this free will fail, basically we are leaking old_size bytes
     }
     return result;

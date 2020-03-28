@@ -16,8 +16,8 @@ struct StackAllocator {
     StackAllocator(StackAllocator&& other) = default;
     StackAllocator& operator=(StackAllocator&& other) = default;
 
-    void* allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
-    void* reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock allocate_bytes(size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
+    MemoryBlock reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment = TM_DEFAULT_ALIGNMENT);
     bool reallocate_bytes_in_place(void* ptr, size_t old_size, size_t new_size,
                                    size_t alignment = TM_DEFAULT_ALIGNMENT);
     void free_bytes(void* ptr, size_t size, size_t alignment = TM_DEFAULT_ALIGNMENT);
@@ -87,7 +87,7 @@ size_t get_capacity_for(StackAllocator* allocator) {
  *    returning, but on success you can keep allocated memory by dismissing the guard.
  *  - Use the allocator as temporary memory and free allocated memory at the end of the scope.
  *
- * @example
+ * example:
  *      StackAllocator allocator = ...
  *      int* single_int = allocate_storage(&allocator, int, 1); // Allocate a single int.
  *      {

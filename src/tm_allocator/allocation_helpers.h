@@ -126,16 +126,17 @@ void free_storage_impl(Allocator* allocator, const char* file, size_t line, T* p
 // Allocation helpers will just delegate.
 
 template <class T, class Allocator>
-T* allocate_storage_impl(Allocator* allocator, size_t count = 1, size_t alignment = TypeSizes<T>::alignment) {
+AllocationResult<T> allocate_storage_impl(Allocator* allocator, size_t count = 1,
+                                          size_t alignment = TypeSizes<T>::alignment) {
     TM_ASSERT(Allocator::is_valid(allocator));
-    return (T*)allocator->allocate_bytes(count * TypeSizes<T>::size, alignment);
+    return allocator->allocate_bytes(count * TypeSizes<T>::size, alignment).as<T>();
 }
 template <class T, class Allocator>
-T* reallocate_storage_impl(Allocator* allocator, T* ptr, size_t old_count, size_t new_count,
-                           size_t alignment = TypeSizes<T>::alignment) {
+AllocationResult<T> reallocate_storage_impl(Allocator* allocator, T* ptr, size_t old_count, size_t new_count,
+                                            size_t alignment = TypeSizes<T>::alignment) {
     TM_ASSERT(Allocator::is_valid(allocator));
-    return (T*)allocator->reallocate_bytes(ptr, old_count * TypeSizes<T>::size, new_count * TypeSizes<T>::size,
-                                           alignment);
+    return allocator->reallocate_bytes(ptr, old_count * TypeSizes<T>::size, new_count * TypeSizes<T>::size, alignment)
+        .as<T>();
 }
 template <class T, class Allocator>
 bool reallocate_storage_in_place_impl(Allocator* allocator, T* ptr, size_t old_count, size_t new_count,
@@ -164,23 +165,45 @@ void free_storage_impl(Allocator* allocator, T* ptr, size_t count = 1, size_t al
 
 template <class T, class Allocator>
 T* create_default_init(Allocator* allocator, size_t count = 1, size_t alignment = alignof(T)) {
-    T* storage = allocate_storage(allocator, T, count, alignment);
+    auto storage = allocate_storage(allocator, T, count, alignment);
     if (storage) {
         for (size_t i = 0; i < count; ++i) {
-            TM_PLACEMENT_NEW(&storage[i]) T();
+            TM_PLACEMENT_NEW(&storage.ptr[i]) T();
         }
     }
-    return storage;
+    return storage.ptr;
+}
+
+/*!
+ * @brief Creates an array of with a minimum required size. The returned array might be bigger than requested.
+ * Call like this: create_at_least<int[]>(allocator, 12);
+ *
+ * @param allocator[IN,OUT] The allocator to use.
+ * @param count[IN] The minimum required element count of the array.
+ * @param alignment[IN] The alignment of the array.
+ * @result An array with default constructed elements, or result.ptr == nullptr if out of memory.
+ * The actually allocated element count is in result.size, which is at least as big as count on success.
+ */
+template <class T, class Allocator>
+CreateResult<::std::remove_extent_t<T>> create_at_least(Allocator* allocator, size_t count,
+                                                        size_t alignment = alignof(T)) {
+    auto storage = allocate_storage(allocator, ::std::remove_extent_t<T>, count, alignment);
+    if (storage) {
+        for (size_t i = 0; i < storage.size; ++i) {
+            TM_PLACEMENT_NEW(&storage.ptr[i])::std::remove_pointer_t<::std::remove_extent_t<T>>();
+        }
+    }
+    return {storage.ptr, storage.size};
 }
 
 #ifndef TMAL_NO_STL
 template <class T, class Allocator, class... Args, ::std::enable_if_t<!::std::is_array_v<T>, int> = 0>
 T* create(Allocator* allocator, Args&&... args) {
-    T* storage = allocate_storage(allocator, T, 1, alignof(T));
+    auto storage = allocate_storage(allocator, T, 1, alignof(T));
     if (storage) {
-        TM_PLACEMENT_NEW(storage) T(::std::forward<Args>(args)...);
+        TM_PLACEMENT_NEW(storage.ptr) T(::std::forward<Args>(args)...);
     }
-    return storage;
+    return storage.ptr;
 }
 
 template <class T, class Allocator, ::std::enable_if_t<::std::is_array_v<T>&& ::std::extent_v<T> == 0, int> = 0>
@@ -188,10 +211,10 @@ template <class T, class Allocator, ::std::enable_if_t<::std::is_array_v<T>&& ::
     auto storage = allocate_storage(allocator, ::std::remove_extent_t<T>, count, alignment);
     if (storage) {
         for (size_t i = 0; i < count; ++i) {
-            TM_PLACEMENT_NEW(&storage[i]) ::std::remove_pointer_t<::std::remove_extent_t<T>>();
+            TM_PLACEMENT_NEW(&storage.ptr[i]) ::std::remove_pointer_t<::std::remove_extent_t<T>>();
         }
     }
-    return storage;
+    return storage.ptr;
 }
 
 template <class T, class... Args, ::std::enable_if_t<::std::extent_v<T> != 0, int> = 0>

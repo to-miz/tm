@@ -1,13 +1,15 @@
-void* tml::MallocAllocator::allocate_bytes(size_t size, size_t alignment) {
+tml::MemoryBlock tml::MallocAllocator::allocate_bytes(size_t size, size_t alignment) {
     TM_MAYBE_UNUSED(alignment);
-    return TM_MALLOC(size, alignment);
+    void* ptr = TM_MALLOC(size, alignment);
+    return {ptr, (ptr) ? size : 0};
 }
-void* tml::MallocAllocator::reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment) {
+tml::MemoryBlock tml::MallocAllocator::reallocate_bytes(void* ptr, size_t old_size, size_t new_size, size_t alignment) {
     TM_MAYBE_UNUSED(old_size);
     TM_MAYBE_UNUSED(alignment);
     TM_MAYBE_UNUSED(new_size);
     TM_MAYBE_UNUSED(alignment);
-    return TM_REALLOC(ptr, old_size, alignment, new_size, alignment);
+    void* new_ptr = TM_REALLOC(ptr, old_size, alignment, new_size, alignment);
+    return {new_ptr, (new_ptr) ? new_size : 0};
 }
 bool tml::MallocAllocator::reallocate_bytes_in_place(void* ptr, size_t old_size, size_t new_size, size_t alignment) {
     TM_MAYBE_UNUSED(ptr);

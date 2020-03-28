@@ -1,5 +1,5 @@
 /*
-tm_allocator.h v0.0.2a - public domain - https://github.com/to-miz/tm
+tm_allocator.h v0.0.3 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
@@ -79,11 +79,16 @@ SWITCHES
 
 ISSUES
     - Not yet first release.
+    - TMAL_ALLOCATION_HELPERS_LEVEL not properly implemented.
 
 TODO
     - Write documentation.
 
 HISTORY     (DD.MM.YY)
+    v0.0.3   28.03.20 Changed the allocate_bytes and reallocate_bytes to return a MemoryBlock,
+                      allowing for more efficient allocations for allocators, that use fixed size blocks.
+                      Added create_at_least to allocate arrays with a minimum required size.
+                      The resulting array might be bigger, resulting in fewer reallocations for dynamic arrays when growing.
     v0.0.2a  23.02.20 Fixed typo.
     v0.0.2   04.01.20 Added tml::MonotonicAllocator::current_stack_allocator.
     v0.0.1   21.12.19 Initial Commit.
@@ -112,6 +117,8 @@ namespace tml {
 #include "functions.h"
 
 #include "Mutex.h"
+
+#include "Types.h"
 
 #include "StackAllocator.h"
 
