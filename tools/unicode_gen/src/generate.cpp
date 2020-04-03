@@ -259,7 +259,6 @@ void generate_source_file(const parsed_data& parsed, const unique_ucd& ucd, cons
         }
     };
 
-    auto stage_one_table_type = get_type_from_size(ucd.min_sizes.stage_one_table);
     auto stage_one_function_type = get_type_from_size(ucd.min_sizes.stage_one_function);
     auto stage_two_type = get_type_from_size(ucd.min_sizes.stage_two);
 

@@ -129,14 +129,14 @@ template <class T, class Allocator>
 AllocationResult<T> allocate_storage_impl(Allocator* allocator, size_t count = 1,
                                           size_t alignment = TypeSizes<T>::alignment) {
     TM_ASSERT(Allocator::is_valid(allocator));
-    return allocator->allocate_bytes(count * TypeSizes<T>::size, alignment).as<T>();
+    return allocator->allocate_bytes(count * TypeSizes<T>::size, alignment).template as<T>();
 }
 template <class T, class Allocator>
 AllocationResult<T> reallocate_storage_impl(Allocator* allocator, T* ptr, size_t old_count, size_t new_count,
                                             size_t alignment = TypeSizes<T>::alignment) {
     TM_ASSERT(Allocator::is_valid(allocator));
     return allocator->reallocate_bytes(ptr, old_count * TypeSizes<T>::size, new_count * TypeSizes<T>::size, alignment)
-        .as<T>();
+        .template as<T>();
 }
 template <class T, class Allocator>
 bool reallocate_storage_in_place_impl(Allocator* allocator, T* ptr, size_t old_count, size_t new_count,
@@ -178,6 +178,7 @@ T* create_default_init(Allocator* allocator, size_t count = 1, size_t alignment 
  * @brief Creates an array of with a minimum required size. The returned array might be bigger than requested.
  * Call like this: create_at_least<int[]>(allocator, 12);
  *
+ * @tparam T An array type like int[].
  * @param allocator[IN,OUT] The allocator to use.
  * @param count[IN] The minimum required element count of the array.
  * @param alignment[IN] The alignment of the array.

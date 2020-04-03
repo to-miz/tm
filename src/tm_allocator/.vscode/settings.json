@@ -39,6 +39,7 @@
         "xtr1common": "cpp",
         "xutility": "cpp",
         "cctype": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "*.idl": "cpp"
     }
 }
