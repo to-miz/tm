@@ -198,3 +198,128 @@ TEST_CASE("word tokenizing") {
         CHECK(tmsu_find_word_start_n(str_first, str_first + 2) == str_first);      // Returns beginning of string.
     }
 }
+
+TEST_CASE("url encoding") {
+    {
+        const tm_size_t buffer_size = 256;
+        char buffer[buffer_size];
+        char decode_buffer[buffer_size];
+
+        {
+            std::string_view test = "Hello World";
+            std::string_view expected = "Hello%20World";
+            REQUIRE(tmsu_url_encode(test.data(), (tm_size_t)test.size(), buffer, buffer_size) ==
+                    (tm_size_t)expected.size());
+            REQUIRE(expected == std::string_view(buffer, expected.size()));
+            REQUIRE(tmsu_url_decode(buffer, (tm_size_t)expected.size(), decode_buffer, buffer_size) ==
+                    (tm_size_t)test.size());
+            REQUIRE(test == std::string_view(decode_buffer, test.size()));
+        }
+
+        {
+            std::string_view test = "-!\"_haushd.a#~-+/&\"§Ha.ha__";
+            std::string_view expected = "-%21%22_haushd.a%23%7E-%2B%2F%26%22%C2%A7Ha.ha__";
+            REQUIRE(tmsu_url_encode(test.data(), (tm_size_t)test.size(), buffer, buffer_size) ==
+                    (tm_size_t)expected.size());
+            REQUIRE(expected == std::string_view(buffer, expected.size()));
+            REQUIRE(tmsu_url_decode(buffer, (tm_size_t)expected.size(), decode_buffer, buffer_size) ==
+                    (tm_size_t)test.size());
+            REQUIRE(test == std::string_view(decode_buffer, test.size()));
+        }
+
+        {
+            std::string_view invalid = "%%";
+            REQUIRE(tmsu_url_decode(invalid.data(), (tm_size_t)invalid.size(), decode_buffer, buffer_size) == 0);
+        }
+        {
+            std::string_view invalid = "%1";
+            REQUIRE(tmsu_url_decode(invalid.data(), (tm_size_t)invalid.size(), decode_buffer, buffer_size) == 0);
+        }
+        {
+            std::string_view invalid = "%1P";
+            REQUIRE(tmsu_url_decode(invalid.data(), (tm_size_t)invalid.size(), decode_buffer, buffer_size) == 0);
+        }
+        {
+            std::string_view invalid = "%P";
+            REQUIRE(tmsu_url_decode(invalid.data(), (tm_size_t)invalid.size(), decode_buffer, buffer_size) == 0);
+        }
+        {
+            std::string_view invalid = "%";
+            REQUIRE(tmsu_url_decode(invalid.data(), (tm_size_t)invalid.size(), decode_buffer, buffer_size) == 0);
+        }
+        {
+            std::string_view valid = "";
+            REQUIRE(tmsu_url_decode(valid.data(), (tm_size_t)valid.size(), decode_buffer, buffer_size) == 0);
+        }
+        {
+            std::string_view valid = "%41";
+            REQUIRE(tmsu_url_decode(valid.data(), (tm_size_t)valid.size(), decode_buffer, buffer_size) == 1);
+            REQUIRE(std::string_view(decode_buffer, 1) == "A");
+        }
+
+        CHECK_ASSERTION_FAILURE(tmsu_url_decode(nullptr, 10, decode_buffer, buffer_size));
+        CHECK_ASSERTION_FAILURE(tmsu_url_decode("a", 1, nullptr, buffer_size));
+        CHECK_NOASSERT(tmsu_url_decode(nullptr, 0, nullptr, 0));
+        REQUIRE(tmsu_url_decode(nullptr, 0, nullptr, 0) == 0);
+    }
+}
+
+TEST_CASE("base64") {
+    struct DataSet {
+        std::string_view value;
+        std::string_view base64;
+        std::string_view base64url;
+    };
+
+    static const DataSet data[] = {
+        {"", "", ""},
+        {"Hello World", "SGVsbG8gV29ybGQ=", "SGVsbG8gV29ybGQ"},
+        {"Some random test text", "U29tZSByYW5kb20gdGVzdCB0ZXh0", "U29tZSByYW5kb20gdGVzdCB0ZXh0"},
+        {"\x08", "CA==", "CA"},
+        {"\xFF", "/w==", "_w"},
+        {std::string_view("\x00\x10", 2), "ABA=", "ABA"},
+        {std::string_view("\xFF\x00\xF0\xFE\xFF\xFE\xA0\xCC", 8), "/wDw/v/+oMw=", "_wDw_v_-oMw"},
+    };
+
+    for (auto&& entry : data) {
+        const tm_size_t buffer_size = 256;
+        char encode_buffer[buffer_size];
+        char decode_buffer[buffer_size];
+
+        size_t encode_size =
+            (size_t)tmsu_base64_encode(entry.value.data(), (tm_size_t)entry.value.size(), encode_buffer, buffer_size);
+        REQUIRE(encode_size == entry.base64.size());
+        REQUIRE(std::string_view(encode_buffer, encode_size) == entry.base64);
+
+        size_t decode_size =
+            (size_t)tmsu_base64_decode(encode_buffer, (tm_size_t)encode_size, decode_buffer, buffer_size);
+        REQUIRE(decode_size == entry.value.size());
+        REQUIRE(std::string_view(decode_buffer, decode_size) == entry.value);
+
+        encode_size =
+            (size_t)tmsu_base64url_encode(entry.value.data(), (tm_size_t)entry.value.size(), encode_buffer, buffer_size);
+        REQUIRE(encode_size == entry.base64url.size());
+        REQUIRE(std::string_view(encode_buffer, encode_size) == entry.base64url);
+
+        decode_size = (size_t)tmsu_base64url_decode(encode_buffer, (tm_size_t)encode_size, decode_buffer, buffer_size);
+        REQUIRE(decode_size == entry.value.size());
+        REQUIRE(std::string_view(decode_buffer, decode_size) == entry.value);
+    }
+
+    REQUIRE(tmsu_base64_decode("a", 1, nullptr, 0) == 0);
+    REQUIRE(tmsu_base64_decode("aa", 2, nullptr, 0) == 0);
+    REQUIRE(tmsu_base64_decode("aaa", 3, nullptr, 0) == 0);
+    REQUIRE(tmsu_base64_decode("aaaa", 4, nullptr, 0) == 3);
+    REQUIRE(tmsu_base64_decode(nullptr, 0, nullptr, 0) == 0);
+
+    REQUIRE(tmsu_base64url_decode("a", 1, nullptr, 0) == 0);
+    REQUIRE(tmsu_base64url_decode("aa", 2, nullptr, 0) == 1);
+    REQUIRE(tmsu_base64url_decode("aaa", 3, nullptr, 0) == 2);
+    REQUIRE(tmsu_base64url_decode("aaaa", 4, nullptr, 0) == 3);
+    REQUIRE(tmsu_base64url_decode(nullptr, 0, nullptr, 0) == 0);
+
+    CHECK_ASSERTION_FAILURE(tmsu_base64_decode(nullptr, 2, nullptr, 0));
+    CHECK_ASSERTION_FAILURE(tmsu_base64_decode("aa", 2, nullptr, 1));
+    CHECK_ASSERTION_FAILURE(tmsu_base64url_decode(nullptr, 2, nullptr, 0));
+    CHECK_ASSERTION_FAILURE(tmsu_base64url_decode("aa", 2, nullptr, 1));
+}

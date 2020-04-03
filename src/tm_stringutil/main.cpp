@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.3.4 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.9.0 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak MERGE_YEAR
 
 no warranty; use at your own risk
@@ -20,6 +20,8 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
+    v0.9.0  03.04.20 Added tmsu_base64_decode, tmsu_base64url_encode, tmsu_base64url_decode,
+                     tmsu_url_encode, tmsu_url_decode.
     v0.3.4  02.05.19 Added tmsu_find_word_end_n and tmsu_find_word_start_n.
     v0.3.3  06.03.19 Added optional defines for TM_STRCSPN and TM_STRSPN to make use
                      of CRT if it is present.
@@ -298,6 +300,103 @@ TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_n(const char* a_first, const 
                                                      const char* b_last);
 TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_n(const char* str_first, const char* str_last,
                                                    const char* find_str_first, const char* find_str_last);
+
+/* Some encoding/decoding functions. */
+
+/*!
+ * @brief Base64 encodes input bytes into an output octet stream. The octet stream is not nullterminated.
+ *
+ * No allocations take place. If the provided output size is not enough, the required size will be returned.
+ * Note that base64 encoding is at most 4/3 of the original size, so an output buffer with
+ * (input_size + (input_size / 3) + 4) should be enough.
+ *
+ * @param input_bytes[IN] The input bytes, that are to be base64 encoded.
+ * @param input_size[IN] The size (in bytes) of the input.
+ * @param out[OUT] The output octet stream.
+ * @param out_size[INT] The size of the output (in bytes/octets).
+ * @return The number of octets produced on success. If the returned number is greater than @param out_size, then the
+ * output buffer was not big enough and it denotes a failure to encode. In this case the returned number is the required
+ * output size.
+ */
+TMSU_DEF tm_size_t tmsu_base64_encode(const void* input_bytes, tm_size_t input_size, char* out, tm_size_t out_size);
+
+/*!
+ * @brief Base64 decodes a base64 encoded string to raw bytes.
+ *
+ * No allocations take place. If the provided output size is not enough, the required size will be returned.
+ * Note that base64 encoding is at most 4/3 of the original size, so an output buffer with the same size as the input
+ * should be enough.
+ *
+ * @param base64_encoded_string[IN] The base64 encoded string.
+ * @param base64_input_size[IN]
+ * @param out[OUT]
+ * @param out_size[IN]
+ * @return If the returned size is greater than @param out_size, then the output buffer was not big enough and the
+ * returned size is the required output size.
+ * If the returned size is 0, then @param base64_encoded_string is malformed or empty.
+ * If the returned size is greater than 0 and less than or equal to @param out_size, then decoding succeeded.
+ */
+TMSU_DEF tm_size_t tmsu_base64_decode(const char* base64_encoded_string, tm_size_t base64_input_size, void* out,
+                                      tm_size_t out_size);
+
+/*!
+ * @brief Base64url encodes input bytes into an output octet stream. The octet stream is not nullterminated.
+ *
+ * No allocations take place. If the provided output size is not enough, the required size will be returned.
+ * Note that base64url encoding is at most 4/3 of the original size, so an output buffer with
+ * (input_size + (input_size / 3) + 4) should be enough.
+ *
+ * @param input_bytes[IN] The input bytes, that are to be base64url encoded.
+ * @param input_size[IN] The size (in bytes) of the input.
+ * @param out[OUT] The output octet stream.
+ * @param out_size[INT] The size of the output (in bytes or octets).
+ * @return The number of octets produced on success. If the returned number is greater than @param out_size, then the
+ * output buffer was not big enough and it denotes a failure to encode. In this case the returned number is the required
+ * output size.
+ */
+TMSU_DEF tm_size_t tmsu_base64url_encode(const void* input_bytes, tm_size_t input_size, char* out, tm_size_t out_size);
+
+/*!
+ * @brief Base64url decodes a base64url encoded string to raw bytes.
+ *
+ * No allocations take place. If the provided output size is not enough, the required size will be returned.
+ * Note that base64url encoding is at most 4/3 of the original size, so an output buffer with the same size as the input
+ * should be enough.
+ *
+ * @param base64url_encoded_string[IN] The base64url encoded string.
+ * @param base64url_input_size[IN] The size of the string in bytes or octets.
+ * @param out[OUT] The output buffer.
+ * @param out_size[IN] The size of the output in bytes.
+ * @return If the returned size is greater than @param out_size, then the output buffer was not big enough and the
+ * returned size is the required output size.
+ * If the returned size is 0, then @param base64url_encoded_string is malformed or empty.
+ * If the returned size is greater than 0 and less than or equal to @param out_size, then decoding succeeded.
+ */
+TMSU_DEF tm_size_t tmsu_base64url_decode(const char* base64url_encoded_string, tm_size_t base64url_input_size,
+                                         void* out, tm_size_t out_size);
+
+/*!
+ * @brief Url encodes an input string. If the output buffer is not big enough, the required size is returned.
+ * @param input[IN] The input string. Note that the input can be any raw binary data or string.
+ * @param input_size[IN] The size of the input in bytes.
+ * @param out[OUT] The output buffer. It will contain a valid ASCII string on success. The output is NOT nullterminated.
+ * @param out_size[IN] The size of the output buffer in bytes or octets.
+ * @return If the returned size is less than or equal to @param out_size, then encoding succeeded.
+ * Otherwise the returned size denotes the required output buffer size and encoding failed.
+ */
+TMSU_DEF tm_size_t tmsu_url_encode(const void* input, tm_size_t input_size, char* out, tm_size_t out_size);
+
+/*!
+ * @brief Url decodes an input string. If the output buffer is not big enough, the required size is returned.
+ * @param url_encoded_input[IN] The url encoded input string.
+ * @param input_size[IN] The size of the input in bytes or octets.
+ * @param out[OUT] The output buffer. Note that the output can be any raw binary data or string.
+ * @param out_size[IN] The size of the output buffer in bytes. The output is NOT nullterminated.
+ * @return If the returned size is less than or equal to @param out_size, then encoding succeeded.
+ * If the returned size is 0, then @param url_encoded_input is malformed or empty.
+ * Otherwise the returned size denotes the required output buffer size and encoding failed.
+ */
+TMSU_DEF tm_size_t tmsu_url_decode(const char* url_encoded_input, tm_size_t input_size, void* out, tm_size_t out_size);
 
 /* Crt extensions, that are non standard and may not be provided. */
 

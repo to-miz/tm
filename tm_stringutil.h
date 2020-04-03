@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.3.4 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.9.0 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2020
 
 no warranty; use at your own risk
@@ -20,6 +20,8 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
+    v0.9.0  03.04.20 Added tmsu_base64_decode, tmsu_base64url_encode, tmsu_base64url_decode,
+                     tmsu_url_encode, tmsu_url_decode.
     v0.3.4  02.05.19 Added tmsu_find_word_end_n and tmsu_find_word_start_n.
     v0.3.3  06.03.19 Added optional defines for TM_STRCSPN and TM_STRSPN to make use
                      of CRT if it is present.
@@ -335,6 +337,103 @@ TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_n(const char* a_first, const 
                                                      const char* b_last);
 TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_n(const char* str_first, const char* str_last,
                                                    const char* find_str_first, const char* find_str_last);
+
+/* Some encoding/decoding functions. */
+
+/*!
+ * @brief Base64 encodes input bytes into an output octet stream. The octet stream is not nullterminated.
+ *
+ * No allocations take place. If the provided output size is not enough, the required size will be returned.
+ * Note that base64 encoding is at most 4/3 of the original size, so an output buffer with
+ * (input_size + (input_size / 3) + 4) should be enough.
+ *
+ * @param input_bytes[IN] The input bytes, that are to be base64 encoded.
+ * @param input_size[IN] The size (in bytes) of the input.
+ * @param out[OUT] The output octet stream.
+ * @param out_size[INT] The size of the output (in bytes/octets).
+ * @return The number of octets produced on success. If the returned number is greater than @param out_size, then the
+ * output buffer was not big enough and it denotes a failure to encode. In this case the returned number is the required
+ * output size.
+ */
+TMSU_DEF tm_size_t tmsu_base64_encode(const void* input_bytes, tm_size_t input_size, char* out, tm_size_t out_size);
+
+/*!
+ * @brief Base64 decodes a base64 encoded string to raw bytes.
+ *
+ * No allocations take place. If the provided output size is not enough, the required size will be returned.
+ * Note that base64 encoding is at most 4/3 of the original size, so an output buffer with the same size as the input
+ * should be enough.
+ *
+ * @param base64_encoded_string[IN] The base64 encoded string.
+ * @param base64_input_size[IN]
+ * @param out[OUT]
+ * @param out_size[IN]
+ * @return If the returned size is greater than @param out_size, then the output buffer was not big enough and the
+ * returned size is the required output size.
+ * If the returned size is 0, then @param base64_encoded_string is malformed or empty.
+ * If the returned size is greater than 0 and less than or equal to @param out_size, then decoding succeeded.
+ */
+TMSU_DEF tm_size_t tmsu_base64_decode(const char* base64_encoded_string, tm_size_t base64_input_size, void* out,
+                                      tm_size_t out_size);
+
+/*!
+ * @brief Base64url encodes input bytes into an output octet stream. The octet stream is not nullterminated.
+ *
+ * No allocations take place. If the provided output size is not enough, the required size will be returned.
+ * Note that base64url encoding is at most 4/3 of the original size, so an output buffer with
+ * (input_size + (input_size / 3) + 4) should be enough.
+ *
+ * @param input_bytes[IN] The input bytes, that are to be base64url encoded.
+ * @param input_size[IN] The size (in bytes) of the input.
+ * @param out[OUT] The output octet stream.
+ * @param out_size[INT] The size of the output (in bytes or octets).
+ * @return The number of octets produced on success. If the returned number is greater than @param out_size, then the
+ * output buffer was not big enough and it denotes a failure to encode. In this case the returned number is the required
+ * output size.
+ */
+TMSU_DEF tm_size_t tmsu_base64url_encode(const void* input_bytes, tm_size_t input_size, char* out, tm_size_t out_size);
+
+/*!
+ * @brief Base64url decodes a base64url encoded string to raw bytes.
+ *
+ * No allocations take place. If the provided output size is not enough, the required size will be returned.
+ * Note that base64url encoding is at most 4/3 of the original size, so an output buffer with the same size as the input
+ * should be enough.
+ *
+ * @param base64url_encoded_string[IN] The base64url encoded string.
+ * @param base64url_input_size[IN] The size of the string in bytes or octets.
+ * @param out[OUT] The output buffer.
+ * @param out_size[IN] The size of the output in bytes.
+ * @return If the returned size is greater than @param out_size, then the output buffer was not big enough and the
+ * returned size is the required output size.
+ * If the returned size is 0, then @param base64url_encoded_string is malformed or empty.
+ * If the returned size is greater than 0 and less than or equal to @param out_size, then decoding succeeded.
+ */
+TMSU_DEF tm_size_t tmsu_base64url_decode(const char* base64url_encoded_string, tm_size_t base64url_input_size,
+                                         void* out, tm_size_t out_size);
+
+/*!
+ * @brief Url encodes an input string. If the output buffer is not big enough, the required size is returned.
+ * @param input[IN] The input string. Note that the input can be any raw binary data or string.
+ * @param input_size[IN] The size of the input in bytes.
+ * @param out[OUT] The output buffer. It will contain a valid ASCII string on success. The output is NOT nullterminated.
+ * @param out_size[IN] The size of the output buffer in bytes or octets.
+ * @return If the returned size is less than or equal to @param out_size, then encoding succeeded.
+ * Otherwise the returned size denotes the required output buffer size and encoding failed.
+ */
+TMSU_DEF tm_size_t tmsu_url_encode(const void* input, tm_size_t input_size, char* out, tm_size_t out_size);
+
+/*!
+ * @brief Url decodes an input string. If the output buffer is not big enough, the required size is returned.
+ * @param url_encoded_input[IN] The url encoded input string.
+ * @param input_size[IN] The size of the input in bytes or octets.
+ * @param out[OUT] The output buffer. Note that the output can be any raw binary data or string.
+ * @param out_size[IN] The size of the output buffer in bytes. The output is NOT nullterminated.
+ * @return If the returned size is less than or equal to @param out_size, then encoding succeeded.
+ * If the returned size is 0, then @param url_encoded_input is malformed or empty.
+ * Otherwise the returned size denotes the required output buffer size and encoding failed.
+ */
+TMSU_DEF tm_size_t tmsu_url_decode(const char* url_encoded_input, tm_size_t input_size, void* out, tm_size_t out_size);
 
 /* Crt extensions, that are non standard and may not be provided. */
 
@@ -1244,6 +1343,287 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len) {
         }
     }
     return TM_NULL;
+}
+
+static char const* const tmsu_base64_chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789+/";
+
+static char const* const tmsu_base64url_chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789-_";
+
+static tm_size_t tmsu_base64_encode_chars(char const* const chars, tm_bool pad, const void* input_bytes,
+                                          tm_size_t input_size, char* out, tm_size_t out_size) {
+    TM_ASSERT((chars == tmsu_base64_chars) || (chars == tmsu_base64url_chars));
+
+    tm_size_t out_index = 0;
+    const char* in = (const char*)input_bytes;
+    unsigned int char_index[4];
+    tm_size_t i = 0;
+    for (; input_size >= 3; i += 3, input_size -= 3) {
+        unsigned int a = (unsigned char)in[i];
+        unsigned int b = (unsigned char)in[i + 1];
+        unsigned int c = (unsigned char)in[i + 2];
+
+        // Divide each three 8 bit blocks into four 6 bit blocks:
+        // AAAAAA AABBBB BBBBCC CCCCCC
+        char_index[0] = (a >> 2u);
+        char_index[1] = ((a & 0x3u) << 4) | (b >> 4u);
+        char_index[2] = ((b & 0xFu) << 2) | (c >> 6u);
+        char_index[3] = (c & 0x3Fu);
+
+        TM_ASSERT(char_index[0] < 64);
+        TM_ASSERT(char_index[1] < 64);
+        TM_ASSERT(char_index[2] < 64);
+        TM_ASSERT(char_index[3] < 64);
+
+        if (out_index + 4 < out_size) {
+            out[out_index + 0] = chars[char_index[0]];
+            out[out_index + 1] = chars[char_index[1]];
+            out[out_index + 2] = chars[char_index[2]];
+            out[out_index + 3] = chars[char_index[3]];
+        }
+        out_index += 4;
+    }
+
+    // The remaining size is either 1 or 2, it can't be 3, since it would have been handeled by the above loop.
+    TM_ASSERT(input_size == 0 || input_size == 1 || input_size == 2);
+    if (input_size > 0) {
+        unsigned int a = (unsigned char)in[i];
+        unsigned int b = (input_size > 1) ? (unsigned char)in[i + 1] : 0;
+
+        // Divide each three 8 bit blocks into four 6 bit blocks:
+        // AAAAAA AABBBB BBBBCC CCCCCC
+        char_index[0] = (a >> 2u);
+        char_index[1] = ((a & 0x3u) << 4) | (b >> 4u);
+        char_index[2] = ((b & 0xFu) << 2);
+        char_index[3] = 0;
+
+        TM_ASSERT(char_index[0] < 64);
+        TM_ASSERT(char_index[1] < 64);
+        TM_ASSERT(char_index[2] < 64);
+        TM_ASSERT(char_index[3] < 64);
+
+        if (out_index + 2 < out_size) {
+            out[out_index + 0] = chars[char_index[0]];
+            out[out_index + 1] = chars[char_index[1]];
+            out_index += 2;
+        }
+        if (input_size > 1) {
+            if (out_index + 1 < out_size) out[out_index] = chars[char_index[2]];
+            ++out_index;
+        } else if (pad) {
+            if (out_index + 1 < out_size) out[out_index] = '=';
+            ++out_index;
+        }
+
+        if (pad) {
+            if (out_index + 1 < out_size) out[out_index] = '=';
+            ++out_index;
+        }
+    }
+    return out_index;
+}
+
+static tm_size_t tmsu_base64_decode_chars(char const* const chars, tm_bool expect_padding,
+                                          const char* base64_encoded_string, tm_size_t base64_input_size, void* out,
+                                          tm_size_t out_size) {
+    TM_ASSERT((chars == tmsu_base64_chars) || (chars == tmsu_base64url_chars));
+    TM_ASSERT((base64_input_size % 4 == 0) || !expect_padding);
+
+    tm_size_t out_index = 0;
+    char* p = (char*)out;
+    unsigned int char_value[4];
+    tm_size_t i = 0;
+    for (; base64_input_size > 4; i += 4, base64_input_size -= 4) {
+        char_value[0] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 0]) - chars);
+        char_value[1] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 1]) - chars);
+        char_value[2] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 2]) - chars);
+        char_value[3] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 3]) - chars);
+
+        if (char_value[0] >= 64) return 0;
+        if (char_value[1] >= 64) return 0;
+        if (char_value[2] >= 64) return 0;
+        if (char_value[3] >= 64) return 0;
+
+        // Decompose each four 6 bit blocks into three 8 bit blocks:
+        // 00000011 11112222 22333333
+        if (out_index + 3 < out_size) {
+            p[out_index + 0] = (char)((char_value[0] << 2) | (char_value[1] >> 4));
+            p[out_index + 1] = (char)(((char_value[1] << 4) & 0xF0u) | (char_value[2] >> 2));
+            p[out_index + 2] = (char)(((char_value[2] << 6) & 0xC0u) | (char_value[3]));
+        }
+        out_index += 3;
+    }
+
+    // Handle last 4 bytes seperately, since they might have padding '='.
+    if (base64_input_size > 0) {
+        int padding_count = 0;
+        if (expect_padding) {
+            char_value[0] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 0]) - chars);
+            char_value[1] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 1]) - chars);
+            char_value[2] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 2]) - chars);
+            char_value[3] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 3]) - chars);
+
+            if (char_value[0] >= 64) return 0;
+            if (char_value[1] >= 64) return 0;
+            if (char_value[3] >= 64) {
+                if (base64_encoded_string[i + 3] != '=') return 0;
+                char_value[3] = 0;
+                padding_count = 1;
+            }
+            if (char_value[2] >= 64) {
+                if (base64_encoded_string[i + 2] != '=') return 0;
+                char_value[2] = 0;
+                padding_count = 2;
+            }
+        } else {
+            char_value[0] = (base64_input_size > 0) ? (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 0]) - chars) : 0;
+            char_value[1] = (base64_input_size > 1) ? (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 1]) - chars) : 0;
+            char_value[2] = (base64_input_size > 2) ? (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 2]) - chars) : 0;
+            char_value[3] = (base64_input_size > 3) ? (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 3]) - chars) : 0;
+
+            if (char_value[0] >= 64) return 0;
+            if (char_value[1] >= 64) return 0;
+            if (char_value[2] >= 64) return 0;
+            if (char_value[3] >= 64) return 0;
+
+            padding_count = 2 - (base64_input_size > 2) - (base64_input_size > 3);
+        }
+
+        // Decompose each four 6 bit blocks into three 8 bit blocks:
+        // 00000011 11112222 22333333
+        if (out_index + 1 < out_size) p[out_index] = (char)((char_value[0] << 2) | (char_value[1] >> 4));
+        ++out_index;
+        if (padding_count < 2) {
+            if (out_index + 1 < out_size) p[out_index] = (char)(((char_value[1] << 4) & 0xF0u) | (char_value[2] >> 2));
+            ++out_index;
+        }
+        if (padding_count < 1) {
+            if (out_index + 1 < out_size)  p[out_index] = (char)(((char_value[2] << 6) & 0xC0u) | (char_value[3]));
+            ++out_index;
+        }
+    }
+    return out_index;
+}
+
+TMSU_DEF tm_size_t tmsu_base64_encode(const void* input_bytes, tm_size_t input_size, char* out, tm_size_t out_size) {
+    TM_ASSERT(input_bytes || input_size == 0);
+    TM_ASSERT(out || out_size == 0);
+    return tmsu_base64_encode_chars(tmsu_base64_chars, /*pad=*/TM_TRUE, input_bytes, input_size, out, out_size);
+}
+TMSU_DEF tm_size_t tmsu_base64url_encode(const void* input_bytes, tm_size_t input_size, char* out, tm_size_t out_size) {
+    TM_ASSERT(input_bytes || input_size == 0);
+    TM_ASSERT(out || out_size == 0);
+    return tmsu_base64_encode_chars(tmsu_base64url_chars, /*pad=*/TM_FALSE, input_bytes, input_size, out, out_size);
+}
+TMSU_DEF tm_size_t tmsu_base64_decode(const char* base64_encoded_string, tm_size_t base64_input_size, void* out,
+                                      tm_size_t out_size) {
+    TM_ASSERT(base64_encoded_string || base64_input_size == 0);
+    TM_ASSERT(out || out_size == 0);
+    if (base64_input_size == 0) return 0;
+    if (base64_input_size % 4 != 0) return 0;
+    return tmsu_base64_decode_chars(tmsu_base64_chars, /*expect_padding=*/TM_TRUE, base64_encoded_string,
+                                    base64_input_size, out, out_size);
+}
+TMSU_DEF tm_size_t tmsu_base64url_decode(const char* base64url_encoded_string, tm_size_t base64url_input_size,
+                                         void* out, tm_size_t out_size) {
+    TM_ASSERT(base64url_encoded_string || base64url_input_size == 0);
+    TM_ASSERT(out || out_size == 0);
+    if (base64url_input_size < 2) return 0;
+    return tmsu_base64_decode_chars(tmsu_base64url_chars, /*expect_padding=*/TM_FALSE, base64url_encoded_string,
+                                    base64url_input_size, out, out_size);
+}
+
+TMSU_DEF tm_size_t tmsu_url_encode(const void* input, tm_size_t input_size, char* out, tm_size_t out_size) {
+    TM_ASSERT(input || input_size == 0);
+    TM_ASSERT(out || out_size == 0);
+
+    const char* in = (const char*)input;
+    tm_size_t out_index = 0;
+    for (tm_size_t i = 0; i < input_size; ++i) {
+        unsigned int c = (unsigned char)in[i];
+        // Special case characters, that are allowed in uri strings.
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '-') || (c == '_') ||
+            (c == '.')) {
+            if (out_index < out_size) out[out_index] = (char)c;
+            ++out_index;
+            continue;
+        }
+
+        // Percent encode any other byte.
+        // Byte to hex inplace.
+        unsigned int l = (c >> 4u) & 0x0Fu;
+        l += (l <= 9) ? '0' : ('A' - 10);
+        unsigned int r = c & 0x0Fu;
+        r += (r <= 9) ? '0' : ('A' - 10);
+
+        if (out_index < out_size) out[out_index] = '%';
+        ++out_index;
+        if (out_index < out_size) out[out_index] = (char)l;
+        ++out_index;
+        if (out_index < out_size) out[out_index] = (char)r;
+        ++out_index;
+    }
+    return out_index;
+}
+
+TMSU_DEF tm_size_t tmsu_url_decode(const char* url_encoded_input, tm_size_t input_size, void* out, tm_size_t out_size) {
+    TM_ASSERT(url_encoded_input || input_size == 0);
+    TM_ASSERT(out || out_size == 0);
+
+    char* p = (char*)out;
+    tm_size_t out_index = 0;
+    for (tm_size_t i = 0; i < input_size; ++i) {
+        unsigned int c = (unsigned char)url_encoded_input[i];
+        // Special case characters, that are allowed in uri strings.
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '-') || (c == '_') ||
+            (c == '.')) {
+            if (out_index < out_size) p[out_index] = (char)c;
+            ++out_index;
+            continue;
+        }
+
+        if (c == '%') {
+            // Check for malformed input.
+            if (input_size - i < 3) return 0;
+
+            // Percent decode.
+            unsigned int l = (unsigned char)url_encoded_input[i + 1];
+            unsigned int r = (unsigned char)url_encoded_input[i + 2];
+
+            // Hex to byte inplace.
+            if (l >= '0' && l <= '9')
+                l -= '0';
+            else if (l >= 'A' && l <= 'F')
+                l = (l - 'A') + 10;
+            else if (l >= 'a' && l <= 'f')
+                l = (l - 'a') + 10;
+            else
+                return 0;
+
+            if (r >= '0' && r <= '9')
+                r -= '0';
+            else if (r >= 'A' && r <= 'F')
+                r = (r - 'A') + 10;
+            else if (r >= 'a' && r <= 'f')
+                r = (r - 'a') + 10;
+            else
+                return 0;
+
+            if (out_index < out_size) p[out_index] = (char)((unsigned char)((l << 4u) | r));
+            ++out_index;
+            i += 2;
+            continue;
+        }
+
+        // Invalid character encountered.
+        return 0;
+    }
+    return out_index;
 }
 
 #ifdef __cplusplus
