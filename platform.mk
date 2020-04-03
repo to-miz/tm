@@ -12,7 +12,11 @@ VERBOSE   := false
 
 # Include config that may change any of the variables here.
 
+ifneq (${CONFIG_FILE},)
+-include ${CONFIG_FILE}
+else
 -include config.mk
+endif
 
 # Set up declarations used for all supported platforms and compilers.
 
