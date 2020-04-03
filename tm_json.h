@@ -1,5 +1,5 @@
 /*
-tm_json.h v0.4.2 - public domain - https://github.com/to-miz/tm
+tm_json.h v0.9.0 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -119,6 +119,8 @@ ISSUES
     - Json5 unquoted identifiers don't allow for \u unicode escape sequences or unicode letters.
 
 HISTORY
+    v0.9.0  03.04.20  Added jsonResolveJsonPointer, that resolves Json Pointer according to
+                      https://tools.ietf.org/html/rfc6901
     v0.4.2  29.10.19  Fixed a buffer overrun error in skipWhitespace.
     v0.4.1  29.10.19  Added JSON_READER_ALLOW_EXTENDED_WHITESPACE.
                       Fixed various issues with unquoted property names, escaped newlines and json5 string validation.
@@ -204,13 +206,28 @@ HISTORY
 /* clang-format off */
 #ifdef TM_JSON_IMPLEMENTATION
     /* define these to avoid crt */
-    #ifndef TM_MEMCHR
+    #if !defined(TM_MEMCHR) || !defined(TM_STRLEN) || !defined(TM_STRCHR) \
+        || !defined(TM_MEMCMP) || !defined(TM_MEMCPY) || !defined(TM_MEMSET)
+
         #include <string.h>
-        #define TM_MEMCHR memchr
-    #endif
-    #ifndef TM_STRLEN
-        #include <string.h>
-        #define TM_STRLEN strlen
+        #ifndef TM_MEMCHR
+            #define TM_MEMCHR memchr
+        #endif
+        #ifndef TM_STRLEN
+            #define TM_STRLEN strlen
+        #endif
+        #ifndef TM_STRCHR
+            #define TM_STRCHR strchr
+        #endif
+        #ifndef TM_MEMCMP
+            #define TM_MEMCMP memcmp
+        #endif
+        #ifndef TM_MEMCPY
+            #define TM_MEMCPY memcpy
+        #endif
+        #ifndef TM_MEMSET
+            #define TM_MEMSET memset
+        #endif
     #endif
     #if !defined(TM_ISDIGIT) || !defined(TM_ISALPHA) || !defined(TM_ISXDIGIT) \
         || !defined(TM_ISSPACE) || !defined(TM_TOLOWER)
@@ -231,28 +248,15 @@ HISTORY
             #define TM_TOLOWER tolower
         #endif
     #endif
-    #ifndef TM_MEMCMP
-        #include <string.h>
-        #define TM_MEMCMP memcmp
-    #endif
-    #ifndef TM_MEMCPY
-        #include <string.h>
-        #define TM_MEMCPY memcpy
-    #endif
-    #ifndef TM_MEMSET
-        #include <string.h>
-        #define TM_MEMSET memset
-    #endif
-    // define TMJ_ALLOCATE and TMJ_FREE with your own allocator if dynamic allocation is unwanted
-    #ifndef TMJ_ALLOCATE
-        #ifdef __cplusplus
-            #define TMJ_ALLOCATE(size, alignment) (new char[(size)])
-            #define TMJ_FREE(ptr, size) (delete[] (ptr))
-        #else
-            #include <stdlib.h>
-            #define TMJ_ALLOCATE(size, alignment) (malloc(size))
-            #define TMJ_FREE(ptr, size) (free(ptr))
-        #endif
+
+    /* Global allocation functions to use. */
+    #if !defined(TM_MALLOC) || !defined(TM_REALLOC) || !defined(TM_FREE)
+        // Either all or none have to be defined.
+        #include <stdlib.h>
+        #define TM_MALLOC(size, alignment) malloc((size))
+        #define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) realloc((ptr), (new_size))
+        // #define TM_REALLOC_IN_PLACE(ptr, old_size, old_alignment, new_size, new_alignment) // Optional
+        #define TM_FREE(ptr, size, alignment) free((ptr))
     #endif
 
     // define this if you want to use infinity and nan extensions for json using math.h
@@ -280,12 +284,12 @@ HISTORY
     // for more details, see TMJ_TO_INT section at SWITCHES at the top of this file
     #ifndef TMJ_TO_INT
         #define TMJ_DEFINE_OWN_STRING_CONVERSIONS
-        #define TMJ_TO_INT(str, len, out_ptr, base) tmj_to_int((str), (len), (out_ptr), (base))
-        #define TMJ_TO_UINT(str, len, out_ptr, base) tmj_to_uint((str), (len), (out_ptr), (base))
-        #define TMJ_TO_INT64(str, len, out_ptr, base) tmj_to_int64((str), (len), (out_ptr), (base))
-        #define TMJ_TO_UINT64(str, len, out_ptr, base) tmj_to_uint64((str), (len), (out_ptr), (base))
-        #define TMJ_TO_FLOAT(str, len, out_ptr) tmj_to_float((str), (len), (out_ptr))
-        #define TMJ_TO_DOUBLE(str, len, out_ptr) tmj_to_double((str), (len), (out_ptr))
+        #define TMJ_TO_INT(first, last, out_ptr, base) tmj_to_int((first), (last), (out_ptr), (base))
+        #define TMJ_TO_UINT(first, last, out_ptr, base) tmj_to_uint((first), (last), (out_ptr), (base))
+        #define TMJ_TO_INT64(first, last, out_ptr, base) tmj_to_int64((first), (last), (out_ptr), (base))
+        #define TMJ_TO_UINT64(first, last, out_ptr, base) tmj_to_uint64((first), (last), (out_ptr), (base))
+        #define TMJ_TO_FLOAT(first, last, out_ptr) tmj_to_float((first), (last), (out_ptr))
+        #define TMJ_TO_DOUBLE(first, last, out_ptr) tmj_to_double((first), (last), (out_ptr))
     #endif
 #endif
 
@@ -794,6 +798,14 @@ TMJ_DEF JsonValue jsonGetMemberCached(const JsonObject* object, const char* name
 TMJ_DEF JsonValue* jsonQueryMemberCached(const JsonObject* object, const char* name, tm_size_t* lastAccess);
 TMJ_DEF JsonValue jsonGetEntry(const JsonArray* object, tm_size_t index);
 
+/*!
+ * @brief Resolves a json pointer, see https://tools.ietf.org/html/rfc6901 for reference.
+ * Might allocate memory to unescape json_pointer, but tries not to.
+ * @param value[IN] The value to start searching.
+ * @param json_pointer[IN] The json pointer as string. Can also be in fragment form.
+ */
+TMJ_DEF JsonValue jsonResolveJsonPointer(const JsonValue* value, const char* json_pointer);
+
 // string_view overloads
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
 TMJ_DEF JsonValue jsonGetMember(const JsonObject* object, TM_STRING_VIEW name);
@@ -907,12 +919,10 @@ inline uint64_t JsonValueStruct::getUInt64(uint64_t def) const { return jsonGetU
 // clang-format on
 
 static tm_bool stringEquals(const char* a, size_t aSize, const char* b, size_t bSize) {
-    TM_ASSERT(bSize > 0);
     if (aSize != bSize) return TM_FALSE;
     return TM_MEMCMP(a, b, bSize) == 0;
 }
 static tm_bool stringEqualsIgnoreCase(const char* a, size_t aSize, const char* b, size_t bSize) {
-    TM_ASSERT(bSize > 0);
     if (aSize != bSize) return TM_FALSE;
     do {
         // We know that b is already uppercased.
@@ -925,13 +935,13 @@ static tm_bool stringEqualsIgnoreCase(const char* a, size_t aSize, const char* b
 }
 
 static tm_bool stringStartsWith(const char* a, size_t aSize, const char* b, size_t bSize) {
-    TM_ASSERT(bSize > 0);
+    if (bSize == 0) return TM_TRUE;
     if (aSize < bSize) return TM_FALSE;
     return TM_MEMCMP(a, b, bSize) == 0;
 }
 
 static tm_bool stringStartsWithIgnoreCase(const char* a, size_t aSize, const char* b, size_t bSize) {
-    TM_ASSERT(bSize > 0);
+    if (bSize == 0) return TM_TRUE;
     if (aSize < bSize) return TM_FALSE;
     return stringEqualsIgnoreCase(a, bSize, b, bSize);
 }
@@ -2938,7 +2948,7 @@ static JsonErrorType jsonReadArray(JsonReader* reader, JsonStackAllocator* alloc
 
 TMJ_DEF JsonAllocatedDocument jsonAllocateDocument(const char* data, tm_size_t size, unsigned int flags) {
     size_t poolSize = size * sizeof(JsonValue);
-    char* pool = (char*)TMJ_ALLOCATE(poolSize, JSON_ALIGNMENT_VALUE);
+    char* pool = (char*)TM_MALLOC(poolSize, JSON_ALIGNMENT_VALUE);
     JsonStackAllocator allocator;
     allocator.ptr = pool;
     allocator.size = 0;
@@ -3220,7 +3230,7 @@ static JsonErrorType jsonReadArrayEx(JsonReader* reader, JsonStackAllocator* all
 
 TMJ_DEF JsonAllocatedDocument jsonAllocateDocumentEx(const char* data, tm_size_t size, unsigned int flags) {
     size_t poolSize = size * sizeof(JsonValue);
-    char* pool = (char*)TMJ_ALLOCATE(poolSize, JSON_ALIGNMENT_VALUE);
+    char* pool = (char*)TM_MALLOC(poolSize, JSON_ALIGNMENT_VALUE);
     JsonStackAllocator allocator;
     allocator.ptr = pool;
     allocator.size = 0;
@@ -3276,7 +3286,7 @@ TMJ_DEF JsonDocument jsonMakeDocumentEx(JsonStackAllocator* allocator, const cha
 }
 TMJ_DEF void jsonFreeDocument(JsonAllocatedDocument* doc) {
     if (doc->pool) {
-        TMJ_FREE(doc->pool, doc->poolSize);
+        TM_FREE(doc->pool, doc->poolSize, JSON_ALIGNMENT_VALUE);
         doc->pool = TM_NULL;
         doc->poolSize = 0;
     }
@@ -3564,6 +3574,200 @@ TMJ_DEF uint64_t jsonGetUInt64(const JsonValue* value, uint64_t def) {
     }
 }
 #endif
+
+TMJ_DEF JsonValue jsonResolveJsonPointer(const JsonValue* value, const char* json_pointer) {
+    TM_ASSERT(value);
+    TM_ASSERT(json_pointer);
+
+    JsonValue current = *value;
+
+    // Small buffer optimization, so we don't allocate too much memory.
+    char sbo[64];
+    char* buffer = sbo;
+    size_t buffer_size = 64;
+
+    tm_bool is_fragment = (*json_pointer == '#');
+    if (is_fragment) ++json_pointer;
+
+    /*
+    Examples
+    {
+       "foo": ["bar", "baz"],
+       "": 0,
+       "a/b": 1,
+       "c%d": 2,
+       "e^f": 3,
+       "g|h": 4,
+       "i\\j": 5,
+       "k\"l": 6,
+       " ": 7,
+       "m~n": 8
+    }
+
+    ""           // the whole document
+    "/foo"       ["bar", "baz"]
+    "/foo/0"     "bar"
+    "/"          0
+    "/a~1b"      1
+    "/c%d"       2
+    "/e^f"       3
+    "/g|h"       4
+    "/i\\j"      5
+    "/k\"l"      6
+    "/ "         7
+    "/m~0n"      8
+
+    #            // the whole document
+    #/foo        ["bar", "baz"]
+    #/foo/0      "bar"
+    #/           0
+    #/a~1b       1
+    #/c%25d      2
+    #/e%5Ef      3
+    #/g%7Ch      4
+    #/i%5Cj      5
+    #/k%22l      6
+    #/%20        7
+    #/m~0n       8
+
+    */
+
+    tm_bool error = TM_FALSE;
+
+    const char* first = TM_STRCHR(json_pointer, '/');
+    while (first) {
+        ++first; // Skip "/"
+        const char* next = TM_STRCHR(first, '/');
+        if (!next) next = first + TM_STRLEN(first);
+
+        if (TM_ISDIGIT((unsigned char)first[0])) {
+            // first refers to an array index.
+            if (current.type != JVAL_ARRAY) {
+                error = TM_TRUE;
+                break;
+            }
+
+#ifndef TMJ_NO_INT64
+            uint64_t index = 0;
+            TMJ_TO_UINT64(first, next, &index, /*base=*/10);
+#else
+            uint32_t index = 0;
+            TMJ_TO_UINT32(first, next, &index, /*base=*/10);
+#endif
+            if ((tm_size_t)index >= current.data.array.count) {
+                error = TM_TRUE;
+                break;
+            }
+
+            current = current.data.array.values[index];
+        } else {
+            // first refers a field.
+            if (current.type != JVAL_OBJECT) {
+                error = TM_TRUE;
+                break;
+            }
+
+            // Copy segment to buffer, so we can unescape.
+            size_t length = (size_t)(next - first);
+            if (length + 1 > buffer_size) {
+                size_t new_size = buffer_size * 2;
+                if (new_size < length + 1) new_size = length + 1;
+                char* new_buffer = TM_NULL;
+                if (buffer == sbo) {
+                    new_buffer = (char*)TM_MALLOC(new_size * sizeof(char), sizeof(char));
+                } else {
+                    new_buffer = (char*)TM_REALLOC(buffer, buffer_size * sizeof(char), sizeof(char),
+                                                   new_size * sizeof(char*), sizeof(char));
+                }
+                if (!new_buffer) {
+                    error = TM_TRUE;
+                    break;
+                }
+                buffer = new_buffer;
+                buffer_size = new_size;
+            }
+
+            TM_ASSERT(buffer);
+            if (length) TM_MEMCPY(buffer, first, length * sizeof(char));
+            buffer[length] = 0;  // Nullterminate, just so we don't always have to do size comparisons.
+
+            size_t out_index = 0;
+            // Unescape segment.
+            if (is_fragment) {
+                for (size_t i = 0; i < length; ++i, ++out_index) {
+                    if (buffer[i] == '%') {
+                        // Url decode something like %20 -> ' '.
+                        if (!TM_ISXDIGIT((unsigned char)buffer[i + 1]) || !TM_ISXDIGIT((unsigned char)buffer[i + 2])) {
+                            error = TM_TRUE;
+                            break;
+                        }
+                        uint32_t byte = 0;
+                        TMJ_TO_UINT(buffer + i + 1, buffer + i + 3, &byte, /*base=*/16);
+                        buffer[out_index] = (unsigned char)byte;
+                        i += 2;
+                        continue;
+                    }
+
+                    if (buffer[i] == '~') {
+                        if (buffer[i + 1] == '0') {
+                            buffer[out_index] = '~';
+                            ++i;
+                            continue;
+                        } else if (buffer[i + 1] == '1') {
+                            buffer[out_index] = '/';
+                            ++i;
+                            continue;
+                        } else {
+                            error = TM_TRUE;
+                            break;
+                        }
+                    }
+
+                    buffer[out_index] = buffer[i];
+                }
+                if (error) break;
+            } else {
+                for (size_t i = 0; i < length; ++i, ++out_index) {
+                    if (buffer[i] == '~') {
+                        if (buffer[i + 1] == '0') {
+                            buffer[out_index] = '~';
+                            ++i;
+                            continue;
+                        } else if (buffer[i + 1] == '1') {
+                            buffer[out_index] = '/';
+                            ++i;
+                            continue;
+                        } else {
+                            error = TM_TRUE;
+                            break;
+                        }
+                    }
+                    buffer[out_index] = buffer[i];
+                }
+                if (error) break;
+            }
+            buffer[out_index] = 0;
+
+            JsonObject obj = jsonGetObject(&current);
+            current = jsonGetMember(&obj, buffer);
+        }
+
+        if (*next == 0) break;
+        first = next;
+    }
+
+    if (buffer != sbo) {
+        TM_FREE(buffer, buffer_size * sizeof(char), sizeof(char));
+    }
+
+    if (error) {
+        current.type = JVAL_NULL;
+        current.data.content.data = TM_NULL;
+        current.data.content.size = 0;
+    }
+
+    return current;
+}
 
 #endif  // TM_JSON_IMPLEMENTATION
 

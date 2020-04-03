@@ -73,6 +73,13 @@ bool str_equal(JsonStringView a, const char* b) {
     return strncmp(a.data, b, a.size) == 0;
 }
 
+bool operator==(JsonStringView lhs, JsonStringView rhs) {
+    if (lhs.size != rhs.size) return false;
+    return strncmp(lhs.data, rhs.data, lhs.size) == 0;
+}
+
+bool operator!=(JsonStringView lhs, JsonStringView rhs) { return !(lhs == rhs); }
+
 std::ostream& operator<<(std::ostream& os, const JsonStringView& value) {
     os.write(value.data, value.size);
     return os;
@@ -210,6 +217,26 @@ bool ulps_comparison(double a, double b) {
     auto am = (au < bu) ? (au) : (bu);
     auto bm = (au < bu) ? (bu) : (au);
     return (bm - am) <= 1;
+}
+
+bool compare_value(JsonValue lhs, JsonValue rhs) {
+    if (lhs.type != rhs.type) return false;
+    if (lhs.type == JVAL_ARRAY) {
+        if (lhs.data.array.count != rhs.data.array.count) return false;
+        for (tm_size_t i = 0, count = lhs.data.array.count; i < count; ++i) {
+            if (!compare_value(lhs.data.array[i], rhs.data.array[i])) return false;
+        }
+        return true;
+    }
+    if (lhs.type == JVAL_OBJECT) {
+        if (lhs.data.object.count != rhs.data.object.count) return false;
+        for (tm_size_t i = 0, count = lhs.data.object.count; i < count; ++i) {
+            if (lhs.data.object.nodes[i].name != rhs.data.object.nodes[i].name) return false;
+            if (!compare_value(lhs.data.object.nodes[i].value, rhs.data.object.nodes[i].value)) return false;
+        }
+        return true;
+    }
+    return lhs.data.content == rhs.data.content;
 }
 
 TEST_CASE("float conversion" * doctest::description("Test the fallback string to float conversions.")) {
@@ -724,4 +751,52 @@ No \\n's!",
 
     AllocatedDocument ex_pool = jsonAllocateDocumentEx(json, (tm_size_t)strlen(json), JSON_READER_JSON5);
     REQUIRE(ex_pool.document.error.type == JSON_OK);
+}
+
+TEST_CASE("Json Pointer") {
+    // Example taken from https://tools.ietf.org/html/rfc6901
+    const char* json = R"(
+        {
+           "foo": ["bar", "baz"],
+           "": 0,
+           "a/b": 1,
+           "c%d": 2,
+           "e^f": 3,
+           "g|h": 4,
+           "i\\j": 5,
+           "k\"l": 6,
+           " ": 7,
+           "m~n": 8
+        }
+    )";
+
+    AllocatedDocument pool = jsonAllocateDocument(json, (tm_size_t)strlen(json), JSON_READER_STRICT);
+    REQUIRE(pool.document.error.type == JSON_OK);
+
+    auto root = pool.document.root;
+    CHECK(compare_value(root, jsonResolveJsonPointer(&root, "")));
+    CHECK(compare_value(root["foo"], jsonResolveJsonPointer(&root, "/foo")));
+    CHECK(compare_value(root["foo"][0], jsonResolveJsonPointer(&root, "/foo/0")));
+    CHECK(compare_value(root[""], jsonResolveJsonPointer(&root, "/")));
+    CHECK(compare_value(root["a/b"], jsonResolveJsonPointer(&root, "/a~1b")));
+    CHECK(compare_value(root["c%d"], jsonResolveJsonPointer(&root, "/c%d")));
+    CHECK(compare_value(root["e^f"], jsonResolveJsonPointer(&root, "/e^f")));
+    CHECK(compare_value(root["g|h"], jsonResolveJsonPointer(&root, "/g|h")));
+    CHECK(compare_value(root["i\\j"], jsonResolveJsonPointer(&root, "/i\\j")));
+    CHECK(compare_value(root["k\"l"], jsonResolveJsonPointer(&root, "/k\"l")));
+    CHECK(compare_value(root[" "], jsonResolveJsonPointer(&root, "/ ")));
+    CHECK(compare_value(root["m~n"], jsonResolveJsonPointer(&root, "/m~0n")));
+
+    CHECK(compare_value(root, jsonResolveJsonPointer(&root, "#")));
+    CHECK(compare_value(root["foo"], jsonResolveJsonPointer(&root, "#/foo")));
+    CHECK(compare_value(root["foo"][0], jsonResolveJsonPointer(&root, "#/foo/0")));
+    CHECK(compare_value(root[""], jsonResolveJsonPointer(&root, "#/")));
+    CHECK(compare_value(root["a/b"], jsonResolveJsonPointer(&root, "#/a~1b")));
+    CHECK(compare_value(root["c%d"], jsonResolveJsonPointer(&root, "#/c%25d")));
+    CHECK(compare_value(root["e^f"], jsonResolveJsonPointer(&root, "#/e%5Ef")));
+    CHECK(compare_value(root["g|h"], jsonResolveJsonPointer(&root, "#/g%7Ch")));
+    CHECK(compare_value(root["i\\j"], jsonResolveJsonPointer(&root, "#/i%5Cj")));
+    CHECK(compare_value(root["k\"l"], jsonResolveJsonPointer(&root, "#/k%22l")));
+    CHECK(compare_value(root[" "], jsonResolveJsonPointer(&root, "#/%20")));
+    CHECK(compare_value(root["m~n"], jsonResolveJsonPointer(&root, "#/m~0n")));
 }
