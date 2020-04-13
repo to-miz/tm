@@ -12,6 +12,7 @@ tm_bezier.h | Calculate bezier curve points with forward differencing using only
 tm_bin_packing.h | C port with minor modifications of the Guillotine and MaxRects algorithms originally written by [Jukka Jylänki](https://github.com/juj/RectangleBinPack) (also public domain). | C99/C++ | v1.0.7
 tm_cli.h | Commandline parser that is similar to getopt_long, but doesn't rely on globals and very lightweight. | C99/C++ | v0.2.3
 tm_conversion.h | From and to string conversion library with minimal dependencies. | C99/C++ | v0.9.9.9
+tm_hashmapx.h | A hashmap implementation library using [X-Macros](https://en.wikipedia.org/wiki/X_Macro) for C99. The hashmap uses linear-probing and is power-of-two sized. | C99 | v.0.0.1
 tm_json.h | C++ and C99 json parsing library that can do both json reading and parsing into a json document for queries. Accepts a wide variety of flags, can be used to parse json in strict mode, or in json5 mode with the right combination of flags. | C99/C++ | v0.9.0
 tm_polygon.h | Triangulation and clipping of polygons. Clipping supports union, difference and substraction. | C99/C++ | v1.1
 tm_print.h | Lightweight typesafe variadic print and snprint using C++11 and variadic templates. | C++11 | v0.0.22
