@@ -371,13 +371,13 @@ TMCLI_DEF tm_bool CLI_ARGUMENT_FLOAT(const tmcli_tchar* str) {
 }
 
 /* Ignore missing-field-initializers warning on gcc/clang, because we use {0} to zero initialize. */
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
 TMCLI_DEF tmcli_parser_settings tmcli_default_parser_settings() {
-    tmcli_parser_settings result = {0};
+    tmcli_parser_settings result = {TM_NULL, TM_FALSE};
     result.error_log = stderr;
     result.allow_free_arguments = TM_TRUE;
     return result;

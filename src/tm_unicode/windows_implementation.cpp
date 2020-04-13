@@ -103,7 +103,7 @@ static tm_bool tmu_to_platform_path_n(const char* path, tm_size_t size, tmu_plat
     if (required_size <= 0) return TM_FALSE; /* Size was not zero, so conversion failed. */
     ++required_size;                         /* Extra space for null-terminator. */
 
-    if (required_size <= TMU_SBO_SIZE) {
+    if ((unsigned int)required_size <= TMU_SBO_SIZE) {
         out->path = out->sbo;
         out->allocated_size = 0;
     } else {
@@ -476,7 +476,8 @@ TMU_DEF tmu_utf8_command_line_result tmu_utf8_winapi_get_command_line() {
     }
 
     if (result.ec == TM_OK) {
-        result = tmu_utf8_command_line_from_utf16(wide_args, wide_args_count);
+        // Safe const cast wide_args.
+        result = tmu_utf8_command_line_from_utf16((WCHAR const* const*)wide_args, wide_args_count);
     }
 
     if (wide_args) {
