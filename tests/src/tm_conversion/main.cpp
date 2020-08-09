@@ -623,8 +623,8 @@ TEST_CASE("Test float accuracy") {
                 // check whether snprintf actually does any rounding
                 bool rounding_error = true;
                 // check if snprintf would have printed a 5 if precision was higher
-                if (snprintf_buffer_r[snprintf_r_len - 2] >= '5') {
-                    if (tm_result.size == (tm_size_t)snprintf_len) {
+                if (snprintf_r_len > 2 && snprintf_buffer_r[snprintf_r_len - 2] >= '5') {
+                    if (tm_result.size == (tm_size_t)snprintf_len && snprintf_len > 0) {
                         int diff = tm_buffer[tm_result.size - 1] - snprintf_buffer[snprintf_len - 1];
                         if (diff == 1) {
                             // we rounded up, but snprintf didn't, even though it could have
