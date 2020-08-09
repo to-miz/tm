@@ -207,13 +207,9 @@ TEST_CASE("Test float format specifiers") {
     check_output("{:g}", "1", 1.0);
 }
 
-#if defined(TMP_FLOAT_BACKEND_TM_CONVERSION) && !defined(TMC_HAS_SCIENTIFIC)
-/* tm_conversion doesn't have support for scientific printing yet. */
-const bool scientific_may_fail = true;
-#else
-const bool scientific_may_fail = false;
-#endif
-TEST_CASE("Test float scientific format specifiers" * doctest::may_fail(scientific_may_fail)) {
+// These conversations may fail, since it is hard to tell, what representation a given implementation will take, since
+// there are multiple valid ones for hex.
+TEST_CASE("Test float scientific format specifiers" * doctest::may_fail(true)) {
     check_output("{:e}", "1.000000e+00", 1.0);
     check_output("{:E}", "1.000000E+00", 1.0);
 
