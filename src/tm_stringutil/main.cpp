@@ -1,10 +1,8 @@
 /*
-tm_stringutil.h v0.9.0 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.9.1 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak MERGE_YEAR
 
 no warranty; use at your own risk
-
-First release not hit yet. Probably very buggy.
 
 LICENSE
     see license notes at end of file
@@ -20,6 +18,7 @@ PURPOSE
     Most functions have versions that work on nullterminated and length based strings.
 
 HISTORY
+    v0.9.1  20.04.20 Added tmsu_sv_begin and tmsu_sv_end convenience functions.
     v0.9.0  03.04.20 Added tmsu_base64_decode, tmsu_base64url_encode, tmsu_base64url_decode,
                      tmsu_url_encode, tmsu_url_decode.
     v0.3.4  02.05.19 Added tmsu_find_word_end_n and tmsu_find_word_start_n.
@@ -136,6 +135,9 @@ including this file, so both C and C++ use the same data types.
     #define TMSU_STRING_VIEW_SIZE(x) (x).size
     #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, (tm_size_t)(size))
 #endif
+
+static inline const char* tmsu_sv_begin(tmsu_string_view str) { return TMSU_STRING_VIEW_DATA(str); }
+static inline const char* tmsu_sv_end(tmsu_string_view str) { return TMSU_STRING_VIEW_DATA(str) + TMSU_STRING_VIEW_SIZE(str); }
 
 /* clang-format on */
 
