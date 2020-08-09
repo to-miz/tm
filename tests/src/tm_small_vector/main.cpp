@@ -371,7 +371,7 @@ TEST_CASE_TEMPLATE("insert middle", T, int, non_trivial, non_trivial8, non_trivi
         T* p = buffer;
         for (int i = 0; i < size; ++i) {
             auto index = i / 2;
-            memmove(p + index + 1, p + index, (size - index - 1) * sizeof(T));
+            std::move_backward(p + index, p + size - 1, p + size);
             p[i / 2] = T{i};
 
             v.insert(v.begin() + v.size() / 2, T{i});
@@ -394,7 +394,7 @@ TEST_CASE_TEMPLATE("insert middle", T, int, non_trivial, non_trivial8, non_trivi
 
         T* p = buffer;
         for (int i = 0; i < 10; ++i) {
-            memmove(p + i + 2, p + i, i * sizeof(T));
+            std::move_backward(p + i, p + 2 * i, p + 2 * i + 2);
             p[i] = T{i};
             p[i + 1] = T{i};
 
