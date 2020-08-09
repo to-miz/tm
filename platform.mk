@@ -1,6 +1,9 @@
 # Disable the built-in rules.
 .SUFFIXES:
 
+# Default rule.
+all:
+
 # Set up project and platform defaults. These can be user supplied in the commandline.
 
 BUILD     := debug
@@ -54,7 +57,7 @@ ifeq (${OS},Windows_NT)
 	shell_random := cmd /c "echo %RANDOM%"
 	shell_delete = del /f/q/s "${1}${path_sep}${2}" >nul 2>nul
 
-	windows_defines := NOMINMAX UNICODE _CRT_SECURE_NO_WARNINGS _SCL_SECURE_NO_WARNINGS
+	windows_defines := NOMINMAX UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS _SCL_SECURE_NO_WARNINGS
 else
 	os := linux
 	exe_ext := .out
@@ -175,7 +178,7 @@ cxx_options.clang = -std=c++17 ${cxx_options.clang.${BUILD}} ${options.clang}
 
 c_options.clang.debug :=
 c_options.clang.release :=
-c_options.clang = -std=c99 ${c_options.clang.${BUILD}} ${options.clang}
+c_options.clang = -std=c99 -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE ${c_options.clang.${BUILD}} ${options.clang}
 
 link_options.clang.debug   :=
 link_options.clang.release :=
@@ -194,6 +197,10 @@ sanitize.gcc ?= -fsanitize=address
 
 options.gcc.debug   := -fstack-protector-all -g -ggdb -fno-omit-frame-pointer ${sanitize.gcc}
 options.gcc.release := -O3 -march=native
+# ifeq (${ARCH},64)
+# options.gcc.debug += -municode
+# options.gcc.release += -municode
+# endif
 options.gcc = ${warnings.gcc} -m${ARCH} ${options.gcc.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}})
 
 cxx_options.gcc.debug :=
@@ -202,7 +209,7 @@ cxx_options.gcc = -std=c++17 ${cxx_options.gcc.${BUILD}} ${options.gcc}
 
 c_options.gcc.debug :=
 c_options.gcc.release :=
-c_options.gcc = -std=c99 ${c_options.gcc.${BUILD}} ${options.gcc}
+c_options.gcc = -std=c99 -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE ${c_options.gcc.${BUILD}} ${options.gcc}
 
 link_options.gcc.debug   :=
 link_options.gcc.release :=
@@ -235,10 +242,12 @@ warnings.cl  += -w44746 # volatile access of '<expression>' is subject to /volat
 warnings.cl += ${clang_cl_warnings}
 
 sanitize.cl := -RTCsu -GS -sdl
+# sanitize.cl += -analyze
 
 options.cl.debug   := -Od -Zi -MDd ${sanitize.cl}
 options.cl.release := -DNDEBUG -MD -GS- -Gy -fp:fast -Ox -Oy- -GL -Gw -Oi -O2
-options.cl.exception := -EHsc
+# options.cl.exception := -EHsc
+options.cl.exception := -EHs
 options.cl        = ${warnings.cl} ${options.cl.exception} -Oi -permissive- -utf-8 -volatile:iso \
 					${options.cl.${BUILD}} $(addprefix -D, ${DEFINES.${BUILD}}) -FS -FC -bigobj
 
