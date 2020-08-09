@@ -1,6 +1,7 @@
-Language:      Cpp
-BasedOnStyle:  Google
-ColumnLimit:   120
-IndentWidth:   4
-UseTab:        Never
-SortIncludes:  false
+Language:                   Cpp
+BasedOnStyle:               Google
+ColumnLimit:                120
+IndentWidth:                4
+UseTab:                     Never
+SortIncludes:               false
+BreakBeforeBinaryOperators: true
