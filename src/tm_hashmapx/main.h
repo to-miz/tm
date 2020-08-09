@@ -754,7 +754,7 @@ TMH_DEF tm_bool TMH_STR_JOIN(TMH_X_FUNCPREFIX, TMH_INSERT_MOVE)(TMH_X_NAME* map,
         uint64_t hash = TMH_X_KEY_HASH(*key);
         uint64_t index = hash & mask;
 #ifdef TMH_INTERNAL_TESTING
-        printf("Key %s: hash: %llu; index: %llu\n", *key, hash, index);
+        printf("Key %s: hash: %llu; index: %llu\n", *key, (unsigned long long)hash, (unsigned long long)index);
 #endif
         TM_ASSERT(index < (uint64_t)map->capacity);
 

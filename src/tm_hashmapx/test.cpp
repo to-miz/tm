@@ -1,3 +1,5 @@
+// For printf to accept %llu on mingw
+#define __USE_MINGW_ANSI_STDIO 1
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -144,11 +146,11 @@ int main(int argc, char const *argv[]) {
             printf("Couldn't find %s in map\n", entry.key);
             return -1;
         }
-        printf("%s: %d, probes: %llu, (%s)\n", entry.key, *found, strmap_probe_length,
+        printf("%s: %d, probes: %llu, (%s)\n", entry.key, *found, (unsigned long long)strmap_probe_length,
                (entry.value == *found) ? "SUCCESS" : "FAILED");
     }
 
-    #if 0
+#if 0
     strmap strmap_create();
     void strmap_destroy(strmap* map);
     tm_size_t strmap_size(strmap* map);
@@ -169,7 +171,7 @@ int main(int argc, char const *argv[]) {
         if (strmap_is_tombstone(&s, i)) continue;
         auto pair = strmap_get(&s, i);
         if (!pair.key) {
-            printf("No key for index %llu\n", i);
+            printf("No key for index %llu\n", (unsigned long long)i);
             return -1;
         }
         if (std::find_if(std::begin(entries), std::end(entries), [pair](const Entry& entry) {
@@ -184,8 +186,10 @@ int main(int argc, char const *argv[]) {
         }
     }
 
-    printf("Map has %llu/%llu entries and is %f filled\n", s.count, s.capacity, (double)s.count / (double)s.capacity);
-    printf("On average %f probes needed, with max %llu for %s\n", (double)probes / (double)count, max_probe, max_probe_key);
+    printf("Map has %llu/%llu entries and is %f filled\n", (unsigned long long)s.count, (unsigned long long)s.capacity,
+           (double)s.count / (double)s.capacity);
+    printf("On average %f probes needed, with max %llu for %s\n", (double)probes / (double)count,
+           (unsigned long long)max_probe, max_probe_key);
     strmap_destroy(&s);
     return 0;
 }
