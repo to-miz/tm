@@ -21,6 +21,7 @@ tm_stringutil.h | String utility functions, from matching, comparison to tokeniz
 tm_uint128.h | A uint128 type with a couple of backends to choose. | C99/C++11 | v0.0.4
 tm_unicode.h | A Utf-8 everywhere library with Utf-8/Utf-16 conversion, caseless comparison and system call wrappers for cross platform windows/linux Utf-8 support. | C99/C++ | v0.9.0
 tm_utility.h | Utility and convenience functions, mainly for my personal use. | C++11 | v1.1.5
+tm_xml.h | An xml reader with no extra validation. Only UTF-8 xml documents, does perform unicode validity checks. | C99/C++ | v0.1.0
 
 These libraries follow the same guidelines as [stb](https://github.com/nothings/stb).
 They have minimal dependencies and are dual licensed in both the public domain and MIT.

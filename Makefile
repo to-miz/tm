@@ -54,6 +54,7 @@ include tests/src/tm_uint128/tm_uint128.mk
 include src/tm_hashmapx/tm_hashmapx.mk
 include tests/src/tm_hashmapx/tm_hashmapx.mk
 
+include src/tm_xml/tm_xml.mk
 # Combined
 
 merge.all.deps := tm_conversion.h tm_print.h tm_json.h tm_cli.h
