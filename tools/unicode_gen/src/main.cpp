@@ -1912,7 +1912,7 @@ void generate_tables(const vector<data_entry> data_entries, unique_ucd* out) {
         ucd.data.flags = to_flags(flags, data->category, data->bidirectional_category);
         ucd.data.grapheme_break = (flags & generate_flags_grapheme_break) ? data->grapheme_break : grapheme_break_other;
         ucd.data.width = 0;
-        /*if (flags & generate_flags_width)*/ {
+        if (flags & generate_flags_width) {
             ucd.data.width = 1;
             if (data->grapheme_break == grapheme_break_extend || data->grapheme_break == grapheme_break_prepend ||
                 data->grapheme_break == grapheme_break_zwj || data->grapheme_break == grapheme_break_control ||
@@ -2267,7 +2267,7 @@ struct stream_close_guard {
 
 #include "generate.cpp"
 
-int MAIN(int argc, tchar const* argv[]) {
+extern "C" int MAIN(int argc, tchar const* argv[]) {
     app_name = argv[0];
     stream_close_guard output_guard{stdout, TEXT("stdout")};
 

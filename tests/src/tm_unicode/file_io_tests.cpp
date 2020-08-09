@@ -277,69 +277,69 @@ TEST_CASE("error reporting") {
     mock.entries.push_back({fn, fn, mock_file});
     mock.entries.push_back({fn3, fn3, mock_file});
 
-    mock.stat_should_fail_with = mock_error;
+    mock.set_fail(fail_stat, mock_error);
     CHECK(tmu_file_exists(fn).ec == mock_error);
 
-    mock.stat_should_fail_with = mock_error;
+    mock.set_fail(fail_stat, mock_error);
     CHECK(tmu_directory_exists(fn).ec == mock_error);
 
-    mock.stat_should_fail_with = mock_error;
+    mock.set_fail(fail_stat, mock_error);
     CHECK(tmu_file_timestamp(fn).ec == mock_error);
 
     mock.file = {};
-    mock.fopen_should_fail_with = mock_error;
+    mock.set_fail(fail_fopen, mock_error);
     CHECK(tmu_read_file(fn).ec == mock_error);
     CHECK(!mock.file.is_open);
     mock.file = {};
-    mock.fread_should_fail_with = mock_error;
+    mock.set_fail(fail_fread, mock_error);
     CHECK(tmu_read_file(fn).ec == mock_error);
     CHECK(!mock.file.is_open);
 
     mock.file = {};
-    mock.fopen_should_fail_with = mock_error;
+    mock.set_fail(fail_fopen, mock_error);
     CHECK(tmu_read_file_as_utf8(fn).ec == mock_error);
     CHECK(!mock.file.is_open);
     mock.file = {};
-    mock.fread_should_fail_with = mock_error;
+    mock.set_fail(fail_fread, mock_error);
     CHECK(tmu_read_file_as_utf8(fn).ec == mock_error);
     CHECK(!mock.file.is_open);
 
     mock.file = {};
-    mock.fopen_should_fail_with = mock_error;
+    mock.set_fail(fail_fopen, mock_error);
     CHECK(tmu_read_file(fn).ec == mock_error);
     CHECK(!mock.file.is_open);
     mock.file = {};
-    mock.fread_should_fail_with = mock_error;
+    mock.set_fail(fail_fread, mock_error);
     CHECK(tmu_read_file(fn).ec == mock_error);
     CHECK(!mock.file.is_open);
 
     mock.file = {};
-    mock.mkdir_should_fail_with = mock_error;
+    mock.set_fail(fail_mkdir, mock_error);
     CHECK(tmu_write_file_ex("a/b/c/d", &test_data, 1, tmu_create_directory_tree).ec == mock_error);
     CHECK(!mock.file.is_open);
     CHECK(mock.entries.size() == 2);
     mock.file = {};
-    mock.stat_should_fail_with = mock_error;
+    mock.set_fail(fail_stat, mock_error);
     CHECK(tmu_write_file_ex(fn, &test_data, 1, 0).ec == mock_error);
     CHECK(!mock.file.is_open);
     CHECK(mock.entries.size() == 2);
     mock.file = {};
-    mock.fopen_should_fail_with = mock_error;
+    mock.set_fail(fail_fopen, mock_error);
     CHECK(tmu_write_file_ex(fn, &test_data, 1, tmu_overwrite).ec == mock_error);
     CHECK(!mock.file.is_open);
     CHECK(mock.entries.size() == 2);
     mock.file = {};
-    mock.fwrite_should_fail_with = mock_error;
+    mock.set_fail(fail_fwrite, mock_error);
     CHECK(tmu_write_file_ex(fn, &test_data, 1, tmu_overwrite).ec == mock_error);
     CHECK(!mock.file.is_open);
     CHECK(mock.entries.size() == 2);
 
     mock.file = {};
-    mock.fopen_should_fail_with = mock_error;
+    mock.set_fail(fail_fopen, mock_error);
     CHECK(tmu_write_file_as_utf8(fn, &test_data, 1).ec == mock_error);
     CHECK(!mock.file.is_open);
     mock.file = {};
-    mock.fwrite_should_fail_with = mock_error;
+    mock.set_fail(fail_fwrite, mock_error);
     CHECK(tmu_write_file_as_utf8(fn, &test_data, 1).ec == mock_error);
     CHECK(!mock.file.is_open);
 
@@ -353,33 +353,33 @@ TEST_CASE("error reporting") {
     CHECK(tmu_write_file_ex(fn, &test_data, 1, tmu_atomic_write).ec == mock_error);
 #endif
 
-    mock.stat_should_fail_with = mock_error;
+    mock.set_fail(fail_stat, mock_error);
     CHECK(tmu_rename_file_ex(fn, fn2, 0) == mock_error);
     CHECK(mock.entries.size() == 2);
-    mock.rename_should_fail_with = mock_error;
+    mock.set_fail(fail_rename, mock_error);
     CHECK(tmu_rename_file_ex(fn, fn2, 0) == mock_error);
     CHECK(mock.entries.size() == 2);
-    mock.rename_should_fail_with = mock_error;
-    mock.stat_should_fail_with = mock_error;
+    mock.set_fail(fail_rename, mock_error);
+    mock.set_fail(fail_stat, mock_error);
     CHECK(tmu_rename_file_ex(fn, fn2, tmu_overwrite) == mock_error);
     CHECK(mock.entries.size() == 2);
-    mock.rename_should_fail_with = mock_error;
-    mock.remove_should_fail_with = mock_error;
+    mock.set_fail(fail_rename, mock_error);
+    mock.set_fail(fail_remove, mock_error);
     CHECK(tmu_rename_file_ex(fn, fn3, tmu_overwrite) == mock_error);
     CHECK(mock.entries.size() == 2);
-    mock.mkdir_should_fail_with = mock_error;
+    mock.set_fail(fail_mkdir, mock_error);
     CHECK(tmu_rename_file_ex(fn, "a/b/c/d", tmu_create_directory_tree) == mock_error);
     CHECK(mock.entries.size() == 2);
 
-    mock.remove_should_fail_with = mock_error;
+    mock.set_fail(fail_remove, mock_error);
     CHECK(tmu_delete_file(fn) == mock_error);
     CHECK(mock.entries.size() == 2);
 
-    mock.mkdir_should_fail_with = mock_error;
+    mock.set_fail(fail_mkdir, mock_error);
     CHECK(tmu_create_directory(fn2) == mock_error);
     CHECK(mock.entries.size() == 2);
 
-    mock.rmdir_should_fail_with = mock_error;
+    mock.set_fail(fail_rmdir, mock_error);
     CHECK(tmu_delete_directory(fn2) == mock_error);
     CHECK(mock.entries.size() == 2);
 }
@@ -404,11 +404,12 @@ TEST_CASE("error reporting") {
         CAPTURE(func_string);
         allocation_guard alloc_guard;
         mock.file = {};
-        win_mock.set_fail(which, ERROR_MOCK);
+        mock.set_fail(which, ERROR_MOCK);
         auto result = test_func();
         CHECK(result);
         CHECK(mock.entries.size() == 2);
         CHECK(!mock.file.is_open);
+        CHECK(mock.readdir_index == 0);
     };
 
 #define check(which, cond) do_test((which), #cond, [&]() { return (cond) != TM_OK; })
@@ -461,6 +462,8 @@ TEST_CASE("error reporting") {
     check(fail_GetCurrentDirectoryW, tmu_current_working_directory(0).ec);
     check(fail_WideCharToMultiByte, tmu_current_working_directory(0).ec);
 
+    check(fail_malloc, tmu_open_directory(".").ec);
+    check(fail_FindFirstFileW, tmu_open_directory(".").ec);
 #undef check
 }
 
@@ -478,15 +481,15 @@ TEST_CASE("winapi command line") {
     REQUIRE(*result.command_line.args[1] == 0);
     REQUIRE(result.command_line.internal_buffer);
 
-    win_mock.set_fail(fail_GetCommandLineW, ERROR_MOCK);
+    mock.set_fail(fail_GetCommandLineW, ERROR_MOCK);
     result = tmu_utf8_winapi_get_command_line_managed();
     REQUIRE(result.ec != TM_OK);
 
-    win_mock.set_fail(fail_GetCommandLineW, ERROR_MOCK_INVALID_COMMAND_LINE);
+    mock.set_fail(fail_GetCommandLineW, ERROR_MOCK_INVALID_COMMAND_LINE);
     result = tmu_utf8_winapi_get_command_line_managed();
     REQUIRE(result.ec != TM_OK);
 
-    win_mock.set_fail(fail_CommandLineToArgvW, ERROR_MOCK);
+    mock.set_fail(fail_CommandLineToArgvW, ERROR_MOCK);
     result = tmu_utf8_winapi_get_command_line_managed();
     REQUIRE(result.ec != TM_OK);
 }
@@ -564,5 +567,197 @@ TEST_CASE("command line") {
         uint16_t const * const invalid_args[2] = {invalid, &empty};
         auto result = tmu_utf8_command_line_from_utf16_managed(invalid_args, 1);
         REQUIRE(result.ec == TM_EINVAL);
+    }
+}
+
+TEST_CASE("positive directory reading") {
+    allocation_guard alloc_guard;
+
+    mock.entries.clear();
+    mock.entries.push_back({".", "", mock_dir});
+    mock.entries.push_back({"..", "", mock_dir});
+    mock.entries.push_back({"a", "", mock_dir});
+    mock.entries.push_back({"b", "", mock_dir});
+    mock.entries.push_back({"c", "", mock_file});
+    mock.entries.push_back({"d", "", mock_file});
+    mock.entries.push_back({"e", "", mock_dir});
+
+    auto dir = tmu_open_directory("./");
+    REQUIRE(dir.ec == TM_OK);
+    auto entry = tmu_read_directory(&dir);
+    REQUIRE(dir.ec == TM_OK);
+    REQUIRE(entry);
+    REQUIRE(std::string_view{entry->name} == "a");
+    REQUIRE(entry->is_file == false);
+    entry = tmu_read_directory(&dir);
+    REQUIRE(dir.ec == TM_OK);
+    REQUIRE(entry);
+    REQUIRE(std::string_view{entry->name} == "b");
+    REQUIRE(entry->is_file == false);
+    entry = tmu_read_directory(&dir);
+    REQUIRE(dir.ec == TM_OK);
+    REQUIRE(entry);
+    REQUIRE(std::string_view{entry->name} == "c");
+    REQUIRE(entry->is_file == true);
+    entry = tmu_read_directory(&dir);
+    REQUIRE(dir.ec == TM_OK);
+    REQUIRE(entry);
+    REQUIRE(std::string_view{entry->name} == "d");
+    REQUIRE(entry->is_file == true);
+    entry = tmu_read_directory(&dir);
+    REQUIRE(dir.ec == TM_OK);
+    REQUIRE(entry);
+    REQUIRE(std::string_view{entry->name} == "e");
+    REQUIRE(entry->is_file == false);
+    entry = tmu_read_directory(&dir);
+    REQUIRE(dir.ec == TM_OK);
+    REQUIRE(!entry);
+    tmu_close_directory(&dir);
+}
+
+TEST_CASE("module filename") {
+    allocation_guard alloc_guard;
+
+    std::string_view expected = "some/dir/and/a/file.exe";
+    std::string_view expected_dir = "some/dir/and/a/";
+    mock.set_module_filename(expected);
+
+    auto res = tmu_module_filename();
+    REQUIRE(res.ec == TM_OK);
+    REQUIRE(res.contents.data == expected);
+    tmu_destroy_contents(&res.contents);
+
+    res = tmu_module_directory();
+    REQUIRE(res.ec == TM_OK);
+    REQUIRE(res.contents.data == expected_dir);
+    tmu_destroy_contents(&res.contents);
+
+    char long_name[2048];
+    for (int i = 0; i < 2047; ++i) {
+        long_name[i] = 'X';
+    }
+    long_name[2047] = 0;
+    expected = long_name;
+    expected_dir = "";
+    mock.set_module_filename(expected);
+
+    res = tmu_module_filename();
+    REQUIRE(res.ec == TM_OK);
+    REQUIRE(res.contents.data == expected);
+    tmu_destroy_contents(&res.contents);
+
+    res = tmu_module_directory();
+    REQUIRE(res.ec == TM_OK);
+    REQUIRE(res.contents.data == expected_dir);
+    tmu_destroy_contents(&res.contents);
+}
+
+TEST_CASE("console output") {
+    allocation_guard overall_alloc_guard;
+
+// Preprocessor defined, so that we do not run into Wformat-security when the format string isn't a string literal.
+#define long_str                                                                       \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+
+    {
+        allocation_guard alloc_guard;
+        tmu_console_output_init();
+        const char* test = "test_output";
+        tmu_console_output(tmu_console_out, test);
+        REQUIRE(mock.out.has_output(test));
+        mock.clear();
+    }
+
+    {
+        allocation_guard alloc_guard;
+        tmu_console_output_init();
+        std::string_view test = "test_output";
+        tmu_console_output_n(tmu_console_out, test.data(), (tm_size_t)test.size());
+        REQUIRE(mock.out.has_output(test));
+        mock.clear();
+    }
+
+    {
+        allocation_guard alloc_guard;
+        tmu_console_output_init();
+        std::string_view test = long_str;
+        tmu_console_output_n(tmu_console_out, test.data(), (tm_size_t)test.size());
+        REQUIRE(mock.out.has_output(test));
+        mock.clear();
+    }
+
+#define test_format "This is a test format %d"
+    {
+        allocation_guard alloc_guard;
+        tmu_console_output_init();
+        int result = tmu_printf(test_format, 1);
+        std::string_view format = test_format;
+        REQUIRE(result == (int)format.size());
+        REQUIRE(mock.out.has_output(format));
+        mock.clear();
+    }
+
+    {
+        allocation_guard alloc_guard;
+        tmu_console_output_init();
+        int result = tmu_printf(long_str);
+        std::string_view format = long_str;
+        REQUIRE(result == (int)format.size());
+        REQUIRE(mock.out.has_output(format));
+        mock.clear();
+    }
+
+    {
+        allocation_guard alloc_guard;
+        tmu_console_output_init();
+        int result = tmu_fprintf(&mock.out.file, test_format, 1);
+        std::string_view format = test_format;
+        REQUIRE(result == (int)format.size());
+        REQUIRE(mock.out.has_output(test_format));
+        mock.clear();
+    }
+
+    {
+        allocation_guard alloc_guard;
+        mock.out.is_file = true;
+        tmu_console_output_init();
+        int result = tmu_fprintf(&mock.out.file, test_format, 1);
+        std::string_view format = test_format;
+        REQUIRE(result == (int)format.size());
+        REQUIRE(mock.out.has_output(test_format));
+        mock.clear();
+    }
+
+    {
+        allocation_guard alloc_guard;
+        tmu_console_output_init();
+        int result = tmu_fprintf(&mock.out.file, long_str);
+        std::string_view format = long_str;
+        REQUIRE(result == (int)format.size());
+        REQUIRE(mock.out.has_output(format));
+        mock.clear();
+    }
+
+    {
+        allocation_guard alloc_guard;
+        mock.out.is_file = true;
+        tmu_console_output_init();
+        int result = tmu_fprintf(&mock.out.file, long_str);
+        std::string_view format = long_str;
+        REQUIRE(result == (int)format.size());
+        REQUIRE(mock.out.has_output(format));
+        mock.clear();
     }
 }

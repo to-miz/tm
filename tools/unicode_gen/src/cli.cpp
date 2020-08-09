@@ -246,7 +246,7 @@ bool copy_as_ascii_string_dumb(const tchar* str, char* out, size_t out_len) {
     while (*str) {
         auto c = *str++;
 #if IS_WCHAR
-        if (c < 0 || c > 127) {
+        if ((char)c < 0 || c > 127) {
             FPRINTF(stderr, TEXT("Prefix is not ascii.\n"));
             return false;
         }

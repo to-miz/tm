@@ -1,8 +1,17 @@
-typedef struct {
+typedef struct tmu_platform_path_struct {
     tmu_tchar* path;
     tmu_tchar sbo[TMU_SBO_SIZE];
     tm_size_t allocated_size;
 } tmu_platform_path;
+
+// WC_ERR_INVALID_CHARS exists only since Vista.
+#if (defined(WINVER) && WINVER >= 0x0600) || (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600)
+    #define TMU_TO_UTF8_FLAGS WC_ERR_INVALID_CHARS
+    #define TMU_FROM_UTF8_FLAGS MB_ERR_INVALID_CHARS
+#else
+    #define TMU_TO_UTF8_FLAGS 0
+    #define TMU_FROM_UTF8_FLAGS 0
+#endif
 
 static tm_errc tmu_winerror_to_errc(DWORD error, tm_errc def) {
     switch (error) {
@@ -97,9 +106,14 @@ static tm_errc tmu_winerror_to_errc(DWORD error, tm_errc def) {
 }
 
 static tm_bool tmu_to_platform_path_n(const char* path, tm_size_t size, tmu_platform_path* out) {
-    if (size <= 0) return TM_TRUE;
+    if (size <= 0) {
+        out->path = out->sbo;
+        out->sbo[0] = 0;
+        out->allocated_size = 0;
+        return TM_TRUE;
+    }
 
-    int required_size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, (int)size, TM_NULL, 0);
+    int required_size = MultiByteToWideChar(CP_UTF8, TMU_FROM_UTF8_FLAGS, path, (int)size, TM_NULL, 0);
     if (required_size <= 0) return TM_FALSE; /* Size was not zero, so conversion failed. */
     ++required_size;                         /* Extra space for null-terminator. */
 
@@ -113,7 +127,7 @@ static tm_bool tmu_to_platform_path_n(const char* path, tm_size_t size, tmu_plat
     }
 
     int converted_size =
-        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, (int)size, out->path, (int)required_size);
+        MultiByteToWideChar(CP_UTF8, TMU_FROM_UTF8_FLAGS, path, (int)size, out->path, (int)required_size);
     /* Always nullterminate, since MultiByteToWideChar doesn't null-terminate when the supplying it a length param. */
     if (required_size) {
         if (converted_size <= 0) {
@@ -179,6 +193,7 @@ static tmu_exists_result tmu_directory_exists_t(const WCHAR* dir) {
     return result;
 }
 
+TM_STATIC_ASSERT(sizeof(tmu_file_time) == sizeof(FILETIME), invalid_file_time_size);
 static tmu_file_timestamp_result tmu_file_timestamp_t(const WCHAR* filename) {
     tmu_file_timestamp_result result = {0, TM_OK};
 
@@ -188,7 +203,6 @@ static tmu_file_timestamp_result tmu_file_timestamp_t(const WCHAR* filename) {
         return result;
     }
 
-    TM_STATIC_ASSERT(sizeof(result.file_time) == sizeof(fileAttr.ftLastWriteTime), invalid_file_time_size);
     TMU_MEMCPY(&result.file_time, &fileAttr.ftLastWriteTime, sizeof(fileAttr.ftLastWriteTime));
     return result;
 }
@@ -401,7 +415,7 @@ static tm_errc tmu_delete_directory_t(const WCHAR* dir) {
 static tmu_contents_result tmu_to_utf8(const WCHAR* str, tm_size_t extra_size) {
     tmu_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
     if (str && *str) {
-        int size = WideCharToMultiByte(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, TM_NULL, 0, TM_NULL, TM_NULL);
+        int size = WideCharToMultiByte(CP_UTF8, TMU_TO_UTF8_FLAGS, str, -1, TM_NULL, 0, TM_NULL, TM_NULL);
         if (size <= 0) {
             result.ec = tmu_winerror_to_errc(GetLastError(), TM_EINVAL);
         } else {
@@ -413,7 +427,7 @@ static tmu_contents_result tmu_to_utf8(const WCHAR* str, tm_size_t extra_size) {
             } else {
                 result.contents.capacity = size;
 
-                int real_size = WideCharToMultiByte(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, result.contents.data, size,
+                int real_size = WideCharToMultiByte(CP_UTF8, TMU_TO_UTF8_FLAGS, str, -1, result.contents.data, size,
                                                     TM_NULL, TM_NULL);
                 result.contents.size = (tm_size_t)real_size;
 
@@ -459,6 +473,189 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     if (result.ec == TM_OK) tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_TRUE);
     TMU_FREE(dir, len * sizeof(WCHAR), sizeof(WCHAR));
     return result;
+}
+
+TMU_DEF tmu_contents_result tmu_module_filename() {
+    tmu_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
+
+    WCHAR sbo[MAX_PATH];
+
+    WCHAR* filename = sbo;
+    DWORD filename_size = MAX_PATH;
+
+    DWORD size = GetModuleFileNameW(TM_NULL, filename, filename_size);
+    DWORD last_error = GetLastError();
+    if (size > 0 && size >= filename_size && (last_error == ERROR_INSUFFICIENT_BUFFER || last_error == ERROR_SUCCESS)) {
+        WCHAR* new_filename = (WCHAR*)TMU_MALLOC(filename_size * sizeof(WCHAR) * 2, sizeof(WCHAR));
+        if (!new_filename) {
+            result.ec = TM_ENOMEM;
+            return result;
+        }
+        filename = new_filename;
+        filename_size *= 2;
+
+        for (;;) {
+            size = GetModuleFileNameW(TM_NULL, filename, filename_size);
+            last_error = GetLastError();
+            if (last_error != ERROR_INSUFFICIENT_BUFFER && last_error != ERROR_SUCCESS) {
+                break;
+            }
+            if (size >= filename_size) {
+                new_filename = (WCHAR*)TMU_REALLOC(filename, filename_size * sizeof(WCHAR), sizeof(WCHAR),
+                                                   filename_size * sizeof(WCHAR) * 2, sizeof(WCHAR));
+                if (!new_filename) {
+                    result.ec = TM_ENOMEM;
+                    break;
+                }
+                filename = new_filename;
+                filename_size *= 2;
+                continue;
+            }
+            break;
+        }
+    }
+
+    if (size == 0) result.ec = tmu_winerror_to_errc(last_error, TM_EIO);
+
+    if (result.ec == TM_OK) {
+        TM_ASSERT(size < filename_size);
+        filename[size] = 0;  // Force nulltermination.
+        result = tmu_to_utf8(filename, 0);
+    }
+    if (result.ec == TM_OK) tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_FALSE);
+
+    if (filename != sbo) {
+        TMU_FREE(filename, filename_size * sizeof(WCHAR), sizeof(WCHAR));
+    }
+    return result;
+}
+
+struct tmu_internal_find_data {
+    HANDLE handle;
+    WIN32_FIND_DATAW data;
+    BOOL has_data;
+    tm_errc next_ec;
+};
+
+static tmu_opened_dir tmu_open_directory_t(tmu_platform_path* dir) {
+    TM_ASSERT(dir);
+
+    tmu_opened_dir result;
+    ZeroMemory(&result, sizeof(result));
+
+    const WCHAR* path = TM_NULL;
+    if (!tmu_internal_append_wildcard(dir, &path)) {
+        result.ec = TM_ENOMEM;
+        return result;
+    }
+
+    struct tmu_internal_find_data* find_data
+        = (struct tmu_internal_find_data*)TMU_MALLOC(sizeof(struct tmu_internal_find_data), sizeof(void*));
+    if (!find_data) {
+        result.ec = TM_ENOMEM;
+        return result;
+    }
+
+    ZeroMemory(find_data, sizeof(struct tmu_internal_find_data));
+    find_data->handle = FindFirstFileW(path, &find_data->data);
+    if (find_data->handle == INVALID_HANDLE_VALUE) {
+        result.ec = tmu_winerror_to_errc(GetLastError(), TM_EIO);
+        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+        return result;
+    }
+
+    find_data->has_data = 1;
+    result.internal = find_data;
+    return result;
+}
+
+TMU_DEF void tmu_close_directory(tmu_opened_dir* dir) {
+    if (!dir) return;
+    if (dir->internal) {
+        struct tmu_internal_find_data* find_data = (struct tmu_internal_find_data*)dir->internal;
+        if (find_data->handle != INVALID_HANDLE_VALUE) {
+            FindClose(find_data->handle);
+        }
+        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+    }
+    tmu_destroy_contents(&dir->internal_buffer);
+    ZeroMemory(dir, sizeof(tmu_opened_dir));
+}
+
+TMU_DEF const tmu_read_directory_result* tmu_read_directory(tmu_opened_dir* dir) {
+    if (!dir) return TM_NULL;
+    if (dir->ec != TM_OK) return TM_NULL;
+    if (!dir->internal) return TM_NULL;
+
+    struct tmu_internal_find_data* find_data = (struct tmu_internal_find_data*)dir->internal;
+    if (find_data->handle == INVALID_HANDLE_VALUE) {
+        dir->ec = TM_EPERM;
+        return TM_NULL;
+    }
+    if (!find_data->has_data) {
+        dir->ec = find_data->next_ec;
+        return TM_NULL;
+    }
+
+    /* Skip "." and ".." entries. */
+    while (find_data->has_data
+           && ((find_data->data.cFileName[0] == '.' && find_data->data.cFileName[1] == 0)
+               || (find_data->data.cFileName[0] == '.' && find_data->data.cFileName[1] == '.'
+                   && find_data->data.cFileName[2] == 0))) {
+        find_data->has_data = FindNextFileW(find_data->handle, &find_data->data);
+        if (!find_data->has_data) {
+            DWORD last_error = GetLastError();
+            if (last_error != ERROR_NO_MORE_FILES) dir->ec = tmu_winerror_to_errc(last_error, TM_EPERM);
+            return TM_NULL;
+        }
+    }
+
+    ZeroMemory(&dir->internal_result, sizeof(tmu_read_directory_result));
+    int required_size = WideCharToMultiByte(CP_UTF8, TMU_TO_UTF8_FLAGS, find_data->data.cFileName, -1, TM_NULL, 0,
+                                            TM_NULL, TM_NULL);
+    if (required_size <= 0) {
+        dir->ec = tmu_winerror_to_errc(GetLastError(), TM_EPERM);
+        return TM_NULL;
+    }
+
+    // Additional size for trailing slash and nullterminator.
+    required_size += 1 + ((find_data->data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0);
+    if (!dir->internal_buffer.data) {
+        dir->internal_buffer.data = (char*)TMU_MALLOC((size_t)required_size, sizeof(char));
+        if (!dir->internal_buffer.data) {
+            dir->ec = TM_ENOMEM;
+            return TM_NULL;
+        }
+        dir->internal_buffer.capacity = (tm_size_t)required_size;
+    } else if (dir->internal_buffer.capacity < (tm_size_t)required_size) {
+        dir->internal_buffer.size = 0;
+        if (!tmu_grow_by(&dir->internal_buffer, (tm_size_t)required_size)) {
+            dir->ec = TM_ENOMEM;
+            return TM_NULL;
+        }
+    }
+    TM_ASSERT(dir->internal_buffer.data);
+    int real_size = WideCharToMultiByte(CP_UTF8, TMU_TO_UTF8_FLAGS, find_data->data.cFileName, -1,
+                                        dir->internal_buffer.data, (int)dir->internal_buffer.capacity, TM_NULL, TM_NULL);
+    if (real_size <= 0 || real_size >= required_size) {
+        dir->ec = tmu_winerror_to_errc(GetLastError(), TM_EPERM);
+        return TM_NULL;
+    }
+
+    TM_ASSERT((tm_size_t)real_size < dir->internal_buffer.capacity);
+    dir->internal_buffer.data[real_size] = 0; /* Always nullterminate. */
+    dir->internal_buffer.size = (tm_size_t)real_size;
+    tmu_to_tmu_path(&dir->internal_buffer, /*is_dir=*/((find_data->data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0));
+
+    dir->internal_result.is_file = (find_data->data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+    dir->internal_result.name = dir->internal_buffer.data;
+
+    find_data->has_data = FindNextFileW(find_data->handle, &find_data->data);
+    if (!find_data->has_data) {
+        DWORD last_error = GetLastError();
+        if (last_error != ERROR_NO_MORE_FILES) find_data->next_ec = tmu_winerror_to_errc(last_error, TM_EPERM);
+    }
+    return &dir->internal_result;
 }
 
 #if !defined(TMU_NO_SHELLAPI)
@@ -537,29 +734,34 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
         return written == (DWORD)len;
     }
 
-    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
-    tmu_conversion_result conv_result =
-        tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
-                               /*replace_str_len=*/0,
-                               /*nullterminate=*/TM_FALSE, /*out=*/TM_NULL, /*out_len=*/0);
-    if (conv_result.ec != TM_ERANGE) return conv_result.ec == TM_OK;
-
     tmu_char16 sbo[TMU_SBO_SIZE];
-    tmu_char16* wide = sbo;
-    if (conv_result.size > TMU_SBO_SIZE) {
-        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
-        if (!wide) return TM_FALSE;
-    }
 
-    conv_result = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
+    tmu_conversion_result conv_result
+        = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                                 /*replace_str_len=*/0,
+                                 /*nullterminate=*/TM_FALSE, /*out=*/sbo, /*out_len=*/TMU_SBO_SIZE);
+
+    tmu_char16* wide = sbo;
+    if (conv_result.ec == TM_ERANGE) {
+        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        if (wide) {
+            tmu_conversion_result new_result
+                = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
                                          /*replace_str_len=*/0,
                                          /*nullterminate=*/TM_FALSE, wide, conv_result.size);
+            conv_result.ec = new_result.ec;
+        } else {
+            conv_result.ec = TM_ENOMEM;
+        }
+    }
+
     if (conv_result.ec == TM_OK) {
         BOOL result = WriteConsoleW(tmu_console_state[handle].handle, wide, (DWORD)conv_result.size, &written, TM_NULL);
         if (!result) written = 0;
     }
 
-    if (wide != sbo) {
+    if (wide && wide != sbo) {
         TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
     }
     return written == (DWORD)conv_result.size;

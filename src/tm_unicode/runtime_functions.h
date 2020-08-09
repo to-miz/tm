@@ -112,6 +112,6 @@
 		#define TMU_STRCHRW tmu_strchrw
 	#endif
 
-	#define TMU_WCSLEN(str) lstrlenW((str))
+	#define TMU_WCSLEN(str) (size_t)lstrlenW((str))
 #endif /* defined(TMU_USE_WINDOWS_H) */
 /* clang-format on */

@@ -14,8 +14,14 @@
 #ifdef CP_UTF8
     #undef CP_UTF8
 #endif
+#ifdef ERROR_SUCCESS
+    #undef ERROR_SUCCESS
+#endif
 #ifdef MB_ERR_INVALID_CHARS
     #undef MB_ERR_INVALID_CHARS
+#endif
+#ifdef WC_ERR_INVALID_CHARS
+    #undef WC_ERR_INVALID_CHARS
 #endif
 
 #ifdef ERROR_ACCESS_DENIED
@@ -160,6 +166,9 @@
 #ifdef ERROR_OPERATION_ABORTED
     #undef ERROR_OPERATION_ABORTED
 #endif
+#ifdef ERROR_NO_MORE_FILES
+    #undef ERROR_NO_MORE_FILES
+#endif
 
 #ifdef FILE_ATTRIBUTE_DIRECTORY
     #undef FILE_ATTRIBUTE_DIRECTORY
@@ -195,4 +204,67 @@
 #endif
 #ifdef MOVEFILE_REPLACE_EXISTING
     #undef MOVEFILE_REPLACE_EXISTING
+#endif
+
+#ifdef GetModuleFileNameW
+    #undef GetModuleFileNameW
+#endif
+#ifdef FindFirstFileW
+    #undef FindFirstFileW
+#endif
+#ifdef FindClose
+    #undef FindClose
+#endif
+#ifdef FindNextFileW
+    #undef FindNextFileW
+#endif
+#ifdef WIN32_FIND_DATAW
+    #undef WIN32_FIND_DATAW
+#endif
+#ifdef FILE_ATTRIBUTE_DIRECTORY
+    #undef FILE_ATTRIBUTE_DIRECTORY
+#endif
+
+#ifdef ZeroMemory
+    #undef ZeroMemory
+#endif
+
+#ifdef FILETIME
+    #undef FILETIME
+#endif
+
+#ifdef WINVER
+    #undef WINVER
+#endif
+
+#ifdef SetConsoleOutputCP
+    #undef SetConsoleOutputCP
+#endif
+#ifdef SetConsoleCP
+    #undef SetConsoleCP
+#endif
+#ifdef WriteFile
+    #undef WriteFile
+#endif
+#ifdef WriteConsoleW
+    #undef WriteConsoleW
+#endif
+#ifdef GetStdHandle
+    #undef GetStdHandle
+#endif
+#ifdef GetConsoleMode
+    #undef GetConsoleMode
+#endif
+#ifdef STD_INPUT_HANDLE
+    #undef STD_INPUT_HANDLE
+#endif
+#ifdef STD_OUTPUT_HANDLE
+    #undef STD_OUTPUT_HANDLE
+#endif
+#ifdef STD_ERROR_HANDLE
+    #undef STD_ERROR_HANDLE
+#endif
+
+#ifdef UINT
+    #undef UINT
 #endif

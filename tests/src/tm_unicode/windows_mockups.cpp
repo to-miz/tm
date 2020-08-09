@@ -6,7 +6,7 @@ int test_MultiByteToWideChar(int codepage, DWORD flags, const char* multibyte, i
     TM_ASSERT(widechar_len >= 0);
     TM_ASSERT(multibyte || multibyte_len == 0);
 
-    if (win_mock.test_fail(fail_MultiByteToWideChar)) return 0;
+    if (mock.test_fail(fail_MultiByteToWideChar)) return 0;
 
     if (multibyte_len == -1) {
         multibyte_len = (int)(strlen(multibyte) + 1);  // Include null-terminator.
@@ -26,14 +26,14 @@ int test_MultiByteToWideChar(int codepage, DWORD flags, const char* multibyte, i
 int test_WideCharToMultiByte(int codepage, DWORD flags, const tchar* widechar, int widechar_len, char* multibyte,
                              int multibyte_len, const char* default_char, bool* default_char_used) {
     TM_ASSERT(codepage == CP_UTF8);
-    TM_ASSERT(flags == MB_ERR_INVALID_CHARS);
+    TM_ASSERT(flags == WC_ERR_INVALID_CHARS);
 
     TM_ASSERT(default_char == nullptr);
     TM_ASSERT(default_char_used == nullptr);
 
     TM_ASSERT(widechar || widechar_len == 0);
 
-    if (win_mock.test_fail(fail_WideCharToMultiByte)) return 0;
+    if (mock.test_fail(fail_WideCharToMultiByte)) return 0;
 
     if (widechar_len == -1) {
         widechar_len = (int)(test_strlen(widechar) + 1);  // Include null-terminator.

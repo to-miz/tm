@@ -34,6 +34,44 @@ void tmu_destroy_platform_path(tmu_platform_path* path) {
     }
 }
 
+#if defined(_WIN32) && !defined(TMU_TESTING_UNIX)
+static tm_bool tmu_internal_append_wildcard(tmu_platform_path* dir, const tmu_tchar** out) {
+    TM_ASSERT(dir);
+    TM_ASSERT(dir->path);
+    TM_ASSERT(out);
+
+    size_t len = TMU_TEXTLEN(dir->path);
+    if (len == 0) {
+        *out = TMU_TEXT("*");
+        return TM_TRUE;
+    }
+
+    tm_bool ends_in_slash = (dir->path[len - 1] == TMU_TEXT('\\'));
+    size_t required_size = len + 3 - ends_in_slash;
+    if (dir->path == dir->sbo) {
+        if (required_size > TMU_SBO_SIZE) {
+            void* new_path = TMU_MALLOC(required_size, sizeof(tmu_tchar));
+            if (!new_path) return TM_FALSE;
+            TMU_MEMCPY(new_path, dir->path, (len + 1) * sizeof(tmu_tchar));
+            dir->path = (tmu_tchar*)new_path;
+        }
+    } else {
+        void* new_path = TMU_REALLOC(dir->path, dir->allocated_size * sizeof(tmu_tchar), sizeof(tmu_tchar),
+                                     required_size * sizeof(tmu_tchar), sizeof(tmu_tchar));
+        if (!new_path) return TM_FALSE;
+        dir->path = (tmu_tchar*)new_path;
+    }
+    if (dir->path != dir->sbo) dir->allocated_size = (tm_size_t)required_size;
+    len -= ends_in_slash;
+    dir->path[len] = TMU_TEXT('\\');
+    dir->path[len + 1] = TMU_TEXT('*');
+    dir->path[len + 2] = 0;
+    len += 2;
+    *out = dir->path;
+    return TM_TRUE;
+}
+#endif
+
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
 tmu_contents::operator TM_STRING_VIEW() const { return TM_STRING_VIEW_MAKE(data, size); }
 
@@ -336,6 +374,18 @@ TMU_DEF tm_errc tmu_delete_file(const char* filename) {
     return result;
 }
 
+TMU_DEF tmu_contents_result tmu_module_directory() {
+    tmu_contents_result result = tmu_module_filename();
+    if (result.ec == TM_OK) {
+        for (tm_size_t i = result.contents.size; i > 0 && result.contents.data[i - 1] != '/'; --i) {
+            --result.contents.size;
+        }
+        /* Nullterminate */
+        if (result.contents.data) result.contents.data[result.contents.size] = 0;
+    }
+    return result;
+}
+
 TMU_DEF tmu_utf8_command_line_result tmu_utf8_command_line_from_utf16(tmu_char16 const* const* utf16_args,
                                                                       int utf16_args_count) {
     TM_ASSERT(utf16_args_count >= 0);
@@ -445,6 +495,17 @@ TMU_DEF void tmu_utf8_destroy_command_line(tmu_utf8_command_line* command_line) 
         command_line->internal_buffer = TM_NULL;
         command_line->internal_allocated_size = 0;
     }
+}
+
+TMU_DEF tmu_opened_dir tmu_open_directory(const char* dir) {
+    tmu_opened_dir result = {TM_ENOMEM, {TM_NULL, TM_FALSE}, {TM_NULL, 0, 0}, TM_NULL};
+    if (!dir) dir = "";
+    tmu_platform_path platform_dir;
+    if (tmu_to_platform_path(dir, &platform_dir)) {
+        result = tmu_open_directory_t(&platform_dir);
+        tmu_destroy_platform_path(&platform_dir);
+    }
+    return result;
 }
 
 #if defined(__cplusplus)

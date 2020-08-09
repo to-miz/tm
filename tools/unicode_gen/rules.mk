@@ -11,6 +11,9 @@ unicode_gen.out := ${build_dir_root}${unicode_gen_build}${path_sep}unicode_gen${
 ${unicode_gen.out}: private override BUILD := ${unicode_gen_build}
 ${unicode_gen.out}: private CXX_OPTIONS.gcc += -Wno-missing-field-initializers
 ${unicode_gen.out}: private CXX_OPTIONS.gcc += -Wno-error=unused-parameter
+ifeq (${os}${ARCH},windows64)
+${unicode_gen.out}: private CXX_OPTIONS.gcc += -municode
+endif
 ${unicode_gen.out}: private CXX_OPTIONS.clang += -Wno-missing-field-initializers
 ${unicode_gen.out}: private CXX_OPTIONS.clang += -Wno-error=unused-parameter
 ${unicode_gen.out}: private options.cl.exception := -EHa

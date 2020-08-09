@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.9.0 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.9.2 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2020
 
 No warranty; use at your own risk.
@@ -81,6 +81,11 @@ SWITCHES
         tmu_main has to be supplied by the usage code. It has the signature:
             int tmu_main(int argc, const char *const * argv)
 
+NOTES
+    Compiling with -std=c99 on gcc/clang with file io:
+    You need to additionally pass in -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE as options, so that some more advanced
+    posix functions are defined in the headers, that are otherwise not defined because of c99.
+
 ISSUES
     - No locale support for case folding (some locales case fold differently,
       like turkic languages with dotted uppercase I).
@@ -92,6 +97,10 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY    (DD.MM.YY)
+    v0.9.2  08.08.20 Added tmu_printf, tmu_vprintf, tmu_fprintf, tmu_vfprintf.
+                     Added tests for console output.
+    v0.9.1  06.08.20 Added tmu_module_filename, tmu_module_directory, tmu_open_directory,
+                     tmu_close_directory, tmu_read_directory.
     v0.9.0  11.03.20 Updated generated Unicode data to Unicode Version 13.0.0.
     v0.1.9  01.01.20 Fixed compilation error on unix.
     v0.1.8  01.01.20 Added TMU_USE_CONSOLE and TMU_NO_SHELLAPI.
@@ -213,8 +222,13 @@ TM_STRING_VIEW_SIZE and TM_STRING_VIEW_MAKE.
     #define TMU_DEF extern
 #endif
 
-#if defined(TMU_USE_CRT) && !defined(TMU_TESTING)
-    #include <stdio.h>
+#if defined(TMU_USE_CRT)
+    #ifndef TMU_TESTING
+        #include <stdio.h>
+    #endif
+    #if defined(TMU_USE_CONSOLE) && !defined(TMU_USE_WINDOWS_H)
+        #include <stdarg.h>
+    #endif
 #endif
 
 /* Unicode handling. */
@@ -517,6 +531,11 @@ TMU_DEF tmu_conversion_result tmu_utf16_from_utf8_ex(tmu_utf8_stream stream, tmu
                                                      const tmu_char16* replace_str, tm_size_t replace_str_len,
                                                      tm_bool nullterminate, tmu_char16* out, tm_size_t out_len);
 
+TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic(tmu_utf16_stream stream, tmu_contents* out);
+TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic_ex(tmu_utf16_stream stream, tmu_validate validate,
+                                                             const char* replace_str, tm_size_t replace_str_len,
+                                                             tm_bool nullterminate, tm_bool is_sbo, tmu_contents* out);
+
 TMU_DEF tm_size_t tmu_utf8_valid_range(const char* str, tm_size_t len);
 TMU_DEF tm_size_t tmu_utf8_skip_invalid(char* str, tm_size_t len);
 /*TMU_DEF void tmu_utf8_replace_invalid(tmu_contents* r, const char* replace_str, tm_size_t replace_str_len);*/
@@ -670,6 +689,28 @@ TMU_DEF tm_errc tmu_delete_directory(const char* dir);
 
 /* Path related functions. */
 TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size);
+TMU_DEF tmu_contents_result tmu_module_filename();
+TMU_DEF tmu_contents_result tmu_module_directory();
+
+typedef struct {
+    const char* name; /* Either filename or directory name. */
+    tm_bool is_file;  /* Whether entry is a file or a directory. */
+} tmu_read_directory_result;
+
+typedef struct {
+    tm_errc ec;
+    tmu_read_directory_result internal_result;
+
+    tmu_contents internal_buffer;
+    void* internal;
+} tmu_opened_dir;
+
+/*!
+ * @brief
+ */
+TMU_DEF tmu_opened_dir tmu_open_directory(const char* dir);
+TMU_DEF void tmu_close_directory(tmu_opened_dir* dir);
+TMU_DEF const tmu_read_directory_result* tmu_read_directory(tmu_opened_dir* dir);
 
 #if 0
 typedef enum {
@@ -722,6 +763,14 @@ TMU_DEF FILE* tmu_freopen(const char* filename, const char* mode, FILE* current)
 Utf-8 console output wrappers.
 Utf-8 console output on Windows is not very straightforward.
 There are two ways to accomplish it:
+    Using Winapi console functions:
+        SetConsoleOutputCP(...);
+        SetConsoleCP(...);
+        ConsoleWriteW(...); // When output is on console.
+        WriteFile(...);     // When output is redirected to a file.
+
+        This works reliably.
+
     Using Microsoft CRT extensions and wprintf:
         _setmode(_fileno(stdout), _O_U16TEXT);
         wprintf(...);
@@ -733,13 +782,9 @@ There are two ways to accomplish it:
         assertion. It is recommended to define TMU_USE_WINDOWS_H and use Winapi when TMU_USE_CONSOLE is defined.
         This method only exists for completeness.
 
-    Using Winapi console functions:
-        SetConsoleOutputCP(...);
-        SetConsoleCP(...);
-        ConsoleWriteW(...); // When output is on console.
-        WriteFile(...);     // When output is redirected to a file.
-
 Thus the best method seems to be using the Winapi functions directly, which requires Windows headers.
+In either case, you can't use printf or fprintf on stderr/stdout directly anymore.
+This is why tmu_printf and tmu_fprintf exist: They will redirect output to tmu_console_output.
 
 These wrappers will do the following:
     On Linux they just wrap fwritef.
@@ -765,8 +810,33 @@ TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str);
 TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len);
 
 #if defined(TMU_USE_CRT)
-TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f);
+
+/* clang-format off */
+#if defined(__GNUC__) || defined(__clang__)
+    #define TMU_ATTRIB_PRINTF(str_index, check_index) __attribute__((format(printf, str_index, check_index)))
+#else
+    #define TMU_ATTRIB_PRINTF(str_index, check_index)
 #endif
+
+// Adapted from https://stackoverflow.com/a/6849629
+#if defined(_MSC_VER) && _MSC_VER >= 1400 && !defined(__clang__) && !defined(__MINGW32__)
+    #include <sal.h>
+    #if _MSC_VER > 1400
+        #define TMU_FORMAT_STRING(p) _Printf_format_string_ p
+    #else
+        #define TMU_FORMAT_STRING(p) __format_string p
+    #endif
+#else
+    #define TMU_FORMAT_STRING(p) p
+#endif
+/* clang-format on */
+
+TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f);
+TMU_DEF int tmu_printf(TMU_FORMAT_STRING(const char* format), ...) TMU_ATTRIB_PRINTF(1, 2);
+TMU_DEF int tmu_vprintf(const char* format, va_list args);
+TMU_DEF int tmu_fprintf(FILE* stream, TMU_FORMAT_STRING(const char* format), ...) TMU_ATTRIB_PRINTF(2, 3);
+TMU_DEF int tmu_vfprintf(FILE* stream, const char* format, va_list args);
+#endif /* defined(TMU_USE_CRT) */
 
 #endif
 
@@ -921,7 +991,7 @@ TMU_DEF std::vector<char> tmu_read_file_as_utf8_to_vector(TM_STRING_VIEW filenam
 #define TMU_UCD_DEF TMU_DEF
 /* This file was generated using tools/unicode_gen from
    https://github.com/to-miz/tm. Do not modify by hand.
-   Around 31509 bytes (30.77 kilobytes) of data for lookup tables
+   Around 31497 bytes (30.76 kilobytes) of data for lookup tables
    are generated. It was generated using version 13.0.0 of Unicode.*/
 
 #ifdef __cplusplus
@@ -1016,9 +1086,9 @@ typedef struct {
     int32_t simple_case_fold_offset;
 } tmu_ucd_internal;
 
-/* Unicode data entries: 2880 bytes. */
-static const size_t tmu_ucd_entries_size = 240;
-static const tmu_ucd_internal tmu_ucd_entries[240] = {
+/* Unicode data entries: 2868 bytes. */
+static const size_t tmu_ucd_entries_size = 239;
+static const tmu_ucd_internal tmu_ucd_entries[239] = {
     {0, 0, 0, 0},
     {0, 3, 0, 0},
     {0, 2, 0, 0},
@@ -1241,7 +1311,6 @@ static const tmu_ucd_internal tmu_ucd_entries[240] = {
     {0, 12, 0, 0},
     {0, 11, 0, 0},
     {1, 12, 0, 0},
-    {0, 0, 0, 0},
     {17, 0, 199, 0},
     {17, 0, 202, 0},
     {17, 0, 205, 0},
@@ -1291,49 +1360,49 @@ static const uint8_t tmu_ucd_stage_one[1025] = {
     103,104,105, 99,100,101,102,103,104,105, 99,100,101,102,103,104,
     105, 99,100,101,102,103,104,105, 99,100,101,102,103,104,105, 99,
     100,101,102,103,104,105, 99,100,101,102,103,104,105, 99,100,106,
-    222,210,210,210,210,210,223,224,222,210,210,210,210,210,210,223,
-    222,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
-    210,223,214,214,225,226,107,108,214,214,109,110,111,112,113,114,
-    115,227,116,117,210,118,119,120,121,122,123,210,214,214,124,210,
-    125,126,127,128,129,130,131,132,228,133,134,210,229,135,136,137,
+    210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
+    210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
+    210,210,214,214,222,223,107,108,214,214,109,110,111,112,113,114,
+    115,224,116,117,210,118,119,120,121,122,123,210,214,214,124,210,
+    125,126,127,128,129,130,131,132,225,133,134,210,226,135,136,137,
     138,139,140,141,142,143,144,210,145,146,210,147,148,149,150,210,
     151,152,153,154,155,156,210,210,157,158,159,160,210,161,210,162,
-    214,214,214,214,214,214,214,230,163,214,231,210,210,210,210,210,
+    214,214,214,214,214,214,214,227,163,214,228,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     214,214,214,214,214,214,214,214,164,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
-    210,210,210,210,210,210,210,210,214,214,214,214,232,210,210,210,
+    210,210,210,210,210,210,210,210,214,214,214,214,229,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
-    214,214,214,214,165,166,167,233,210,210,210,210,168,169,170,171,
+    214,214,214,214,165,166,167,230,210,210,210,210,168,169,170,171,
     220,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
-    210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,234,
-    214,214,214,214,214,214,214,214,214,235,236,210,210,210,210,210,
+    210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,231,
+    214,214,214,214,214,214,214,214,214,232,233,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
-    214,214,172,214,214,237,210,210,210,210,210,210,210,210,210,210,
+    214,214,172,214,214,234,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,173,174,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
     210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,210,
-    215,238,175,176,177,239,178,210,179,180,181,182,183,184,185,186,
+    215,235,175,176,177,236,178,210,179,180,181,182,183,184,185,186,
     215,215,215,215,187,188,210,210,210,210,210,210,210,210,210,210,
     189,210,190,210,210,191,210,210,210,210,210,210,210,210,210,210,
-    214,192,193,210,210,210,210,210,240,194,195,210,196,197,210,210,
-    241,198,199,200,201,242,243,244,243,243,245,243,246,202,247,203,
-    204,205,206,248,207,208,215,209,242,242,242,242,242,242,242,249,
+    214,192,193,210,210,210,210,210,237,194,195,210,196,197,210,210,
+    238,198,199,200,201,239,240,241,240,240,242,240,243,202,244,203,
+    204,205,206,245,207,208,215,209,239,239,239,239,239,239,239,246,
     220
 };
 
 /* Unicode data stage two: 26880 bytes.*/
 static const uint32_t tmu_ucd_block_size = 128;
-static const uint32_t tmu_ucd_stage_two_blocks_count = 262;
+static const uint32_t tmu_ucd_stage_two_blocks_count = 258;
 static const size_t tmu_ucd_stage_two_size = 26880;
 static const uint8_t tmu_ucd_stage_two[26880] = {
     /* Block 0 */
@@ -2300,8 +2369,8 @@ static const uint8_t tmu_ucd_stage_two[26880] = {
      80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80,
      80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80,  0,  0,  0,  0,
     /* Block 107 */
-    223,224,225,226,227,228,228,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,229,230,231,232,233,  0,  0,  0,  0,  0, 13, 47, 13,
+    222,223,224,225,226,227,227,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,228,229,230,231,232,  0,  0,  0,  0,  0, 13, 47, 13,
      13, 13, 13, 13, 13, 13, 13, 13, 13,  7, 13, 13, 13, 13, 13, 13,
      13, 13, 13, 13, 13, 13, 13,  0, 13, 13, 13, 13, 13,  0, 13,  0,
      13, 13,  0, 13, 13,  0, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
@@ -2364,7 +2433,7 @@ static const uint8_t tmu_ucd_stage_two[26880] = {
      13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
     /* Block 114 */
      13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
-     13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,234,234,
+     13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,233,233,
      13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
      13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,  0,
       0,  0, 13, 13, 13, 13, 13, 13,  0,  0, 13, 13, 13, 13, 13, 13,
@@ -2426,9 +2495,9 @@ static const uint8_t tmu_ucd_stage_two[26880] = {
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     /* Block 121 */
-    235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,
-    235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,
-    235,235,235,235,235,235,235,235, 10, 10, 10, 10, 10, 10, 10, 10,
+    234,234,234,234,234,234,234,234,234,234,234,234,234,234,234,234,
+    234,234,234,234,234,234,234,234,234,234,234,234,234,234,234,234,
+    234,234,234,234,234,234,234,234, 10, 10, 10, 10, 10, 10, 10, 10,
      10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
      10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
      13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
@@ -2438,9 +2507,9 @@ static const uint8_t tmu_ucd_stage_two[26880] = {
      13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
      13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,  0,  0,
       8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  0,  0,  0,  0,  0,  0,
-    235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,
-    235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,
-    235,235,235,235,  0,  0,  0,  0, 10, 10, 10, 10, 10, 10, 10, 10,
+    234,234,234,234,234,234,234,234,234,234,234,234,234,234,234,234,
+    234,234,234,234,234,234,234,234,234,234,234,234,234,234,234,234,
+    234,234,234,234,  0,  0,  0,  0, 10, 10, 10, 10, 10, 10, 10, 10,
      10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
      10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,  0,  0,  0,  0,
     /* Block 123 */
@@ -3074,9 +3143,9 @@ static const uint8_t tmu_ucd_stage_two[26880] = {
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     /* Block 193 */
-    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
-    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
-    236,236, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+    235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,
+    235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,235,
+    235,235, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
      10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
      10, 10, 10, 10, 47, 47, 47, 47, 47, 47, 47, 13,  0,  0,  0,  0,
       8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  0,  0,  0,  0,  6,  6,
@@ -3120,13 +3189,13 @@ static const uint8_t tmu_ucd_stage_two[26880] = {
       7,  7,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     /* Block 198 */
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-     12, 12, 12, 12,237,237,237,237,237,237,237,237,237,237,237,237,
-     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,237,
-    237, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-    237, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-    237, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+     12, 12, 12, 12,236,236,236,236,236,236,236,236,236,236,236,236,
+     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,236,
+    236, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+    236, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+    236, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-     12, 12, 12, 12, 12, 12,237,237,237,237,237,237,237,237,237,237,
+     12, 12, 12, 12, 12, 12,236,236,236,236,236,236,236,236,236,236,
     /* Block 199 */
       8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8, 12, 12, 12,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
@@ -3139,57 +3208,57 @@ static const uint8_t tmu_ucd_stage_two[26880] = {
     /* Block 200 */
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7, 12,  7,
       7, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,  7,  7,  7,  7,  7,
-      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7, 12,237,237,
+      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7, 12,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,237,237,237,237,237,237,237,237,237,237,
     237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,238,238,238,238,238,238,238,238,238,238,
-    238,238,238,238,238,238,238,238,238,238,238,238,238,238,238,238,
     /* Block 201 */
-      7, 12, 12,237,237,237,237,237,237,237,237,237,237,237,237,237,
+      7, 12, 12,236,236,236,236,236,236,236,236,236,236,236,236,236,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7, 12,  7,  7,  7,  7,  7,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7, 12,
-      7,  7, 12, 12, 12, 12, 12, 12, 12, 12, 12,  7,237,237,237,237,
-      7,  7,  7,  7,  7,  7,  7,  7,  7,237,237,237,237,237,237,237,
-     12, 12,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-     12, 12, 12, 12, 12, 12,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
+      7,  7, 12, 12, 12, 12, 12, 12, 12, 12, 12,  7,236,236,236,236,
+      7,  7,  7,  7,  7,  7,  7,  7,  7,236,236,236,236,236,236,236,
+     12, 12,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+     12, 12, 12, 12, 12, 12,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
     /* Block 202 */
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-     12, 12, 12, 12, 12, 12, 12, 12,237,237,237,237,237,237,237,237,
-     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,237,237,237,
-     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,237,237,237,
+     12, 12, 12, 12, 12, 12, 12, 12,236,236,236,236,236,236,236,236,
+     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,236,236,236,
+     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,236,236,236,
     /* Block 203 */
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-      7,  7,  7,  7,  7, 12, 12, 12, 12,237,237,237,237,237,237,237,
-     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
+      7,  7,  7,  7,  7, 12, 12, 12, 12,236,236,236,236,236,236,236,
+     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
     /* Block 204 */
-      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,237,237,237,237,
+      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,236,236,236,236,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-      7,  7,  7,  7,  7,  7,  7,  7,237,237,237,237,237,237,237,237,
-      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,237,237,237,237,237,237,
+      7,  7,  7,  7,  7,  7,  7,  7,236,236,236,236,236,236,236,236,
+      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,236,236,236,236,236,236,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
     /* Block 205 */
-      7,  7,  7,  7,  7,  7,  7,  7,237,237,237,237,237,237,237,237,
+      7,  7,  7,  7,  7,  7,  7,  7,236,236,236,236,236,236,236,236,
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,237,237,
-     12, 12,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
+      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,236,236,
+     12, 12,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
     /* Block 206 */
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
@@ -3198,25 +3267,25 @@ static const uint8_t tmu_ucd_stage_two[26880] = {
      12, 12, 12, 12, 12, 12,  7, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-     12, 12, 12, 12, 12, 12, 12, 12, 12,237, 12, 12, 12, 12, 12, 12,
+     12, 12, 12, 12, 12, 12, 12, 12, 12,236, 12, 12, 12, 12, 12, 12,
     /* Block 207 */
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-     12, 12, 12, 12,237,237,237,237,237,237,237,237,237,237,237,237,
-     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,237,237,
-     12, 12, 12, 12, 12,237,237,237, 12, 12, 12,237,237,237,237,237,
+     12, 12, 12, 12,236,236,236,236,236,236,236,236,236,236,236,236,
+     12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,236,236,
+     12, 12, 12, 12, 12,236,236,236, 12, 12, 12,236,236,236,236,236,
     /* Block 208 */
-     12, 12, 12, 12, 12, 12, 12,237,237,237,237,237,237,237,237,237,
+     12, 12, 12, 12, 12, 12, 12,236,236,236,236,236,236,236,236,236,
      12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-     12, 12, 12, 12, 12, 12, 12, 12, 12,237,237,237,237,237,237,237,
-     12, 12, 12, 12, 12, 12, 12,237,237,237,237,237,237,237,237,237,
-     12, 12, 12,237,237,237,237,237,237,237,237,237,237,237,237,237,
-     12, 12, 12, 12, 12, 12, 12,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
-    237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,237,
+     12, 12, 12, 12, 12, 12, 12, 12, 12,236,236,236,236,236,236,236,
+     12, 12, 12, 12, 12, 12, 12,236,236,236,236,236,236,236,236,236,
+     12, 12, 12,236,236,236,236,236,236,236,236,236,236,236,236,236,
+     12, 12, 12, 12, 12, 12, 12,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
+    236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,236,
     /* Block 209 */
       7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
       7,  7,  7,  0,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
@@ -3264,29 +3333,25 @@ static uint16_t tmu_get_stage_one_value_internal(uint32_t index) {
     if (index >= 8704) return 210;
     if (index < 1025) return tmu_ucd_stage_one[index];
     switch (index) {
-        case 1357: return 250;
+        case 1357: return 247;
         case 1358: return 220;
-        case 1390: return 251;
-        case 1392: return 252;
-        case 1437: return 253;
-        case 1495: return 254;
+        case 1390: return 248;
+        case 1392: return 249;
+        case 1437: return 250;
+        case 1495: return 251;
         case 1520: return 214;
         case 1521: return 214;
         case 1522: return 214;
         case 1523: return 214;
-        case 1524: return 255;
+        case 1524: return 252;
         case 1536: return 220;
-        case 1574: return 256;
-        case 7168: return 257;
-        case 7169: return 258;
-        case 7170: return 259;
-        case 7171: return 260;
-        case 7680: return 222;
-        case 8191: return 261;
-        case 8192: return 222;
-        case 8703: return 261;
+        case 1574: return 253;
+        case 7168: return 254;
+        case 7169: return 255;
+        case 7170: return 256;
+        case 7171: return 257;
     }
-    if (index >= 7172 && index < 7200) return 258;
+    if (index >= 7172 && index < 7200) return 255;
     return 210;
 }
 
@@ -3310,46 +3375,42 @@ static uint8_t tmu_get_stage_two_value_internal(uint32_t block_index,
         case 9: return (offset == 22) ? 0 : 7;
         case 10: return (offset == 0) ? 13 : 0;
         case 11: return (offset == 124) ? 13 : 0;
-        case 12: return (offset == 0) ? 222 : 0;
-        case 13: return (offset < 127) ? 0 : 222;
-        case 14: return (offset >= 1 && offset < 127) ? 0 : 222;
-        case 15: return (offset >= 110 && offset < 112) ? 0 : 13;
-        case 16: return (offset < 90) ? 13 : 0;
-        case 17: return (offset < 123) ? 13 : 0;
-        case 18: return (offset < 73) ? 13 : 0;
-        case 19: return (offset >= 96 && offset < 127) ? 8 : 0;
-        case 20: return (offset < 26) ? 13 : 0;
-        case 21: return (offset < 68) ? 13 : 0;
-        case 22: return (offset < 71) ? 13 : 0;
-        case 23: return (offset < 16) ? 13 : 0;
-        case 24: return (offset == 119) ? 13 : 0;
-        case 25: return (offset < 86) ? 13 : 0;
-        case 26: return (offset == 0 || offset == 8) ? 13 : 0;
-        case 27: return (offset < 124) ? 13 : 0;
-        case 28: return (offset < 118) ? 7 : 0;
-        case 29: return (offset >= 96 && offset < 116) ? 8 : 0;
-        case 30: return (offset < 113) ? 0 : 8;
-        case 31: return (offset >= 44 && offset < 48) ? 237 : 12;
-        case 32: return 237;
-        case 33: return 12;
-        case 34: return (offset < 123) ? 12 : 239;
-        case 35: return (offset >= 62 && offset < 70) ? 7 : 12;
-        case 36: return (offset < 80) ? 12 : 7;
-        case 37: return (offset < 116) ? 7 : 237;
-        case 38: return (offset == 76) ? 237 : 12;
-        case 39: return (offset < 126) ? 237 : 0;
-        case 40: return (offset == 93) ? 13 : 0;
-        case 41: return (offset == 52 || offset == 64) ? 13 : 0;
-        case 42: return (offset == 29 || offset == 32) ? 13 : 0;
-        case 43: return (offset == 33 || offset == 48) ? 13 : 0;
-        case 44: return (offset == 96) ? 13 : 0;
-        case 45: return (offset < 30) ? 13 : 0;
-        case 46: return (offset == 74) ? 13 : 0;
-        case 47: return (offset < 32) ? 1 : 183;
-        case 48: return 1;
-        case 49: return 47;
-        case 50: return (offset < 112) ? 47 : 1;
-        case 51: return (offset == 125) ? 222 : 0;
+        case 12: return (offset >= 110 && offset < 112) ? 0 : 13;
+        case 13: return (offset < 90) ? 13 : 0;
+        case 14: return (offset < 123) ? 13 : 0;
+        case 15: return (offset < 73) ? 13 : 0;
+        case 16: return (offset >= 96 && offset < 127) ? 8 : 0;
+        case 17: return (offset < 26) ? 13 : 0;
+        case 18: return (offset < 68) ? 13 : 0;
+        case 19: return (offset < 71) ? 13 : 0;
+        case 20: return (offset < 16) ? 13 : 0;
+        case 21: return (offset == 119) ? 13 : 0;
+        case 22: return (offset < 86) ? 13 : 0;
+        case 23: return (offset == 0 || offset == 8) ? 13 : 0;
+        case 24: return (offset < 124) ? 13 : 0;
+        case 25: return (offset < 118) ? 7 : 0;
+        case 26: return (offset >= 96 && offset < 116) ? 8 : 0;
+        case 27: return (offset < 113) ? 0 : 8;
+        case 28: return (offset >= 44 && offset < 48) ? 236 : 12;
+        case 29: return 236;
+        case 30: return 12;
+        case 31: return (offset < 123) ? 12 : 238;
+        case 32: return (offset >= 62 && offset < 70) ? 7 : 12;
+        case 33: return (offset < 80) ? 12 : 7;
+        case 34: return (offset < 116) ? 7 : 236;
+        case 35: return (offset == 76) ? 236 : 12;
+        case 36: return (offset < 126) ? 236 : 0;
+        case 37: return (offset == 93) ? 13 : 0;
+        case 38: return (offset == 52 || offset == 64) ? 13 : 0;
+        case 39: return (offset == 29 || offset == 32) ? 13 : 0;
+        case 40: return (offset == 33 || offset == 48) ? 13 : 0;
+        case 41: return (offset == 96) ? 13 : 0;
+        case 42: return (offset < 30) ? 13 : 0;
+        case 43: return (offset == 74) ? 13 : 0;
+        case 44: return (offset < 32) ? 1 : 183;
+        case 45: return 1;
+        case 46: return 47;
+        case 47: return (offset < 112) ? 47 : 1;
         default: return 0;
     }
 }
@@ -3516,7 +3577,7 @@ TMU_UCD_DEF tmu_ucd_case_info_enum tmu_ucd_get_case_info(uint32_t codepoint) {
 		#define TMU_STRCHRW tmu_strchrw
 	#endif
 
-	#define TMU_WCSLEN(str) lstrlenW((str))
+	#define TMU_WCSLEN(str) (size_t)lstrlenW((str))
 #endif /* defined(TMU_USE_WINDOWS_H) */
 /* clang-format on */
 #define TMU_WIDEN(x) ((uint32_t)((uint8_t)(x)))
@@ -4706,6 +4767,43 @@ TMU_DEF tmu_conversion_result tmu_utf16_from_utf8_ex(tmu_utf8_stream stream, tmu
     return result;
 }
 
+TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic(tmu_utf16_stream stream, tmu_contents* out) {
+    return tmu_utf8_from_utf16_dynamic_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL, /*replace_str_len=*/0,
+                                          /*nullterminate=*/TM_FALSE, /*is_sbo=*/TM_FALSE, out);
+}
+
+TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic_ex(tmu_utf16_stream stream, tmu_validate validate,
+                                                             const char* replace_str, tm_size_t replace_str_len,
+                                                             tm_bool nullterminate, tm_bool is_sbo, tmu_contents* out) {
+    TM_ASSERT(out);
+    tmu_conversion_result conv_result = tmu_utf8_from_utf16_ex(stream, validate, replace_str, replace_str_len,
+                                                               nullterminate, out->data, out->capacity);
+    if (conv_result.ec == TM_OK) {
+        out->size = conv_result.size;
+    } else if (conv_result.ec == TM_ERANGE) {
+        void* new_data = TM_NULL;
+        if (is_sbo || out->data == TM_NULL) {
+            new_data = TMU_MALLOC(conv_result.size * sizeof(char), sizeof(char));
+        } else {
+            new_data = TMU_REALLOC(out->data, out->capacity * sizeof(char), sizeof(char),
+                                   conv_result.size * sizeof(char), sizeof(char));
+        }
+        if (!new_data) {
+            conv_result.ec = TM_ENOMEM;
+        } else {
+            out->data = (char*)new_data;
+            out->size = 0;
+            out->capacity = conv_result.size;
+            conv_result = tmu_utf8_from_utf16_ex(stream, validate, replace_str, replace_str_len, nullterminate,
+                                                 out->data, out->capacity);
+            if (conv_result.ec == TM_OK) {
+                out->size = conv_result.size;
+            }
+        }
+    }
+    return conv_result;
+}
+
 TMU_DEF tm_size_t tmu_utf8_copy_truncated(const char* str, tm_size_t str_len, char* out, tm_size_t out_len) {
     TM_ASSERT(str || str_len == 0);
     TM_ASSERT(out || out_len == 0);
@@ -5389,10 +5487,16 @@ int main(int argc, char const* argv[]) {
 	    #include <errno.h> /* errno */
 
 	    #include <wchar.h>
+		#ifndef TMU_PLATFORM_UNIX
+			#include <io.h> /* Directory reading and _fileno. */
+		#endif
 	#endif /* !defined(TMU_TESTING) */
+	#ifdef TMU_USE_CONSOLE
+		#include<stdarg.h> /* Needed for tmu_printf and tmu_fprintf */
+	#endif
 #endif /* defined(TMU_USE_CRT) && !defined(TMU_USE_WINDOWS_H) */
 
-#if defined(_MSC_VER) || defined(TMU_TESTING_MSVC_CRT)
+#if defined(_MSC_VER) || defined(TMU_TESTING_MSVC_CRT) || (defined(__MINGW32__) && !defined(TMU_TESTING_UNIX))
 	#ifndef TMU_TEXT
 	    #define TMU_TEXT(x) L##x
 	#endif
@@ -5414,8 +5518,27 @@ int main(int argc, char const* argv[]) {
 
 #elif defined(TMU_PLATFORM_UNIX)
 	#ifndef TMU_TESTING
+		#if !defined(_XOPEN_SOURCE) || _XOPEN_SOURCE < 500
+            #ifdef _XOPEN_SOURCE
+                #undef _XOPEN_SOURCE
+            #endif
+            #define _XOPEN_SOURCE 500
+        #endif
+        #if !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 200112L
+            #ifdef _POSIX_C_SOURCE
+                #undef _POSIX_C_SOURCE
+            #endif
+            #define _POSIX_C_SOURCE 200112L
+        #endif
+        #ifndef _BSD_SOURCE
+            #define _BSD_SOURCE
+        #endif
 	    #include <unistd.h> /* getcwd */
+		#include <dirent.h> /* Directory reading. */
 	#endif /* !defined(TMU_TESTING) */
+	#ifdef TMU_USE_CONSOLE
+		#include<stdarg.h> /* Needed for tmu_printf and tmu_fprintf */
+	#endif
 
 	#ifndef TMU_TEXT
 	    #define TMU_TEXT(x) x
@@ -5446,8 +5569,14 @@ struct tmu_contents_struct;
 static void tmu_to_tmu_path(struct tmu_contents_struct* path, tm_bool is_dir);
 TMU_DEF tm_bool tmu_grow_by(struct tmu_contents_struct* contents, tm_size_t amount);
 
+#if defined(_WIN32) && !defined(TMU_TESTING_UNIX)
+struct tmu_platform_path_struct;
+static tm_bool tmu_internal_append_wildcard(struct tmu_platform_path_struct* dir, const tmu_tchar** out);
+#endif
+
 /* Platform Tests */
-#if defined(_MSC_VER) || defined(TMU_TESTING_MSVC_CRT)
+#if defined(_MSC_VER) || defined(TMU_TESTING_MSVC_CRT) || (defined(__MINGW32__) && !defined(TMU_TESTING_UNIX))
+
 
 #if defined(TMU_USE_CRT)
 static FILE* tmu_fopen_t(const tmu_tchar* filename, const tmu_tchar* mode) { return _wfopen(filename, mode); }
@@ -5458,11 +5587,20 @@ static FILE* tmu_freopen_t(const tmu_tchar* filename, const tmu_tchar* mode, FIL
 
 #if defined(TMU_USE_WINDOWS_H)
 
-typedef struct {
+typedef struct tmu_platform_path_struct {
     tmu_tchar* path;
     tmu_tchar sbo[TMU_SBO_SIZE];
     tm_size_t allocated_size;
 } tmu_platform_path;
+
+// WC_ERR_INVALID_CHARS exists only since Vista.
+#if (defined(WINVER) && WINVER >= 0x0600) || (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600)
+    #define TMU_TO_UTF8_FLAGS WC_ERR_INVALID_CHARS
+    #define TMU_FROM_UTF8_FLAGS MB_ERR_INVALID_CHARS
+#else
+    #define TMU_TO_UTF8_FLAGS 0
+    #define TMU_FROM_UTF8_FLAGS 0
+#endif
 
 static tm_errc tmu_winerror_to_errc(DWORD error, tm_errc def) {
     switch (error) {
@@ -5557,9 +5695,14 @@ static tm_errc tmu_winerror_to_errc(DWORD error, tm_errc def) {
 }
 
 static tm_bool tmu_to_platform_path_n(const char* path, tm_size_t size, tmu_platform_path* out) {
-    if (size <= 0) return TM_TRUE;
+    if (size <= 0) {
+        out->path = out->sbo;
+        out->sbo[0] = 0;
+        out->allocated_size = 0;
+        return TM_TRUE;
+    }
 
-    int required_size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, (int)size, TM_NULL, 0);
+    int required_size = MultiByteToWideChar(CP_UTF8, TMU_FROM_UTF8_FLAGS, path, (int)size, TM_NULL, 0);
     if (required_size <= 0) return TM_FALSE; /* Size was not zero, so conversion failed. */
     ++required_size;                         /* Extra space for null-terminator. */
 
@@ -5573,7 +5716,7 @@ static tm_bool tmu_to_platform_path_n(const char* path, tm_size_t size, tmu_plat
     }
 
     int converted_size =
-        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, (int)size, out->path, (int)required_size);
+        MultiByteToWideChar(CP_UTF8, TMU_FROM_UTF8_FLAGS, path, (int)size, out->path, (int)required_size);
     /* Always nullterminate, since MultiByteToWideChar doesn't null-terminate when the supplying it a length param. */
     if (required_size) {
         if (converted_size <= 0) {
@@ -5639,6 +5782,7 @@ static tmu_exists_result tmu_directory_exists_t(const WCHAR* dir) {
     return result;
 }
 
+TM_STATIC_ASSERT(sizeof(tmu_file_time) == sizeof(FILETIME), invalid_file_time_size);
 static tmu_file_timestamp_result tmu_file_timestamp_t(const WCHAR* filename) {
     tmu_file_timestamp_result result = {0, TM_OK};
 
@@ -5648,7 +5792,6 @@ static tmu_file_timestamp_result tmu_file_timestamp_t(const WCHAR* filename) {
         return result;
     }
 
-    TM_STATIC_ASSERT(sizeof(result.file_time) == sizeof(fileAttr.ftLastWriteTime), invalid_file_time_size);
     TMU_MEMCPY(&result.file_time, &fileAttr.ftLastWriteTime, sizeof(fileAttr.ftLastWriteTime));
     return result;
 }
@@ -5861,7 +6004,7 @@ static tm_errc tmu_delete_directory_t(const WCHAR* dir) {
 static tmu_contents_result tmu_to_utf8(const WCHAR* str, tm_size_t extra_size) {
     tmu_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
     if (str && *str) {
-        int size = WideCharToMultiByte(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, TM_NULL, 0, TM_NULL, TM_NULL);
+        int size = WideCharToMultiByte(CP_UTF8, TMU_TO_UTF8_FLAGS, str, -1, TM_NULL, 0, TM_NULL, TM_NULL);
         if (size <= 0) {
             result.ec = tmu_winerror_to_errc(GetLastError(), TM_EINVAL);
         } else {
@@ -5873,7 +6016,7 @@ static tmu_contents_result tmu_to_utf8(const WCHAR* str, tm_size_t extra_size) {
             } else {
                 result.contents.capacity = size;
 
-                int real_size = WideCharToMultiByte(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, result.contents.data, size,
+                int real_size = WideCharToMultiByte(CP_UTF8, TMU_TO_UTF8_FLAGS, str, -1, result.contents.data, size,
                                                     TM_NULL, TM_NULL);
                 result.contents.size = (tm_size_t)real_size;
 
@@ -5919,6 +6062,189 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     if (result.ec == TM_OK) tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_TRUE);
     TMU_FREE(dir, len * sizeof(WCHAR), sizeof(WCHAR));
     return result;
+}
+
+TMU_DEF tmu_contents_result tmu_module_filename() {
+    tmu_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
+
+    WCHAR sbo[MAX_PATH];
+
+    WCHAR* filename = sbo;
+    DWORD filename_size = MAX_PATH;
+
+    DWORD size = GetModuleFileNameW(TM_NULL, filename, filename_size);
+    DWORD last_error = GetLastError();
+    if (size > 0 && size >= filename_size && (last_error == ERROR_INSUFFICIENT_BUFFER || last_error == ERROR_SUCCESS)) {
+        WCHAR* new_filename = (WCHAR*)TMU_MALLOC(filename_size * sizeof(WCHAR) * 2, sizeof(WCHAR));
+        if (!new_filename) {
+            result.ec = TM_ENOMEM;
+            return result;
+        }
+        filename = new_filename;
+        filename_size *= 2;
+
+        for (;;) {
+            size = GetModuleFileNameW(TM_NULL, filename, filename_size);
+            last_error = GetLastError();
+            if (last_error != ERROR_INSUFFICIENT_BUFFER && last_error != ERROR_SUCCESS) {
+                break;
+            }
+            if (size >= filename_size) {
+                new_filename = (WCHAR*)TMU_REALLOC(filename, filename_size * sizeof(WCHAR), sizeof(WCHAR),
+                                                   filename_size * sizeof(WCHAR) * 2, sizeof(WCHAR));
+                if (!new_filename) {
+                    result.ec = TM_ENOMEM;
+                    break;
+                }
+                filename = new_filename;
+                filename_size *= 2;
+                continue;
+            }
+            break;
+        }
+    }
+
+    if (size == 0) result.ec = tmu_winerror_to_errc(last_error, TM_EIO);
+
+    if (result.ec == TM_OK) {
+        TM_ASSERT(size < filename_size);
+        filename[size] = 0;  // Force nulltermination.
+        result = tmu_to_utf8(filename, 0);
+    }
+    if (result.ec == TM_OK) tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_FALSE);
+
+    if (filename != sbo) {
+        TMU_FREE(filename, filename_size * sizeof(WCHAR), sizeof(WCHAR));
+    }
+    return result;
+}
+
+struct tmu_internal_find_data {
+    HANDLE handle;
+    WIN32_FIND_DATAW data;
+    BOOL has_data;
+    tm_errc next_ec;
+};
+
+static tmu_opened_dir tmu_open_directory_t(tmu_platform_path* dir) {
+    TM_ASSERT(dir);
+
+    tmu_opened_dir result;
+    ZeroMemory(&result, sizeof(result));
+
+    const WCHAR* path = TM_NULL;
+    if (!tmu_internal_append_wildcard(dir, &path)) {
+        result.ec = TM_ENOMEM;
+        return result;
+    }
+
+    struct tmu_internal_find_data* find_data
+        = (struct tmu_internal_find_data*)TMU_MALLOC(sizeof(struct tmu_internal_find_data), sizeof(void*));
+    if (!find_data) {
+        result.ec = TM_ENOMEM;
+        return result;
+    }
+
+    ZeroMemory(find_data, sizeof(struct tmu_internal_find_data));
+    find_data->handle = FindFirstFileW(path, &find_data->data);
+    if (find_data->handle == INVALID_HANDLE_VALUE) {
+        result.ec = tmu_winerror_to_errc(GetLastError(), TM_EIO);
+        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+        return result;
+    }
+
+    find_data->has_data = 1;
+    result.internal = find_data;
+    return result;
+}
+
+TMU_DEF void tmu_close_directory(tmu_opened_dir* dir) {
+    if (!dir) return;
+    if (dir->internal) {
+        struct tmu_internal_find_data* find_data = (struct tmu_internal_find_data*)dir->internal;
+        if (find_data->handle != INVALID_HANDLE_VALUE) {
+            FindClose(find_data->handle);
+        }
+        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+    }
+    tmu_destroy_contents(&dir->internal_buffer);
+    ZeroMemory(dir, sizeof(tmu_opened_dir));
+}
+
+TMU_DEF const tmu_read_directory_result* tmu_read_directory(tmu_opened_dir* dir) {
+    if (!dir) return TM_NULL;
+    if (dir->ec != TM_OK) return TM_NULL;
+    if (!dir->internal) return TM_NULL;
+
+    struct tmu_internal_find_data* find_data = (struct tmu_internal_find_data*)dir->internal;
+    if (find_data->handle == INVALID_HANDLE_VALUE) {
+        dir->ec = TM_EPERM;
+        return TM_NULL;
+    }
+    if (!find_data->has_data) {
+        dir->ec = find_data->next_ec;
+        return TM_NULL;
+    }
+
+    /* Skip "." and ".." entries. */
+    while (find_data->has_data
+           && ((find_data->data.cFileName[0] == '.' && find_data->data.cFileName[1] == 0)
+               || (find_data->data.cFileName[0] == '.' && find_data->data.cFileName[1] == '.'
+                   && find_data->data.cFileName[2] == 0))) {
+        find_data->has_data = FindNextFileW(find_data->handle, &find_data->data);
+        if (!find_data->has_data) {
+            DWORD last_error = GetLastError();
+            if (last_error != ERROR_NO_MORE_FILES) dir->ec = tmu_winerror_to_errc(last_error, TM_EPERM);
+            return TM_NULL;
+        }
+    }
+
+    ZeroMemory(&dir->internal_result, sizeof(tmu_read_directory_result));
+    int required_size = WideCharToMultiByte(CP_UTF8, TMU_TO_UTF8_FLAGS, find_data->data.cFileName, -1, TM_NULL, 0,
+                                            TM_NULL, TM_NULL);
+    if (required_size <= 0) {
+        dir->ec = tmu_winerror_to_errc(GetLastError(), TM_EPERM);
+        return TM_NULL;
+    }
+
+    // Additional size for trailing slash and nullterminator.
+    required_size += 1 + ((find_data->data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0);
+    if (!dir->internal_buffer.data) {
+        dir->internal_buffer.data = (char*)TMU_MALLOC((size_t)required_size, sizeof(char));
+        if (!dir->internal_buffer.data) {
+            dir->ec = TM_ENOMEM;
+            return TM_NULL;
+        }
+        dir->internal_buffer.capacity = (tm_size_t)required_size;
+    } else if (dir->internal_buffer.capacity < (tm_size_t)required_size) {
+        dir->internal_buffer.size = 0;
+        if (!tmu_grow_by(&dir->internal_buffer, (tm_size_t)required_size)) {
+            dir->ec = TM_ENOMEM;
+            return TM_NULL;
+        }
+    }
+    TM_ASSERT(dir->internal_buffer.data);
+    int real_size = WideCharToMultiByte(CP_UTF8, TMU_TO_UTF8_FLAGS, find_data->data.cFileName, -1,
+                                        dir->internal_buffer.data, (int)dir->internal_buffer.capacity, TM_NULL, TM_NULL);
+    if (real_size <= 0 || real_size >= required_size) {
+        dir->ec = tmu_winerror_to_errc(GetLastError(), TM_EPERM);
+        return TM_NULL;
+    }
+
+    TM_ASSERT((tm_size_t)real_size < dir->internal_buffer.capacity);
+    dir->internal_buffer.data[real_size] = 0; /* Always nullterminate. */
+    dir->internal_buffer.size = (tm_size_t)real_size;
+    tmu_to_tmu_path(&dir->internal_buffer, /*is_dir=*/((find_data->data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0));
+
+    dir->internal_result.is_file = (find_data->data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+    dir->internal_result.name = dir->internal_buffer.data;
+
+    find_data->has_data = FindNextFileW(find_data->handle, &find_data->data);
+    if (!find_data->has_data) {
+        DWORD last_error = GetLastError();
+        if (last_error != ERROR_NO_MORE_FILES) find_data->next_ec = tmu_winerror_to_errc(last_error, TM_EPERM);
+    }
+    return &dir->internal_result;
 }
 
 #if !defined(TMU_NO_SHELLAPI)
@@ -5997,29 +6323,34 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
         return written == (DWORD)len;
     }
 
-    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
-    tmu_conversion_result conv_result =
-        tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
-                               /*replace_str_len=*/0,
-                               /*nullterminate=*/TM_FALSE, /*out=*/TM_NULL, /*out_len=*/0);
-    if (conv_result.ec != TM_ERANGE) return conv_result.ec == TM_OK;
-
     tmu_char16 sbo[TMU_SBO_SIZE];
-    tmu_char16* wide = sbo;
-    if (conv_result.size > TMU_SBO_SIZE) {
-        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
-        if (!wide) return TM_FALSE;
-    }
 
-    conv_result = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
+    tmu_conversion_result conv_result
+        = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                                 /*replace_str_len=*/0,
+                                 /*nullterminate=*/TM_FALSE, /*out=*/sbo, /*out_len=*/TMU_SBO_SIZE);
+
+    tmu_char16* wide = sbo;
+    if (conv_result.ec == TM_ERANGE) {
+        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        if (wide) {
+            tmu_conversion_result new_result
+                = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
                                          /*replace_str_len=*/0,
                                          /*nullterminate=*/TM_FALSE, wide, conv_result.size);
+            conv_result.ec = new_result.ec;
+        } else {
+            conv_result.ec = TM_ENOMEM;
+        }
+    }
+
     if (conv_result.ec == TM_OK) {
         BOOL result = WriteConsoleW(tmu_console_state[handle].handle, wide, (DWORD)conv_result.size, &written, TM_NULL);
         if (!result) written = 0;
     }
 
-    if (wide != sbo) {
+    if (wide && wide != sbo) {
         TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
     }
     return written == (DWORD)conv_result.size;
@@ -6030,7 +6361,7 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
 #elif defined(TMU_USE_CRT)
 
 #define TMU_IMPLEMENT_CRT
-typedef struct {
+typedef struct tmu_platform_path_struct {
     tmu_tchar* path;
     tmu_tchar sbo[TMU_SBO_SIZE];
     tm_size_t allocated_size;
@@ -6055,6 +6386,7 @@ static void tmu_destroy_platform_path(tmu_platform_path* path);
 static tm_bool tmu_to_platform_path_internal(tmu_utf8_stream path_stream, tmu_platform_path* out) {
     TM_ASSERT(out);
     out->path = out->sbo;
+    out->sbo[0] = 0;
     out->allocated_size = 0;
 
     tm_size_t buffer_size = TMU_SBO_SIZE;
@@ -6128,7 +6460,7 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
                                        /*replace_str_len=*/0,
                                        /*nullterminate=*/TM_TRUE, result.contents.data, result.contents.capacity);
             TM_ASSERT(conv_result.ec == TM_OK);
-            TM_ASSERT(conv_result.size + 2 < result.contents.capacity);
+            TM_ASSERT(conv_result.size + 2 <= result.contents.capacity);
             result.contents.size = conv_result.size;
             tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_TRUE);
         }
@@ -6139,50 +6471,265 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     return result;
 }
 
+struct tmu_internal_find_data {
+    intptr_t handle;
+    struct _wfinddata64_t data;
+    tm_bool has_data;
+    tm_errc next_ec;
+};
+
+TMU_DEF tmu_opened_dir tmu_open_directory_t(tmu_platform_path* dir) {
+    tmu_opened_dir result;
+    memset(&result, 0, sizeof(tmu_opened_dir));
+
+    const tmu_char16* path = TM_NULL;
+    if (!tmu_internal_append_wildcard(dir, &path)) {
+        result.ec = TM_ENOMEM;
+        return result;
+    }
+
+    struct tmu_internal_find_data* find_data
+        = (struct tmu_internal_find_data*)TMU_MALLOC(sizeof(struct tmu_internal_find_data), sizeof(void*));
+    if (!find_data) {
+        result.ec = TM_ENOMEM;
+        return result;
+    }
+
+    memset(find_data, 0, sizeof(struct tmu_internal_find_data));
+    find_data->handle = _wfindfirst64(path, &find_data->data);
+    if (find_data->handle == -1) {
+        result.ec = (tm_errc)errno;
+        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+        return result;
+    }
+    find_data->has_data = TM_TRUE;
+    result.internal = find_data;
+    return result;
+}
+
+TMU_DEF void tmu_close_directory(tmu_opened_dir* dir) {
+    if (!dir) return;
+    if (dir->internal) {
+        struct tmu_internal_find_data* find_data = (struct tmu_internal_find_data*)dir->internal;
+        if (find_data->handle != -1) {
+            _findclose(find_data->handle);
+        }
+        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+    }
+    tmu_destroy_contents(&dir->internal_buffer);
+    memset(dir, 0, sizeof(tmu_opened_dir));
+}
+
+TMU_DEF const tmu_read_directory_result* tmu_read_directory(tmu_opened_dir* dir) {
+    if (!dir) return TM_NULL;
+    if (dir->ec != TM_OK) return TM_NULL;
+    if (!dir->internal) return TM_NULL;
+
+    struct tmu_internal_find_data* find_data = (struct tmu_internal_find_data*)dir->internal;
+    if (find_data->handle == -1) {
+        dir->ec = TM_EPERM;
+        return TM_NULL;
+    }
+    if (!find_data->has_data) {
+        dir->ec = find_data->next_ec;
+        return TM_NULL;
+    }
+
+    /* Skip "." and ".." entries. */
+    while (find_data->has_data
+           && ((find_data->data.name[0] == '.' && find_data->data.name[1] == 0)
+               || (find_data->data.name[0] == '.' && find_data->data.name[1] == '.' && find_data->data.name[2] == 0))) {
+        find_data->has_data = (_wfindnext64(find_data->handle, &find_data->data) == 0);
+        if (!find_data->has_data) {
+            int last_error = errno;
+            if (last_error != ENOENT) dir->ec = (tm_errc)last_error;
+            return TM_NULL;
+        }
+    }
+
+    memset(&dir->internal_result, 0, sizeof(tmu_read_directory_result));
+    tmu_utf16_stream stream = tmu_utf16_make_stream(find_data->data.name);
+    tmu_conversion_result conv_result
+        = tmu_utf8_from_utf16_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL, 0, /*nullterminate=*/TM_TRUE,
+                                 dir->internal_buffer.data, dir->internal_buffer.capacity);
+    if (conv_result.ec == TM_ERANGE) {
+        if (conv_result.size < 260) conv_result.size = 260;
+        if (!dir->internal_buffer.data) {
+            dir->internal_buffer.data = (char*)TMU_MALLOC((size_t)conv_result.size, sizeof(char));
+            if (!dir->internal_buffer.data) {
+                dir->ec = TM_ENOMEM;
+                return TM_NULL;
+            }
+            dir->internal_buffer.capacity = conv_result.size;
+        } else if (dir->internal_buffer.capacity < conv_result.size) {
+            dir->internal_buffer.size = 0;
+            if (!tmu_grow_by(&dir->internal_buffer, conv_result.size)) {
+                dir->ec = TM_ENOMEM;
+                return TM_NULL;
+            }
+        }
+        TM_ASSERT(dir->internal_buffer.data);
+        conv_result
+            = tmu_utf8_from_utf16_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL, 0, /*nullterminate=*/TM_TRUE,
+                                     dir->internal_buffer.data, dir->internal_buffer.capacity);
+    }
+    if (conv_result.ec != TM_OK) {
+        dir->ec = conv_result.ec;
+        return TM_NULL;
+    }
+
+    TM_ASSERT(conv_result.size < dir->internal_buffer.capacity);
+    dir->internal_buffer.data[conv_result.size] = 0; /* Always nullterminate. */
+    dir->internal_buffer.size = conv_result.size;
+
+    dir->internal_result.is_file = (find_data->data.attrib & _A_SUBDIR) == 0;
+    dir->internal_result.name = dir->internal_buffer.data;
+
+    find_data->has_data = (_wfindnext64(find_data->handle, &find_data->data) == 0);
+    if (!find_data->has_data) {
+        int last_error = errno;
+        if (last_error != ENOENT) find_data->next_ec = (tm_errc)last_error;
+    }
+    return &dir->internal_result;
+}
+
+/* For mingw on Windows. It could be that these are not declared, but since mingw links against microsoft libraries,
+we should be able to declare them ourselves.
+NOTE: We don't use _get_wpgmptr, because it needs wmain to be used. This solution should work for main() entry points also. */
+#if !defined(_MSC_VER) && !defined(__wargv) && !defined(__argv)
+    #ifdef __cplusplus
+        extern "C" wchar_t** __wargv;
+        extern "C" char** __argv;
+    #else
+        extern char** __argv;
+        extern wchar_t** __wargv;
+    #endif
+#endif
+
+TMU_DEF tmu_contents_result tmu_module_filename() {
+    tmu_contents_result result = {{TM_NULL, 0, 0}, TM_EPERM};
+
+#if 0
+    wchar_t* module_filename = TM_NULL;
+    result.ec = (tm_errc)_get_wpgmptr(&module_filename);
+    if (result.ec == TM_OK && module_filename) {
+        tmu_utf16_stream stream = tmu_utf16_make_stream(module_filename);
+        tmu_conversion_result conv_result
+            = tmu_utf8_from_utf16_dynamic_ex(stream, tmu_validate_error,
+                                             /*replace_str=*/TM_NULL, /*replace_str_len=*/0,
+                                             /*nullterminate=*/TM_TRUE, /*is_sbo=*/TM_FALSE, &result.contents);
+        result.ec = conv_result.ec;
+    }
+#else
+    if (__wargv && __wargv[0]) {
+        tmu_utf16_stream stream = tmu_utf16_make_stream(__wargv[0]);
+        tmu_conversion_result conv_result
+            = tmu_utf8_from_utf16_dynamic_ex(stream, tmu_validate_error,
+                                             /*replace_str=*/TM_NULL, /*replace_str_len=*/0,
+                                             /*nullterminate=*/TM_TRUE, /*is_sbo=*/TM_FALSE, &result.contents);
+        result.ec = conv_result.ec;
+    }
+
+    if (result.contents.data == TM_NULL && __argv && __argv[0]) {
+        size_t len = TMU_STRLEN(__argv[0]);
+        if (len == 0) {
+            result.ec = TM_EPERM;
+            return result;
+        }
+        char* data = (char*)TMU_MALLOC((len + 1), sizeof(char));
+        if (!data) {
+            result.ec = TM_ENOMEM;
+            return result;
+        }
+        TMU_MEMCPY(data, __argv[0], (len + 1) * sizeof(char));
+        result.ec = TM_OK;
+        result.contents.data = data;
+        result.contents.size = (tm_size_t)len;
+        result.contents.capacity = (tm_size_t)len + 1;
+    }
+#endif
+
+    if (result.ec == TM_OK) {
+        tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_FALSE);
+    }
+
+    return result;
+}
+
 #if defined(TMU_USE_CONSOLE)
 
+struct tmu_console_state_t {
+    FILE* stream;
+    tm_bool is_redirected_to_file;
+};
+
+static struct tmu_console_state_t tmu_console_state[3];
+
+#ifndef TMU_TESTING
 #include <fcntl.h>
-#include <io.h>
+#endif
 
 TMU_DEF void tmu_console_output_init() {
-    _setmode(_fileno(stdout), _O_U16TEXT);
-    _setmode(_fileno(stderr), _O_U16TEXT);
+    tmu_console_state[tmu_console_in].stream = stdin;
+    tmu_console_state[tmu_console_in].is_redirected_to_file = TM_FALSE;
+
+    tmu_console_state[tmu_console_out].stream = stdout;
+    tmu_console_state[tmu_console_out].is_redirected_to_file = !_isatty(_fileno(stdout));
+
+    tmu_console_state[tmu_console_err].stream = stderr;
+    tmu_console_state[tmu_console_err].is_redirected_to_file = !_isatty(_fileno(stderr));
+
+    if (!tmu_console_state[tmu_console_out].is_redirected_to_file) {
+        _setmode(_fileno(stdout), _O_U16TEXT);
+    }
+    if (!tmu_console_state[tmu_console_err].is_redirected_to_file) {
+        _setmode(_fileno(stderr), _O_U16TEXT);
+    }
 }
+
 TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str) {
     TM_ASSERT(str);
-    return tmu_console_output_n(handle, str, TMU_STRLEN(str));
+    return tmu_console_output_n(handle, str, (tm_size_t)TMU_STRLEN(str));
 }
+
 TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len) {
     TM_ASSERT(str || len == 0);
     if (handle <= tmu_console_in || handle > tmu_console_err) return TM_FALSE;
     if (!len) return TM_TRUE;
 
-    FILE* files[3] = {stdin, stdout, stderr};
-
-    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
-    tmu_conversion_result conv_result =
-        tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
-                               /*replace_str_len=*/0,
-                               /*nullterminate=*/TM_TRUE, /*out=*/TM_NULL, /*out_len=*/0);
-    if (conv_result.ec != TM_ERANGE) return conv_result.ec == TM_OK;
-
-    tm_size_t written = 0;
-    tmu_char16 sbo[TMU_SBO_SIZE];
-    tmu_char16* wide = sbo;
-    if (conv_result.size > TMU_SBO_SIZE) {
-        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
-        if (!wide) return TM_FALSE;
+    if (tmu_console_state[handle].is_redirected_to_file) {
+        return fwrite(str, sizeof(char), (size_t)len, tmu_console_state[handle].stream) == (size_t)len;
     }
 
-    conv_result = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+    tmu_char16 sbo[TMU_SBO_SIZE];
+
+    tmu_utf8_stream stream = tmu_utf8_make_stream_n(str, len);
+    tmu_conversion_result conv_result
+        = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
+                                 /*replace_str_len=*/0,
+                                 /*nullterminate=*/TM_TRUE, /*out=*/sbo, /*out_len=*/TMU_SBO_SIZE);
+
+    tmu_char16* wide = sbo;
+    if (conv_result.ec == TM_ERANGE) {
+        wide = (tmu_char16*)TMU_MALLOC(conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        if (wide) {
+            tmu_conversion_result new_result
+                = tmu_utf16_from_utf8_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL,
                                          /*replace_str_len=*/0,
                                          /*nullterminate=*/TM_TRUE, wide, conv_result.size);
+            conv_result.ec = new_result.ec;
+        } else {
+            conv_result.ec = TM_ENOMEM;
+        }
+    }
+
+    tm_size_t written = 0;
     if (conv_result.ec == TM_OK) {
-        int print_result = fwprintf(files[handle], L"%ls", wide);
+        int print_result = fwprintf(tmu_console_state[handle].stream, TMU_TEXT("%ls"), wide);
         if (print_result >= 0) written = (tm_size_t)print_result;
     }
 
-    if (wide != sbo) {
+    if (wide && wide != sbo) {
         TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
     }
     return written == conv_result.size;
@@ -6195,14 +6742,13 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
 #endif /* defined(TMU_USE_WINDOWS_H) || defined(TMU_USE_CRT) */
 
 #elif defined(TMU_PLATFORM_UNIX)
-#undef TMU_PLATFORM_UNIX
 
 #ifndef TMU_USE_CRT
 #error tm_unicode.h needs TMU_USE_CRT on this platform.
 #endif
 
 #define TMU_IMPLEMENT_CRT
-typedef struct {
+typedef struct tmu_platform_path_struct {
     const tmu_tchar* path;
     tmu_tchar sbo[TMU_SBO_SIZE];
     /* Not the length of the path string, but the number of bytes allocated, if path is malloced. */
@@ -6284,12 +6830,140 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
     return result;
 }
 
+TMU_DEF tmu_contents_result tmu_module_filename() {
+    tmu_contents_result result = {{TM_NULL, 0, 0}, TM_OK};
+
+    char sbo[260];
+
+    char* filename = sbo;
+    ssize_t filename_size = 260;
+
+    ssize_t size = readlink("/proc/self/exe", filename, filename_size);
+    int last_error = errno;
+    if (size >= filename_size) {
+        filename_size *= 2;
+        char* new_filename = (char*)TMU_MALLOC(filename_size * sizeof(char), sizeof(char));
+        if (!new_filename) {
+            result.ec = TM_ENOMEM;
+            return result;
+        }
+        filename = new_filename;
+
+        for (;;) {
+            size = readlink("/proc/self/exe", filename, filename_size);
+            last_error = errno;
+            if (size < 0) break;
+            if (size >= filename_size) {
+                new_filename = (char*)TMU_REALLOC(filename, filename_size * sizeof(char), sizeof(char),
+                                                  filename_size * sizeof(char) * 2, sizeof(char));
+                if (!new_filename) {
+                    result.ec = TM_ENOMEM;
+                    break;
+                }
+                filename = new_filename;
+                filename_size *= 2;
+                continue;
+            }
+            break;
+        }
+    }
+
+    if (size < 0) result.ec = (tm_errc)last_error;
+
+    if (result.ec == TM_OK) {
+        if (filename == sbo) {
+            filename_size = size + 1;
+            result.contents.data = (char*)TMU_MALLOC(filename_size * sizeof(char), sizeof(char));
+            if (!result.contents.data) {
+                result.ec = TM_ENOMEM;
+                return result;
+            }
+            TMU_MEMCPY(result.contents.data, filename, size * sizeof(char));
+            result.contents.data[size] = 0;  // Force nulltermination.
+        } else {
+            TM_ASSERT(size < filename_size);
+            filename[size] = 0;  // Force nulltermination.
+            result.contents.data = filename;
+        }
+        result.contents.size = (tm_size_t)size;
+        result.contents.capacity = (tm_size_t)filename_size;
+    } else {
+        TMU_FREE(filename, filename_size * sizeof(char), sizeof(char));
+    }
+    return result;
+}
+
+#if 0
+struct tmu_internal_find_data {
+    DIR* handle;
+    char* dir;
+    char* prefix;
+    char* suffix;
+};
+#endif
+
+TMU_DEF tmu_opened_dir tmu_open_directory_t(tmu_platform_path* dir) {
+    TM_ASSERT(dir);
+    TM_ASSERT(dir->path);
+
+    tmu_opened_dir result;
+    memset(&result, 0, sizeof(tmu_opened_dir));
+
+    const char* path = dir->path;
+    if (!path || *path == 0) path = ".";
+
+    DIR* handle = opendir(path);
+    if (!handle) {
+        result.ec = errno;
+        return result;
+    }
+
+    result.internal = handle;
+    return result;
+}
+
+TMU_DEF void tmu_close_directory(tmu_opened_dir* dir) {
+    if (!dir) return;
+    if (dir->internal) {
+        closedir((DIR*)dir->internal);
+    }
+    memset(dir, 0, sizeof(tmu_opened_dir));
+}
+
+TMU_DEF const tmu_read_directory_result* tmu_read_directory(tmu_opened_dir* dir) {
+    if (!dir) return TM_NULL;
+    if (!dir->internal) return TM_NULL;
+    DIR* handle = (DIR*)dir->internal;
+
+    struct dirent* entry = TM_NULL;
+    for (;;) {
+        errno = 0;
+        entry = readdir(handle);
+        if (!entry) {
+            int last_error = errno;
+            if (last_error != 0) dir->ec = last_error;
+            memset(&dir->internal_result, 0, sizeof(tmu_read_directory_result));
+            return TM_NULL;
+        }
+
+        /* Skip "." and ".." entries. */
+        if ((entry->d_name[0] == '.' && entry->d_name[1] == 0)
+            || (entry->d_name[0] == '.' && entry->d_name[1] == '.' && entry->d_name[2] == 0))
+            continue;
+        break;
+    }
+
+    dir->internal_result.name = entry->d_name;
+    dir->internal_result.is_file = ((entry->d_type & DT_DIR) == 0);
+    return &dir->internal_result;
+}
+
 #if defined(TMU_USE_CONSOLE)
 
 TMU_DEF void tmu_console_output_init() {}
 TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str) {
     TM_ASSERT(str);
-    return tmu_console_output_n(handle, str, TMU_STRLEN(str));
+    return tmu_console_output_n(handle, str, (tm_size_t)TMU_STRLEN(str));
 }
 TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len) {
     TM_ASSERT(str || len == 0);
@@ -6297,7 +6971,7 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
     if (!len) return TM_TRUE;
 
     FILE* files[3] = {stdin, stdout, stderr};
-    return fwrite(str, sizeof(char), len, files[handle]) == (size_t)len;
+    return fwrite(str, sizeof(char), (size_t)len, files[handle]) == (size_t)len;
 }
 
 #endif
@@ -6592,6 +7266,128 @@ TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f) {
     if (f == stderr) return tmu_console_err;
     return tmu_console_invalid;
 }
+
+#if defined(TMU_PLATFORM_UNIX)
+TMU_DEF int tmu_printf(TMU_FORMAT_STRING(const char* format), ...) {
+    va_list args;
+    va_start(args, format);
+    int result = vprintf(format, args);
+    va_end(args);
+    return result;
+}
+
+TMU_DEF int tmu_vprintf(const char* format, va_list args) {
+    return vprintf(format, args);
+}
+
+TMU_DEF int tmu_fprintf(FILE* stream, TMU_FORMAT_STRING(const char* format), ...) {
+    va_list args;
+    va_start(args, format);
+    int result = vfprintf(stream, format, args);
+    va_end(args);
+    return result;
+}
+
+TMU_DEF int tmu_vfprintf(FILE* stream, const char* format, va_list args) {
+    return vfprintf(stream, format, args);
+}
+
+#else
+
+static int tmu_internal_vsprintf(char* sbo, size_t sbo_size, char** out, const char* format, va_list args);
+
+#if (!defined(_MSC_VER) || _MSC_VER >= 1900 || defined(__clang__)) && !defined(TMU_TESTING_OLD_MSC)
+#define TMU_ALLOC_OFFSET 1
+// Use vsnprint if available
+static int tmu_internal_vsprintf(char* sbo, size_t sbo_size, char** out, const char* format, va_list args) {
+    va_list args_cp;
+    va_copy(args_cp, args);
+    int needed_size = vsnprintf(sbo, sbo_size, format, args_cp);
+    va_end(args_cp);
+    if (needed_size <= 0) return needed_size;
+    if ((size_t)needed_size < sbo_size) {
+        *out = sbo;
+        return needed_size;
+    }
+    *out = (char*)TMU_MALLOC((size_t)needed_size + 1, sizeof(char));
+    if (!*out) {
+        errno = ENOMEM;
+        return -1;
+    }
+    return vsnprintf(*out, needed_size + 1, format, args);
+}
+#else
+#define TMU_ALLOC_OFFSET 0
+// We are on an old version of MSVC so we need a workaround for non standard vsnprintf.
+static int tmu_internal_vsprintf(char* sbo, size_t sbo_size, char** out, const char* format, va_list args) {
+    va_list args_cp;
+    va_copy(args_cp, args);
+    int needed_size = _vscprintf(format, args_cp);
+    va_end(args_cp);
+    if (needed_size <= 0) return needed_size;
+    if ((size_t)needed_size <= sbo_size) {
+        *out = sbo;
+    } else {
+        *out = (char*)TMU_MALLOC((size_t)needed_size, sizeof(char));
+        if (!*out) {
+            errno = ENOMEM;
+            return -1;
+        }
+    }
+    return _vsnprintf(*out, needed_size, format, args);
+}
+#endif
+
+TMU_DEF int tmu_printf(TMU_FORMAT_STRING(const char* format), ...) {
+    va_list args;
+    va_start(args, format);
+    int result = tmu_vprintf(format, args);
+    va_end(args);
+    return result;
+}
+
+TMU_DEF int tmu_fprintf(FILE* stream, TMU_FORMAT_STRING(const char* format), ...) {
+    va_list args;
+    va_start(args, format);
+    int result = tmu_vfprintf(stream, format, args);
+    va_end(args);
+    return result;
+}
+
+TMU_DEF int tmu_vprintf(const char* format, va_list args) {
+    char sbo[512];
+    char* str = TM_NULL;
+    int result = tmu_internal_vsprintf(sbo, 512, &str, format, args);
+    if (result > 0 && str) {
+        tmu_console_output_n(tmu_console_out, str, (tm_size_t)result);
+    }
+    if (str && str != sbo) {
+        TMU_FREE(str, (result + TMU_ALLOC_OFFSET) * sizeof(char), sizeof(char));
+    }
+    return result;
+}
+
+TMU_DEF int tmu_vfprintf(FILE* stream, const char* format, va_list args) {
+    int result = -1;
+    tmu_console_handle handle = tmu_file_to_console_handle(stream);
+    if (handle == tmu_console_invalid) {
+        result = vfprintf(stream, format, args);
+    } else {
+        char sbo[512];
+        char* str = TM_NULL;
+        result = tmu_internal_vsprintf(sbo, 512, &str, format, args);
+        if (result > 0 && str) {
+            tmu_console_output_n(handle, str, (tm_size_t)result);
+        }
+        if (str && str != sbo) {
+            TMU_FREE(str, (result + TMU_ALLOC_OFFSET) * sizeof(char), sizeof(char));
+        }
+    }
+    return result;
+}
+
+#endif
+
 #endif /* defined(TMU_USE_CONSOLE) && defined(TMU_USE_CRT) */
 
 static void tmu_to_tmu_path(struct tmu_contents_struct* path, tm_bool is_dir) {
@@ -6629,6 +7425,44 @@ void tmu_destroy_platform_path(tmu_platform_path* path) {
         path->allocated_size = 0;
     }
 }
+
+#if defined(_WIN32) && !defined(TMU_TESTING_UNIX)
+static tm_bool tmu_internal_append_wildcard(tmu_platform_path* dir, const tmu_tchar** out) {
+    TM_ASSERT(dir);
+    TM_ASSERT(dir->path);
+    TM_ASSERT(out);
+
+    size_t len = TMU_TEXTLEN(dir->path);
+    if (len == 0) {
+        *out = TMU_TEXT("*");
+        return TM_TRUE;
+    }
+
+    tm_bool ends_in_slash = (dir->path[len - 1] == TMU_TEXT('\\'));
+    size_t required_size = len + 3 - ends_in_slash;
+    if (dir->path == dir->sbo) {
+        if (required_size > TMU_SBO_SIZE) {
+            void* new_path = TMU_MALLOC(required_size, sizeof(tmu_tchar));
+            if (!new_path) return TM_FALSE;
+            TMU_MEMCPY(new_path, dir->path, (len + 1) * sizeof(tmu_tchar));
+            dir->path = (tmu_tchar*)new_path;
+        }
+    } else {
+        void* new_path = TMU_REALLOC(dir->path, dir->allocated_size * sizeof(tmu_tchar), sizeof(tmu_tchar),
+                                     required_size * sizeof(tmu_tchar), sizeof(tmu_tchar));
+        if (!new_path) return TM_FALSE;
+        dir->path = (tmu_tchar*)new_path;
+    }
+    if (dir->path != dir->sbo) dir->allocated_size = (tm_size_t)required_size;
+    len -= ends_in_slash;
+    dir->path[len] = TMU_TEXT('\\');
+    dir->path[len + 1] = TMU_TEXT('*');
+    dir->path[len + 2] = 0;
+    len += 2;
+    *out = dir->path;
+    return TM_TRUE;
+}
+#endif
 
 #if defined(__cplusplus) && defined(TM_STRING_VIEW)
 tmu_contents::operator TM_STRING_VIEW() const { return TM_STRING_VIEW_MAKE(data, size); }
@@ -6932,6 +7766,18 @@ TMU_DEF tm_errc tmu_delete_file(const char* filename) {
     return result;
 }
 
+TMU_DEF tmu_contents_result tmu_module_directory() {
+    tmu_contents_result result = tmu_module_filename();
+    if (result.ec == TM_OK) {
+        for (tm_size_t i = result.contents.size; i > 0 && result.contents.data[i - 1] != '/'; --i) {
+            --result.contents.size;
+        }
+        /* Nullterminate */
+        if (result.contents.data) result.contents.data[result.contents.size] = 0;
+    }
+    return result;
+}
+
 TMU_DEF tmu_utf8_command_line_result tmu_utf8_command_line_from_utf16(tmu_char16 const* const* utf16_args,
                                                                       int utf16_args_count) {
     TM_ASSERT(utf16_args_count >= 0);
@@ -7041,6 +7887,17 @@ TMU_DEF void tmu_utf8_destroy_command_line(tmu_utf8_command_line* command_line) 
         command_line->internal_buffer = TM_NULL;
         command_line->internal_allocated_size = 0;
     }
+}
+
+TMU_DEF tmu_opened_dir tmu_open_directory(const char* dir) {
+    tmu_opened_dir result = {TM_ENOMEM, {TM_NULL, TM_FALSE}, {TM_NULL, 0, 0}, TM_NULL};
+    if (!dir) dir = "";
+    tmu_platform_path platform_dir;
+    if (tmu_to_platform_path(dir, &platform_dir)) {
+        result = tmu_open_directory_t(&platform_dir);
+        tmu_destroy_platform_path(&platform_dir);
+    }
+    return result;
 }
 
 #if defined(__cplusplus)

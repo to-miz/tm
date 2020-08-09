@@ -15,10 +15,16 @@
 	    #include <errno.h> /* errno */
 
 	    #include <wchar.h>
+		#ifndef TMU_PLATFORM_UNIX
+			#include <io.h> /* Directory reading and _fileno. */
+		#endif
 	#endif /* !defined(TMU_TESTING) */
+	#ifdef TMU_USE_CONSOLE
+		#include<stdarg.h> /* Needed for tmu_printf and tmu_fprintf */
+	#endif
 #endif /* defined(TMU_USE_CRT) && !defined(TMU_USE_WINDOWS_H) */
 
-#if defined(_MSC_VER) || defined(TMU_TESTING_MSVC_CRT)
+#if defined(_MSC_VER) || defined(TMU_TESTING_MSVC_CRT) || (defined(__MINGW32__) && !defined(TMU_TESTING_UNIX))
 	#ifndef TMU_TEXT
 	    #define TMU_TEXT(x) L##x
 	#endif
@@ -40,8 +46,27 @@
 
 #elif defined(TMU_PLATFORM_UNIX)
 	#ifndef TMU_TESTING
+		#if !defined(_XOPEN_SOURCE) || _XOPEN_SOURCE < 500
+            #ifdef _XOPEN_SOURCE
+                #undef _XOPEN_SOURCE
+            #endif
+            #define _XOPEN_SOURCE 500
+        #endif
+        #if !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 200112L
+            #ifdef _POSIX_C_SOURCE
+                #undef _POSIX_C_SOURCE
+            #endif
+            #define _POSIX_C_SOURCE 200112L
+        #endif
+        #ifndef _BSD_SOURCE
+            #define _BSD_SOURCE
+        #endif
 	    #include <unistd.h> /* getcwd */
+		#include <dirent.h> /* Directory reading. */
 	#endif /* !defined(TMU_TESTING) */
+	#ifdef TMU_USE_CONSOLE
+		#include<stdarg.h> /* Needed for tmu_printf and tmu_fprintf */
+	#endif
 
 	#ifndef TMU_TEXT
 	    #define TMU_TEXT(x) x

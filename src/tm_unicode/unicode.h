@@ -199,6 +199,11 @@ TMU_DEF tmu_conversion_result tmu_utf16_from_utf8_ex(tmu_utf8_stream stream, tmu
                                                      const tmu_char16* replace_str, tm_size_t replace_str_len,
                                                      tm_bool nullterminate, tmu_char16* out, tm_size_t out_len);
 
+TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic(tmu_utf16_stream stream, tmu_contents* out);
+TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic_ex(tmu_utf16_stream stream, tmu_validate validate,
+                                                             const char* replace_str, tm_size_t replace_str_len,
+                                                             tm_bool nullterminate, tm_bool is_sbo, tmu_contents* out);
+
 TMU_DEF tm_size_t tmu_utf8_valid_range(const char* str, tm_size_t len);
 TMU_DEF tm_size_t tmu_utf8_skip_invalid(char* str, tm_size_t len);
 /*TMU_DEF void tmu_utf8_replace_invalid(tmu_contents* r, const char* replace_str, tm_size_t replace_str_len);*/

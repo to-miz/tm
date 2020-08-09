@@ -11,6 +11,7 @@
 #include <vector>
 #include <algorithm>
 #include <cerrno>
+#include <unordered_map>
 
 #include <string_view>
 #define TM_STRING_VIEW std::string_view
@@ -32,10 +33,11 @@
 #endif
 #ifdef USE_MSVC_CRT
     #define TMU_TESTING_MSVC_CRT
-#else
+#elif !defined(USE_WINDOWS_H)
     #define TMU_TESTING_UNIX
 #endif
 // clang-format on
+#define TMU_USE_CONSOLE
 
 // Simple read file implementation instead of using the one in the library itself.
 // We can't use the implementation in the library, since we are mocking underlying CRT/system calls.
@@ -50,14 +52,25 @@ std::vector<char> read_whole_file(const char* filename) {
     return v;
 }
 
+bool malloc_fail = false;
+bool realloc_fail = false;
+
 // Redirect allocations.
 size_t allocated_size = 0;
 void* test_malloc(size_t size) {
+    if (malloc_fail) {
+        malloc_fail = false;
+        return nullptr;
+    }
     void* result = malloc(size);
     if (result) allocated_size += size;
     return result;
 }
 void* test_realloc(void* ptr, size_t old_size, size_t new_size) {
+    if (realloc_fail) {
+        realloc_fail = false;
+        return nullptr;
+    }
     void* result = realloc(ptr, new_size);
     if (result) allocated_size += new_size - old_size;
     return result;

@@ -54,6 +54,28 @@ TMU_DEF tm_errc tmu_delete_directory(const char* dir);
 
 /* Path related functions. */
 TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size);
+TMU_DEF tmu_contents_result tmu_module_filename();
+TMU_DEF tmu_contents_result tmu_module_directory();
+
+typedef struct {
+    const char* name; /* Either filename or directory name. */
+    tm_bool is_file;  /* Whether entry is a file or a directory. */
+} tmu_read_directory_result;
+
+typedef struct {
+    tm_errc ec;
+    tmu_read_directory_result internal_result;
+
+    tmu_contents internal_buffer;
+    void* internal;
+} tmu_opened_dir;
+
+/*!
+ * @brief
+ */
+TMU_DEF tmu_opened_dir tmu_open_directory(const char* dir);
+TMU_DEF void tmu_close_directory(tmu_opened_dir* dir);
+TMU_DEF const tmu_read_directory_result* tmu_read_directory(tmu_opened_dir* dir);
 
 #if 0
 typedef enum {
@@ -106,6 +128,14 @@ TMU_DEF FILE* tmu_freopen(const char* filename, const char* mode, FILE* current)
 Utf-8 console output wrappers.
 Utf-8 console output on Windows is not very straightforward.
 There are two ways to accomplish it:
+    Using Winapi console functions:
+        SetConsoleOutputCP(...);
+        SetConsoleCP(...);
+        ConsoleWriteW(...); // When output is on console.
+        WriteFile(...);     // When output is redirected to a file.
+
+        This works reliably.
+
     Using Microsoft CRT extensions and wprintf:
         _setmode(_fileno(stdout), _O_U16TEXT);
         wprintf(...);
@@ -117,13 +147,9 @@ There are two ways to accomplish it:
         assertion. It is recommended to define TMU_USE_WINDOWS_H and use Winapi when TMU_USE_CONSOLE is defined.
         This method only exists for completeness.
 
-    Using Winapi console functions:
-        SetConsoleOutputCP(...);
-        SetConsoleCP(...);
-        ConsoleWriteW(...); // When output is on console.
-        WriteFile(...);     // When output is redirected to a file.
-
 Thus the best method seems to be using the Winapi functions directly, which requires Windows headers.
+In either case, you can't use printf or fprintf on stderr/stdout directly anymore.
+This is why tmu_printf and tmu_fprintf exist: They will redirect output to tmu_console_output.
 
 These wrappers will do the following:
     On Linux they just wrap fwritef.
@@ -149,8 +175,33 @@ TMU_DEF tm_bool tmu_console_output(tmu_console_handle handle, const char* str);
 TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str, tm_size_t len);
 
 #if defined(TMU_USE_CRT)
-TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f);
+
+/* clang-format off */
+#if defined(__GNUC__) || defined(__clang__)
+    #define TMU_ATTRIB_PRINTF(str_index, check_index) __attribute__((format(printf, str_index, check_index)))
+#else
+    #define TMU_ATTRIB_PRINTF(str_index, check_index)
 #endif
+
+// Adapted from https://stackoverflow.com/a/6849629
+#if defined(_MSC_VER) && _MSC_VER >= 1400 && !defined(__clang__) && !defined(__MINGW32__)
+    #include <sal.h>
+    #if _MSC_VER > 1400
+        #define TMU_FORMAT_STRING(p) _Printf_format_string_ p
+    #else
+        #define TMU_FORMAT_STRING(p) __format_string p
+    #endif
+#else
+    #define TMU_FORMAT_STRING(p) p
+#endif
+/* clang-format on */
+
+TMU_DEF tmu_console_handle tmu_file_to_console_handle(FILE* f);
+TMU_DEF int tmu_printf(TMU_FORMAT_STRING(const char* format), ...) TMU_ATTRIB_PRINTF(1, 2);
+TMU_DEF int tmu_vprintf(const char* format, va_list args);
+TMU_DEF int tmu_fprintf(FILE* stream, TMU_FORMAT_STRING(const char* format), ...) TMU_ATTRIB_PRINTF(2, 3);
+TMU_DEF int tmu_vfprintf(FILE* stream, const char* format, va_list args);
+#endif /* defined(TMU_USE_CRT) */
 
 #endif
 

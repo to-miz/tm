@@ -4,6 +4,7 @@
 #else
 #define TMU_USE_CRT
 #endif
+#define TMU_USE_CONSOLE
 
 #define TM_UNICODE_IMPLEMENTATION
 #include <tm_unicode.h>

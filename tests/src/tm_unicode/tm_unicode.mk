@@ -33,6 +33,7 @@ tests.tm_unicode.windows.c.out := ${build_dir}tests.tm_unicode.windows.c${exe_ex
 tests.tm_unicode.default.out := ${build_dir}tests.tm_unicode.default${exe_ext}
 tests.tm_unicode.signed_size_t.out := ${build_dir}tests.tm_unicode.signed_size_t${exe_ext}
 tests.tm_unicode.msvc_crt.out := ${build_dir}tests.tm_unicode.msvc_crt${exe_ext}
+tests.tm_unicode.msvc_crt_old.out := ${build_dir}tests.tm_unicode.msvc_crt_old${exe_ext}
 tests.tm_unicode.msvc_crt.signed_size_t.out := ${build_dir}tests.tm_unicode.msvc_crt.signed_size_t${exe_ext}
 tests.tm_unicode.windows.out := ${build_dir}tests.tm_unicode.windows${exe_ext}
 tests.tm_unicode.windows.signed_size_t.out := ${build_dir}tests.tm_unicode.windows.signed_size_t${exe_ext}
@@ -41,6 +42,7 @@ tests.tm_unicode.all_config_deps := ${tests.tm_unicode.default.c.out} \
 									${tests.tm_unicode.default.out} \
 									${tests.tm_unicode.signed_size_t.out} \
 									${tests.tm_unicode.msvc_crt.out} \
+									${tests.tm_unicode.msvc_crt_old.out} \
 									${tests.tm_unicode.msvc_crt.signed_size_t.out} \
 									${tests.tm_unicode.windows.out} \
 									${tests.tm_unicode.windows.signed_size_t.out}
@@ -70,6 +72,10 @@ ${tests.tm_unicode.msvc_crt.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
 	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_MSVC_CRT)
 
+${tests.tm_unicode.msvc_crt_old.out}: ${tests.tm_unicode.deps}
+	${hide}echo Compiling $@.
+	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_MSVC_CRT TMU_TESTING_OLD_MSC)
+
 ${tests.tm_unicode.msvc_crt.signed_size_t.out}: ${tests.tm_unicode.deps}
 	${hide}echo Compiling $@.
 	${hide}$(call cxx_compile_and_link, tests/src/tm_unicode/main.cpp, $@,, USE_MSVC_CRT USE_SIGNED_SIZE_T)
@@ -93,6 +99,8 @@ tests.tm_unicode.run: ${tests.tm_unicode.all_config_deps}
 	${hide}${tests.tm_unicode.signed_size_t.out}
 	${hide}echo Running Test: ${tests.tm_unicode.msvc_crt.out}
 	${hide}${tests.tm_unicode.msvc_crt.out}
+	${hide}echo Running Test: ${tests.tm_unicode.msvc_crt_old.out}
+	${hide}${tests.tm_unicode.msvc_crt_old.out}
 	${hide}echo Running Test: ${tests.tm_unicode.msvc_crt.signed_size_t.out}
 	${hide}${tests.tm_unicode.msvc_crt.signed_size_t.out}
 	${hide}echo Running Test: ${tests.tm_unicode.windows.out}
@@ -115,3 +123,7 @@ tests.tm_unicode.windows.run: ${tests.tm_unicode.windows.out}
 tests.tm_unicode.msvc_crt.run: ${tests.tm_unicode.msvc_crt.out}
 	${hide}echo Running Test: ${tests.tm_unicode.msvc_crt.out}
 	${hide}${tests.tm_unicode.msvc_crt.out}
+
+tests.tm_unicode.msvc_crt_old.run: ${tests.tm_unicode.msvc_crt_old.out}
+	${hide}echo Running Test: ${tests.tm_unicode.msvc_crt_old.out}
+	${hide}${tests.tm_unicode.msvc_crt_old.out}

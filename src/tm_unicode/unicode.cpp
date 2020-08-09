@@ -1185,6 +1185,43 @@ TMU_DEF tmu_conversion_result tmu_utf16_from_utf8_ex(tmu_utf8_stream stream, tmu
     return result;
 }
 
+TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic(tmu_utf16_stream stream, tmu_contents* out) {
+    return tmu_utf8_from_utf16_dynamic_ex(stream, tmu_validate_error, /*replace_str=*/TM_NULL, /*replace_str_len=*/0,
+                                          /*nullterminate=*/TM_FALSE, /*is_sbo=*/TM_FALSE, out);
+}
+
+TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic_ex(tmu_utf16_stream stream, tmu_validate validate,
+                                                             const char* replace_str, tm_size_t replace_str_len,
+                                                             tm_bool nullterminate, tm_bool is_sbo, tmu_contents* out) {
+    TM_ASSERT(out);
+    tmu_conversion_result conv_result = tmu_utf8_from_utf16_ex(stream, validate, replace_str, replace_str_len,
+                                                               nullterminate, out->data, out->capacity);
+    if (conv_result.ec == TM_OK) {
+        out->size = conv_result.size;
+    } else if (conv_result.ec == TM_ERANGE) {
+        void* new_data = TM_NULL;
+        if (is_sbo || out->data == TM_NULL) {
+            new_data = TMU_MALLOC(conv_result.size * sizeof(char), sizeof(char));
+        } else {
+            new_data = TMU_REALLOC(out->data, out->capacity * sizeof(char), sizeof(char),
+                                   conv_result.size * sizeof(char), sizeof(char));
+        }
+        if (!new_data) {
+            conv_result.ec = TM_ENOMEM;
+        } else {
+            out->data = (char*)new_data;
+            out->size = 0;
+            out->capacity = conv_result.size;
+            conv_result = tmu_utf8_from_utf16_ex(stream, validate, replace_str, replace_str_len, nullterminate,
+                                                 out->data, out->capacity);
+            if (conv_result.ec == TM_OK) {
+                out->size = conv_result.size;
+            }
+        }
+    }
+    return conv_result;
+}
+
 TMU_DEF tm_size_t tmu_utf8_copy_truncated(const char* str, tm_size_t str_len, char* out, tm_size_t out_len) {
     TM_ASSERT(str || str_len == 0);
     TM_ASSERT(out || out_len == 0);

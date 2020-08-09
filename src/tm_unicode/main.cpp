@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.9.0 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.9.2 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
@@ -81,6 +81,11 @@ SWITCHES
         tmu_main has to be supplied by the usage code. It has the signature:
             int tmu_main(int argc, const char *const * argv)
 
+NOTES
+    Compiling with -std=c99 on gcc/clang with file io:
+    You need to additionally pass in -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE as options, so that some more advanced
+    posix functions are defined in the headers, that are otherwise not defined because of c99.
+
 ISSUES
     - No locale support for case folding (some locales case fold differently,
       like turkic languages with dotted uppercase I).
@@ -92,6 +97,10 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY    (DD.MM.YY)
+    v0.9.2  08.08.20 Added tmu_printf, tmu_vprintf, tmu_fprintf, tmu_vfprintf.
+                     Added tests for console output.
+    v0.9.1  06.08.20 Added tmu_module_filename, tmu_module_directory, tmu_open_directory,
+                     tmu_close_directory, tmu_read_directory.
     v0.9.0  11.03.20 Updated generated Unicode data to Unicode Version 13.0.0.
     v0.1.9  01.01.20 Fixed compilation error on unix.
     v0.1.8  01.01.20 Added TMU_USE_CONSOLE and TMU_NO_SHELLAPI.
@@ -133,8 +142,13 @@ HISTORY    (DD.MM.YY)
     #define TMU_DEF extern
 #endif
 
-#if defined(TMU_USE_CRT) && !defined(TMU_TESTING)
-    #include <stdio.h>
+#if defined(TMU_USE_CRT)
+    #ifndef TMU_TESTING
+        #include <stdio.h>
+    #endif
+    #if defined(TMU_USE_CONSOLE) && !defined(TMU_USE_WINDOWS_H)
+        #include <stdarg.h>
+    #endif
 #endif
 
 /* Unicode handling. */
