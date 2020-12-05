@@ -11,6 +11,8 @@ ${build_dir}tests.%: private C_INCLUDES   += ${tests.include_dirs}
 # Testing needs functions marked as extern C to be able to throw C++ exceptions, so EHsc can't be used, otherwise UB.
 ${build_dir}tests.%: private options.cl.exception := -EHs
 
+unmerged_deps := src/common/*
+
 # Subprojects
 
 include tools/merge/merge.mk # Defines target merge and output file merge.out.
@@ -59,8 +61,11 @@ include src/tm_xml/tm_xml.mk
 
 merge.all.deps := tm_conversion.h tm_print.h tm_json.h tm_cli.h
 merge.all.deps += tm_stringutil.h tm_bin_packing.h tm_polygon.h tm_bezier.h tm_unicode.h
+include src/tm_resource_ptr/tm_resource_ptr.mk
 
-merge.all: ${merge.all.deps}
+# Combined
+
+merge.all:
 
 tests.deps := tests.tm_conversion tests.tm_print tests.tm_json tests.tm_cli
 tests.deps += tests.tm_stringutil tests.tm_bin_packing tests.tm_polygon tests.tm_bezier tests.tm_unicode
@@ -76,3 +81,5 @@ tests.run: ${tests.run.deps}
 clean:
 	${hide}echo Cleaning folder ${BUILD_DIR}${path_sep}.
 	${hide}${clean_build_dir}
+
+all: merge.all

@@ -92,7 +92,7 @@ else
 endif
 
 # Compiler detection.
-cxx_maybe_gcc := $(findstring gcc,${CXX})$(findstring g++,${CXX})
+cxx_maybe_gcc := $(findstring gcc,${CXX})$(findstring g++,${CXX})$(findstring cc1plus,${CXX})
 
 ifneq ($(findstring clang-cl,${CXX}),)
 	cxx_compiler_selector := cl
@@ -125,7 +125,7 @@ endif # gcc
 endif # clang
 endif # clang-cl
 
-c_maybe_gcc := $(findstring gcc,${CC})$(findstring g++,${CC})
+c_maybe_gcc := $(findstring gcc,${CC})$(findstring g++,${CC})$(findstring cc,${CC})
 
 ifneq ($(findstring clang-cl,${CC}),)
 	c_compiler_selector := cl
@@ -166,6 +166,8 @@ DEFINES.release := NDEBUG ${windows_defines}
 # clang
 
 warnings.clang := -Wall -Wextra -Werror -pedantic -pedantic-errors -Wno-gnu-zero-variadic-macro-arguments -Wno-newline-eof
+# This one emits a warning even if a default label exists.
+warning.clang += -Wswitch-enum
 sanitize.clang ?= -fsanitize=address
 
 options.clang.debug   := -fstack-protector-all -g -ggdb -fno-omit-frame-pointer ${sanitize.clang}
@@ -193,6 +195,8 @@ output_directive.clang   = -o${1}
 # gcc
 
 warnings.gcc := -Wall -Wextra -Werror -pedantic -pedantic-errors
+# This one emits a warning even if a default label exists.
+warning.gcc += -Wswitch-enum
 sanitize.gcc ?= -fsanitize=address
 
 options.gcc.debug   := -fstack-protector-all -g -ggdb -fno-omit-frame-pointer ${sanitize.gcc}
@@ -226,7 +230,10 @@ output_directive.other = -o${1}
 # cl
 
 warnings.cl  := -W4 -WX
-warnings.cl  += -w44062 # enumerator 'identifier' in a switch of enum 'enumeration' is not handled
+# enumerator 'identifier' in switch of enum 'enumeration' is not explicitly handled by a case label
+# This one emits a warning even if a default label exists.
+# warnings.cl  += -w44061 # enumerator in a switch of enum is not handled (even with default-case)
+warnings.cl  += -w44062 # enumerator in a switch of enum is not handled (without default-case)
 warnings.cl  += -w44242 # 'identifier': conversion from 'type1' to 'type2', possible loss of data
 warnings.cl  += -w44254 # 'operator': conversion from 'type1' to 'type2', possible loss of data
 warnings.cl  += -w44287 # 'operator': unsigned/negative constant mismatch
