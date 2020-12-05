@@ -112,7 +112,7 @@ tml::DynamicStackAllocator::DynamicStackAllocator(DynamicStackAllocator&& other)
 tml::DynamicStackAllocator& tml::DynamicStackAllocator::operator=(DynamicStackAllocator&& other) {
     if (this != &other) {
         if (p) {
-            TM_FREE(p, capacity, TM_DEFAULT_ALIGNMENT);
+            TM_FREE(p);
             p = nullptr;
         }
         p = other.p;
@@ -128,7 +128,7 @@ tml::DynamicStackAllocator& tml::DynamicStackAllocator::operator=(DynamicStackAl
 }
 tml::DynamicStackAllocator::~DynamicStackAllocator() {
     if (p) {
-        TM_FREE(p, capacity, TM_DEFAULT_ALIGNMENT);
+        TM_FREE(p);
         p = nullptr;
     }
 }

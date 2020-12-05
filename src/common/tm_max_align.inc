@@ -1,9 +1,12 @@
-/* We need the max align value, but it is a C11 feature. We go with a sensible default for C. */
+/* Default alignment for TM_MALLOC, the default for malloc is alignof(max_align_t). */
 #ifndef TM_MAX_ALIGN
     #ifdef __cplusplus
         #include <cstddef>
-        #define TM_MAX_ALIGN sizeof(std::max_align_t)
+        #define TM_MAX_ALIGN alignof(std::max_align_t)
+    #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+        #include <stddef.h>
+        #define TM_MAX_ALIGN _Alignof(max_align_t)
     #else
-        #define TM_MAX_ALIGN (sizeof(void*) * 2)
+        #define TM_MAX_ALIGN (sizeof(void*))
     #endif
 #endif

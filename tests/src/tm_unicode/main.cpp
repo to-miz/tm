@@ -52,36 +52,7 @@ std::vector<char> read_whole_file(const char* filename) {
     return v;
 }
 
-bool malloc_fail = false;
-bool realloc_fail = false;
-
-// Redirect allocations.
-size_t allocated_size = 0;
-void* test_malloc(size_t size) {
-    if (malloc_fail) {
-        malloc_fail = false;
-        return nullptr;
-    }
-    void* result = malloc(size);
-    if (result) allocated_size += size;
-    return result;
-}
-void* test_realloc(void* ptr, size_t old_size, size_t new_size) {
-    if (realloc_fail) {
-        realloc_fail = false;
-        return nullptr;
-    }
-    void* result = realloc(ptr, new_size);
-    if (result) allocated_size += new_size - old_size;
-    return result;
-}
-void test_free(void* ptr, size_t size) {
-    allocated_size -= size;
-    free(ptr);
-}
-#define TM_MALLOC(size, alignment) test_malloc((size))
-#define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) test_realloc((ptr), (old_size), (new_size))
-#define TM_FREE(ptr, size, alignment) test_free((ptr), (size))
+#include "../redirected_malloc.cpp"
 
 #define TM_UNICODE_IMPLEMENTATION
 #define TMU_SBO_SIZE 15  // Make allocations more common.
@@ -101,19 +72,15 @@ void test_free(void* ptr, size_t size) {
 
 #define TMU_USE_STL
 
+#define TM_USE_RESOURCE_PTR
 #include <tm_unicode.h>
+#include <tm_resource_ptr.h>
 
 #if defined(USE_WINDOWS_H) && !defined(TMU_NO_FILE_IO)
 #include "windows_mockups.cpp"
 #endif
 
 using namespace std;
-
-struct allocation_guard {
-    size_t prev_allocated_size;
-    allocation_guard() : prev_allocated_size(allocated_size) {}
-    ~allocation_guard() { CHECK(prev_allocated_size == allocated_size); }
-};
 
 /* Test strings in raw bytes, spells out byte order mark + "test_string-ﬆﬃÅỞᵫɶᨠ-end" */
 const uint8_t utf8_bom[] = {0xEF, 0xBB, 0xBF, 0x74, 0x65, 0x73, 0x74, 0x5F, 0x73, 0x74, 0x72, 0x69, 0x6E,

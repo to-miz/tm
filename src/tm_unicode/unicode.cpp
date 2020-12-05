@@ -303,7 +303,7 @@ static tm_bool tmu_alloc_output_stream(tmu_conversion_output_stream* out, tm_siz
 static void tmu_destroy_output(tmu_conversion_output_stream* stream) {
     if (stream) {
         if (stream->data && stream->owns) {
-            TMU_FREE(stream->data, stream->capacity * sizeof(char), sizeof(char));
+            TMU_FREE(stream->data);
         }
         stream->data = TM_NULL;
         stream->conversion.size = 0;
@@ -322,8 +322,7 @@ static tm_bool tmu_output_grow(tmu_conversion_output_stream* stream, tm_size_t b
     char* new_data = TM_NULL;
     if (stream->data && stream->owns) {
         TM_ASSERT(stream->capacity > 0);
-        new_data = (char*)TMU_REALLOC(stream->data, stream->capacity * sizeof(char), sizeof(char),
-                                      new_capacity * sizeof(char), sizeof(char));
+        new_data = (char*)TMU_REALLOC(stream->data, new_capacity * sizeof(char), sizeof(char));
     } else {
         new_data = (char*)TMU_MALLOC(new_capacity * sizeof(char), sizeof(char));
         if (new_data && !stream->owns && stream->data && stream->conversion.size) {
@@ -1203,8 +1202,7 @@ TMU_DEF tmu_conversion_result tmu_utf8_from_utf16_dynamic_ex(tmu_utf16_stream st
         if (is_sbo || out->data == TM_NULL) {
             new_data = TMU_MALLOC(conv_result.size * sizeof(char), sizeof(char));
         } else {
-            new_data = TMU_REALLOC(out->data, out->capacity * sizeof(char), sizeof(char),
-                                   conv_result.size * sizeof(char), sizeof(char));
+            new_data = TMU_REALLOC(out->data, conv_result.size * sizeof(char), sizeof(char));
         }
         if (!new_data) {
             conv_result.ec = TM_ENOMEM;

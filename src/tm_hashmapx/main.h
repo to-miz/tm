@@ -597,7 +597,7 @@ TMH_DEF tm_bool tmh_string_equals(const char* lhs, const char* rhs) {
 }
 TMH_DEF void tmh_string_destroy(char** str) {
     if (str && *str) {
-        TM_FREE(*str, (TM_STRLEN(*str) + 1) * sizeof(char), sizeof(char));
+        TM_FREE(*str);
         *str = TM_NULL;
     }
 }
@@ -639,7 +639,7 @@ TMH_DEF TMH_X_NAME TMH_STR_JOIN(TMH_X_FUNCPREFIX, TMH_CREATE)() {
         if (result.values) {
             result.capacity = initial_capacity;
         } else {
-            TM_FREE(result.keys, initial_capacity * sizeof(TMH_X_KEY), sizeof(void*));
+            TM_FREE(result.keys);
         }
     }
     for (tm_size_t i = 0, count = result.capacity; i < count; ++i) {
@@ -662,11 +662,11 @@ TMH_DEF void TMH_STR_JOIN(TMH_X_FUNCPREFIX, TMH_DESTROY)(TMH_X_NAME* map) {
         }
     }
     if (map->keys) {
-        TM_FREE(map->keys, map->capacity * sizeof(TMH_X_KEY), sizeof(void*));
+        TM_FREE(map->keys);
         map->keys = TM_NULL;
     }
     if (map->values) {
-        TM_FREE(map->values, map->capacity * sizeof(TMH_X_VALUE), sizeof(void*));
+        TM_FREE(map->values);
         map->values = TM_NULL;
     }
     map->count = 0;

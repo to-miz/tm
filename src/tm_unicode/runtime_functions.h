@@ -12,8 +12,8 @@
 	    #define TMU_FREE TM_FREE
 	#else
 	    #define TMU_MALLOC(size, alignment) malloc((size))
-	    #define TMU_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) realloc((ptr), (new_size))
-	    #define TMU_FREE(ptr, size, alignment) free((ptr))
+	    #define TMU_REALLOC(ptr, new_size, new_alignment) realloc((ptr), (new_size))
+	    #define TMU_FREE(ptr) free((ptr))
 	#endif
 
 	#ifdef TM_MEMMOVE
@@ -49,9 +49,8 @@
 	    #define TMU_FREE TM_FREE
 	#else
 	    #define TMU_MALLOC(size, alignment) HeapAlloc(GetProcessHeap(), 0, (size))
-	    #define TMU_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) \
-	        HeapReAlloc(GetProcessHeap(), 0, (ptr), (new_size))
-	    #define TMU_FREE(ptr, size, alignment) HeapFree(GetProcessHeap(), 0, (ptr))
+	    #define TMU_REALLOC(ptr, new_size, new_alignment) HeapReAlloc(GetProcessHeap(), 0, (ptr), (new_size))
+	    #define TMU_FREE(ptr) HeapFree(GetProcessHeap(), 0, (ptr))
 	#endif
 
 	#ifdef TM_MEMMOVE

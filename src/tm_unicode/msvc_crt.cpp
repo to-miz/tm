@@ -136,7 +136,7 @@ TMU_DEF tmu_opened_dir tmu_open_directory_t(tmu_platform_path* dir) {
     find_data->handle = _wfindfirst64(path, &find_data->data);
     if (find_data->handle == -1) {
         result.ec = (tm_errc)errno;
-        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+        TMU_FREE(find_data);
         return result;
     }
     find_data->has_data = TM_TRUE;
@@ -151,7 +151,7 @@ TMU_DEF void tmu_close_directory(tmu_opened_dir* dir) {
         if (find_data->handle != -1) {
             _findclose(find_data->handle);
         }
-        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+        TMU_FREE(find_data);
     }
     tmu_destroy_contents(&dir->internal_buffer);
     memset(dir, 0, sizeof(tmu_opened_dir));
@@ -367,7 +367,7 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
     }
 
     if (wide && wide != sbo) {
-        TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        TMU_FREE(wide);
     }
     return written == conv_result.size;
 }

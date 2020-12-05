@@ -158,7 +158,7 @@ TMU_DEF int tmu_vprintf(const char* format, va_list args) {
         tmu_console_output_n(tmu_console_out, str, (tm_size_t)result);
     }
     if (str && str != sbo) {
-        TMU_FREE(str, (result + TMU_ALLOC_OFFSET) * sizeof(char), sizeof(char));
+        TMU_FREE(str);
     }
     return result;
 }
@@ -176,7 +176,7 @@ TMU_DEF int tmu_vfprintf(FILE* stream, const char* format, va_list args) {
             tmu_console_output_n(handle, str, (tm_size_t)result);
         }
         if (str && str != sbo) {
-            TMU_FREE(str, (result + TMU_ALLOC_OFFSET) * sizeof(char), sizeof(char));
+            TMU_FREE(str);
         }
     }
     return result;

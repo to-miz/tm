@@ -125,9 +125,11 @@ You can redefine these macros to either get rid of the dependencies with native 
         // Either all or none have to be defined.
         #include <cstdlib>
         #define TM_MALLOC(size, alignment) std::malloc((size))
-        #define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) std::realloc((ptr), (new_size))
-        // #define TM_REALLOC_IN_PLACE(ptr, old_size, old_alignment, new_size, new_alignment) // Optional
-        #define TM_FREE(ptr, size, alignment) std::free((ptr))
+        #define TM_REALLOC(ptr, new_size, new_alignment) std::realloc((ptr), (new_size))
+        // #define TM_REALLOC_IN_PLACE(ptr, new_size, new_alignment) // Optional
+        #define TM_FREE(ptr) std::free((ptr))
+        // Define as 1 if alignment parameter is actually respected.
+        #define TM_MALLOC_ALIGNMENT_AWARE 0
     #endif
 
     #if !defined(TM_MEMCPY)
@@ -496,16 +498,16 @@ class MonotonicAllocator {
 struct GenerationalId {
     uint32_t bits;  //!< The first byte is the generation, while the remaining are the id.
 
-    inline uint32_t generation() const { return bits >> 24; }
-    inline uint32_t id() const { return bits & 0x007FFFFFu; }
-    inline bool occupied() const { return (bits & (1 << 23)) != 0; }
-    inline explicit operator bool() const { return (bits & (1 << 23)) != 0; }
+    constexpr uint32_t generation() const { return bits >> 24; }
+    constexpr uint32_t id() const { return bits & 0x007FFFFFu; }
+    constexpr bool occupied() const { return (bits & (1 << 23)) != 0; }
+    constexpr explicit operator bool() const { return (bits & (1 << 23)) != 0; }
 
-    inline static uint32_t generation(uint32_t bits) { return bits >> 24; }
-    inline static uint32_t id(uint32_t bits) { return bits & 0x007FFFFFu; }
-    inline static bool occupied(uint32_t bits) { return (bits & (1 << 23)) != 0; }
-    inline static bool valid(uint32_t bits) { return (bits & (1 << 23)) != 0; }
-    inline static GenerationalId make(uint32_t generation, uint32_t id, bool occupied) {
+    constexpr static uint32_t generation(uint32_t bits) { return bits >> 24; }
+    constexpr static uint32_t id(uint32_t bits) { return bits & 0x007FFFFFu; }
+    constexpr static bool occupied(uint32_t bits) { return (bits & (1 << 23)) != 0; }
+    constexpr static bool valid(uint32_t bits) { return (bits & (1 << 23)) != 0; }
+    constexpr static GenerationalId make(uint32_t generation, uint32_t id, bool occupied) {
         return {((generation & 0xFFu) << 24) | (id & 0x007FFFFFu) | ((uint32_t)occupied << 23)};
     }
 };
@@ -585,7 +587,7 @@ struct FixedSizeGenerationalIdAllocator {
      * @param element_alignment[IN] Alignment of each element in bytes. Must be power of two.
      */
     FixedSizeGenerationalIdAllocator(int32_t initial_element_capacity, int32_t element_size_in_bytes,
-                         int32_t element_alignment = TM_DEFAULT_ALIGNMENT);
+                                     int32_t element_alignment = TM_DEFAULT_ALIGNMENT);
     ~FixedSizeGenerationalIdAllocator();
     FixedSizeGenerationalIdAllocator(FixedSizeGenerationalIdAllocator&&);
     FixedSizeGenerationalIdAllocator& operator=(FixedSizeGenerationalIdAllocator&&);
@@ -630,9 +632,10 @@ struct FixedSizeGenerationalIdAllocator {
         void* data = nullptr;
         int32_t size = 0;
         int32_t allocation_size = 0;
+        int32_t allocation_alignment = 0;
 
-        inline ForwardIterator(void* data, int32_t size, int32_t allocation_size)
-            : data(data), size(size), allocation_size(allocation_size) {}
+        ForwardIterator(void* data, int32_t size, int32_t allocation_size, int32_t allocation_alignment);
+
 
        public:
         bool operator==(const ForwardIterator& other) const;
@@ -640,6 +643,8 @@ struct FixedSizeGenerationalIdAllocator {
         void* operator*() const;
         ForwardIterator operator++();     // Prefix
         ForwardIterator operator++(int);  // Postfix
+
+        uint32_t id() const;
     };
     struct ConstForwardIterator {
         friend struct FixedSizeGenerationalIdAllocator;
@@ -654,12 +659,12 @@ struct FixedSizeGenerationalIdAllocator {
         typedef const void*& reference;
 
        protected:
-        void* data = nullptr;
+        const void* data = nullptr;
         int32_t size = 0;
         int32_t allocation_size = 0;
+        int32_t allocation_alignment = 0;
 
-        inline ConstForwardIterator(void* data, int32_t size, int32_t allocation_size)
-            : data(data), size(size), allocation_size(allocation_size) {}
+        ConstForwardIterator(void* data, int32_t size, int32_t allocation_size, int32_t allocation_alignment);
 
        public:
         bool operator==(const ConstForwardIterator& other) const;
@@ -667,14 +672,16 @@ struct FixedSizeGenerationalIdAllocator {
         const void* operator*() const;
         ConstForwardIterator operator++();     // Prefix
         ConstForwardIterator operator++(int);  // Postfix
+
+        uint32_t id() const;
     };
 
-    inline ForwardIterator begin() { return {data, size, allocation_size}; }
-    inline ForwardIterator end() { return {(char*)data + size * allocation_size, 0, allocation_size}; }
-    inline ConstForwardIterator begin() const { return {data, size, allocation_size}; }
-    inline ConstForwardIterator end() const { return {(char*)data + size * allocation_size, 0, allocation_size}; }
-    inline ConstForwardIterator cbegin() const { return {data, size, allocation_size}; }
-    inline ConstForwardIterator cend() const { return {(char*)data + size * allocation_size, 0, allocation_size}; }
+    inline ForwardIterator begin() { return {data, size, allocation_size, allocation_alignment}; }
+    inline ForwardIterator end() { return {(char*)data + size * allocation_size, 0, allocation_size, allocation_alignment}; }
+    inline ConstForwardIterator begin() const { return {data, size, allocation_size, allocation_alignment}; }
+    inline ConstForwardIterator end() const { return {(char*)data + size * allocation_size, 0, allocation_size, allocation_alignment}; }
+    inline ConstForwardIterator cbegin() const { return {data, size, allocation_size, allocation_alignment}; }
+    inline ConstForwardIterator cend() const { return {(char*)data + size * allocation_size, 0, allocation_size, allocation_alignment}; }
 
    private:
     typedef GenerationalId Header;
@@ -743,12 +750,14 @@ struct FixedSizeTypedIdAllocator : private FixedSizeGenerationalIdAllocator {
         using Base::value_type;
 
        private:
-        inline ForwardIterator(void* data, int32_t size, int32_t allocation_size) : Base(data, size, allocation_size) {}
+        inline ForwardIterator(void* data, int32_t size, int32_t allocation_size, int32_t allocation_alignment)
+            : Base(data, size, allocation_size, allocation_alignment) {}
 
        public:
         using Base::operator==;
         using Base::operator!=;
         using Base::operator++;
+        using Base::id;
         T* operator*() const { return static_cast<T*>(Base::operator*()); }
     };
     struct ConstForwardIterator : private FixedSizeGenerationalIdAllocator::ConstForwardIterator {
@@ -767,25 +776,35 @@ struct FixedSizeTypedIdAllocator : private FixedSizeGenerationalIdAllocator {
         using Base::value_type;
 
        private:
-        inline ConstForwardIterator(void* data, int32_t size, int32_t allocation_size)
-            : Base(data, size, allocation_size) {}
+        inline ConstForwardIterator(void* data, int32_t size, int32_t allocation_size, int32_t allocation_alignment)
+            : Base(data, size, allocation_size, allocation_alignment) {}
 
        public:
         using Base::operator==;
         using Base::operator!=;
         using Base::operator++;
+        using Base::id;
         const T* operator*() const { return static_cast<const T*>(Base::operator*()); }
     };
 
-    ForwardIterator begin() { return {this->data, this->size, this->allocation_size}; }
-    ForwardIterator end() { return {(char*)this->data + this->size * this->allocation_size, 0, this->allocation_size}; }
-    ConstForwardIterator begin() const { return {this->data, this->size, this->allocation_size}; }
-    ConstForwardIterator end() const {
-        return {(char*)this->data + this->size * this->allocation_size, 0, this->allocation_size};
+    ForwardIterator begin() { return {this->data, this->size, this->allocation_size, this->allocation_alignment}; }
+    ForwardIterator end() {
+        return {(char*)this->data + this->size * this->allocation_size, 0,
+                this->allocation_size, this->allocation_alignment};
     }
-    ConstForwardIterator cbegin() const { return {this->data, this->size, this->allocation_size}; }
+    ConstForwardIterator begin() const {
+        return {this->data, this->size, this->allocation_size, this->allocation_alignment};
+    }
+    ConstForwardIterator end() const {
+        return {(char*)this->data + this->size * this->allocation_size, 0,
+                this->allocation_size, this->allocation_alignment};
+    }
+    ConstForwardIterator cbegin() const {
+        return {this->data, this->size, this->allocation_size, this->allocation_alignment};
+    }
     ConstForwardIterator cend() const {
-        return {(char*)this->data + this->size * this->allocation_size, 0, this->allocation_size};
+        return {(char*)this->data + this->size * this->allocation_size,
+                0, this->allocation_size, this->allocation_alignment};
     }
 };
 
@@ -1360,7 +1379,7 @@ size_t tml::alignment_offset(uintptr_t ptr, size_t alignment) {
     void* tml::tmal_mmap(size_t size) { return TM_MALLOC(size, 4096); }
     bool tml::tmal_munmap(void* ptr, size_t size) {
         TM_MAYBE_UNUSED(size);
-        TM_FREE(ptr, size, 4096);
+        TM_FREE(ptr);
         return true;
     }
     size_t tml::tmal_get_mmap_granularity() { return 4096; }
@@ -1430,7 +1449,7 @@ tml::RecursiveMutex& tml::RecursiveMutex::operator=(RecursiveMutex&& other) {
         if (internal) {
             using std::recursive_mutex;
             static_cast<recursive_mutex*>(internal)->~recursive_mutex();
-            TM_FREE(internal, sizeof(recursive_mutex), sizeof(void*));
+            TM_FREE(internal);
             internal = nullptr;
         }
     }
@@ -1645,7 +1664,7 @@ tml::DynamicStackAllocator::DynamicStackAllocator(DynamicStackAllocator&& other)
 tml::DynamicStackAllocator& tml::DynamicStackAllocator::operator=(DynamicStackAllocator&& other) {
     if (this != &other) {
         if (p) {
-            TM_FREE(p, capacity, TM_DEFAULT_ALIGNMENT);
+            TM_FREE(p);
             p = nullptr;
         }
         p = other.p;
@@ -1661,7 +1680,7 @@ tml::DynamicStackAllocator& tml::DynamicStackAllocator::operator=(DynamicStackAl
 }
 tml::DynamicStackAllocator::~DynamicStackAllocator() {
     if (p) {
-        TM_FREE(p, capacity, TM_DEFAULT_ALIGNMENT);
+        TM_FREE(p);
         p = nullptr;
     }
 }
@@ -1688,7 +1707,7 @@ tml::MonotonicAllocator::MonotonicAllocator(MonotonicAllocator&& other)
 tml::MonotonicAllocator& tml::MonotonicAllocator::operator=(MonotonicAllocator&& other) {
     if (this != &other) {
         if (!leak_memory && allocators) {
-            TM_FREE(allocators, capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
+            TM_FREE(allocators);
         }
         allocators = other.allocators;
         current = other.current;
@@ -1705,7 +1724,7 @@ tml::MonotonicAllocator& tml::MonotonicAllocator::operator=(MonotonicAllocator&&
 }
 tml::MonotonicAllocator::~MonotonicAllocator() {
     if (!leak_memory && allocators) {
-        TM_FREE(allocators, capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
+        TM_FREE(allocators);
         allocators = nullptr;
     }
 }
@@ -1727,8 +1746,7 @@ tml::MemoryBlock tml::MonotonicAllocator::allocate_bytes(size_t size, size_t ali
     if (auto result = allocators[current].allocate_bytes(size, alignment)) return result;
 
     auto new_capacity = capacity + 1;
-    auto new_allocators = TM_REALLOC(allocators, capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT,
-                                     new_capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
+    auto new_allocators = TM_REALLOC(allocators, new_capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
     if (!new_allocators) return {};
     allocators = (StackAllocator*)new_allocators;
     capacity = new_capacity;
@@ -1790,8 +1808,10 @@ tml::StackAllocatorGuard::~StackAllocatorGuard() {
 
 void tml::StackAllocatorGuard::dismiss() { allocator = nullptr; }
 
-tml::FixedSizeIdAllocator::FixedSizeIdAllocator(int32_t initial_element_capacity, int32_t element_size_in_bytes,
-                                                int32_t element_alignment)
+namespace tml {
+
+FixedSizeIdAllocator::FixedSizeIdAllocator(int32_t initial_element_capacity, int32_t element_size_in_bytes,
+                                           int32_t element_alignment)
     : allocation_size(element_size_in_bytes), allocation_alignment(element_alignment) {
     TM_ASSERT(allocation_size >= (int32_t)sizeof(int32_t));
     if (allocation_alignment < (int32_t)sizeof(int32_t)) allocation_alignment = (int32_t)sizeof(int32_t);
@@ -1800,13 +1820,13 @@ tml::FixedSizeIdAllocator::FixedSizeIdAllocator(int32_t initial_element_capacity
     data = TM_MALLOC(allocation_size * initial_element_capacity, allocation_alignment);
     if (data) capacity = initial_element_capacity;
 }
-tml::FixedSizeIdAllocator::~FixedSizeIdAllocator() {
+FixedSizeIdAllocator::~FixedSizeIdAllocator() {
     if (data) {
-        TM_FREE(data, allocation_size * capacity, allocation_alignment);
+        TM_FREE(data);
         data = nullptr;
     }
 }
-tml::FixedSizeIdAllocator::FixedSizeIdAllocator(FixedSizeIdAllocator&& other)
+FixedSizeIdAllocator::FixedSizeIdAllocator(FixedSizeIdAllocator&& other)
     : data(other.data),
       size(other.size),
       capacity(other.capacity),
@@ -1818,10 +1838,10 @@ tml::FixedSizeIdAllocator::FixedSizeIdAllocator(FixedSizeIdAllocator&& other)
     other.capacity = 0;
     other.free_index = -1;
 }
-tml::FixedSizeIdAllocator& tml::FixedSizeIdAllocator::operator=(FixedSizeIdAllocator&& other) {
+FixedSizeIdAllocator& FixedSizeIdAllocator::operator=(FixedSizeIdAllocator&& other) {
     if (this != &other) {
         if (data) {
-            TM_FREE(data, allocation_size * capacity, allocation_alignment);
+            TM_FREE(data);
         }
         data = other.data;
         size = other.size;
@@ -1835,14 +1855,13 @@ tml::FixedSizeIdAllocator& tml::FixedSizeIdAllocator::operator=(FixedSizeIdAlloc
     return *this;
 }
 
-uint32_t tml::FixedSizeIdAllocator::create() {
+uint32_t FixedSizeIdAllocator::create() {
     TM_ASSERT(data);
     if (auto id = pop()) return id;
 
     if (size >= capacity) {
         auto new_capacity = next_capacity(capacity);
-        auto new_data = TM_REALLOC(data, capacity * allocation_size, allocation_size, new_capacity * allocation_size,
-                                   allocation_alignment);
+        auto new_data = TM_REALLOC(data, new_capacity * allocation_size, allocation_alignment);
         if (new_data) {
             data = new_data;
             capacity = (int32_t)new_capacity;
@@ -1856,14 +1875,14 @@ uint32_t tml::FixedSizeIdAllocator::create() {
     }
     return 0;
 }
-void tml::FixedSizeIdAllocator::destroy(uint32_t id) {
+void FixedSizeIdAllocator::destroy(uint32_t id) {
     if (data_from_id(id)) push(id);
 }
-void* tml::FixedSizeIdAllocator::data_from_id(uint32_t id) {
+void* FixedSizeIdAllocator::data_from_id(uint32_t id) {
     if (id > 0 && (int32_t)(id - 1) < size) return (char*)data + ((id - 1) * allocation_size);
     return nullptr;
 }
-uint32_t tml::FixedSizeIdAllocator::pop() {
+uint32_t FixedSizeIdAllocator::pop() {
     if (free_index >= 0) {
         TM_ASSERT(free_index < size);
         auto result = (uint32_t)(free_index + 1);
@@ -1872,7 +1891,7 @@ uint32_t tml::FixedSizeIdAllocator::pop() {
     }
     return 0;
 }
-void tml::FixedSizeIdAllocator::push(uint32_t id) {
+void FixedSizeIdAllocator::push(uint32_t id) {
     TM_ASSERT(id > 0);
     auto index = id - 1;
     auto new_free = (int32_t*)((char*)data + index * allocation_size);
@@ -1880,9 +1899,9 @@ void tml::FixedSizeIdAllocator::push(uint32_t id) {
     free_index = index;
 }
 
-tml::FixedSizeGenerationalIdAllocator::FixedSizeGenerationalIdAllocator(int32_t initial_element_capacity,
-                                                                        int32_t element_size_in_bytes,
-                                                                        int32_t element_alignment)
+FixedSizeGenerationalIdAllocator::FixedSizeGenerationalIdAllocator(int32_t initial_element_capacity,
+                                                                   int32_t element_size_in_bytes,
+                                                                   int32_t element_alignment)
     : allocation_size(element_size_in_bytes), allocation_alignment(element_alignment) {
     if (allocation_alignment < (int32_t)sizeof(int32_t)) allocation_alignment = (int32_t)sizeof(int32_t);
     // Increase the allocation size by the size of the header.
@@ -1893,13 +1912,13 @@ tml::FixedSizeGenerationalIdAllocator::FixedSizeGenerationalIdAllocator(int32_t 
     data = TM_MALLOC(allocation_size * initial_element_capacity, allocation_alignment);
     if (data) capacity = initial_element_capacity;
 }
-tml::FixedSizeGenerationalIdAllocator::~FixedSizeGenerationalIdAllocator() {
+FixedSizeGenerationalIdAllocator::~FixedSizeGenerationalIdAllocator() {
     if (data) {
-        TM_FREE(data, allocation_size * capacity, allocation_alignment);
+        TM_FREE(data);
         data = nullptr;
     }
 }
-tml::FixedSizeGenerationalIdAllocator::FixedSizeGenerationalIdAllocator(FixedSizeGenerationalIdAllocator&& other)
+FixedSizeGenerationalIdAllocator::FixedSizeGenerationalIdAllocator(FixedSizeGenerationalIdAllocator&& other)
     : data(other.data),
       size(other.size),
       capacity(other.capacity),
@@ -1911,11 +1930,11 @@ tml::FixedSizeGenerationalIdAllocator::FixedSizeGenerationalIdAllocator(FixedSiz
     other.capacity = 0;
     other.free_index = -1;
 }
-tml::FixedSizeGenerationalIdAllocator& tml::FixedSizeGenerationalIdAllocator::operator=(
+FixedSizeGenerationalIdAllocator& FixedSizeGenerationalIdAllocator::operator=(
     FixedSizeGenerationalIdAllocator&& other) {
     if (this != &other) {
         if (data) {
-            TM_FREE(data, allocation_size * capacity, allocation_alignment);
+            TM_FREE(data);
         }
         data = other.data;
         size = other.size;
@@ -1928,14 +1947,13 @@ tml::FixedSizeGenerationalIdAllocator& tml::FixedSizeGenerationalIdAllocator::op
     }
     return *this;
 }
-uint32_t tml::FixedSizeGenerationalIdAllocator::create() {
+uint32_t FixedSizeGenerationalIdAllocator::create() {
     TM_ASSERT(data);
     if (auto id = pop()) return id;
 
     if (size >= capacity) {
         auto new_capacity = next_capacity(capacity);
-        auto new_data = TM_REALLOC(data, capacity * allocation_size, allocation_size, new_capacity * allocation_size,
-                                   allocation_alignment);
+        auto new_data = TM_REALLOC(data, new_capacity * allocation_size, allocation_alignment);
         if (new_data) {
             data = new_data;
             capacity = (int32_t)new_capacity;
@@ -1944,7 +1962,6 @@ uint32_t tml::FixedSizeGenerationalIdAllocator::create() {
 
     if (size < capacity) {
         TM_ASSERT(size != INT32_MAX);
-        TM_ASSERT(size > 0);
         auto header = (Header*)((char*)data + size * allocation_size);
         *header = Header::make(/*generation=*/0, size, /*occupied=*/true);
         size++;
@@ -1952,14 +1969,14 @@ uint32_t tml::FixedSizeGenerationalIdAllocator::create() {
     }
     return 0;
 }
-void tml::FixedSizeGenerationalIdAllocator::destroy(uint32_t id) {
+void FixedSizeGenerationalIdAllocator::destroy(uint32_t id) {
     if (base_from_id(id)) push(id);
 }
-void* tml::FixedSizeGenerationalIdAllocator::data_from_id(uint32_t id) {
+void* FixedSizeGenerationalIdAllocator::data_from_id(uint32_t id) {
     if (auto base = base_from_id(id)) return body_from_base(base);
     return nullptr;
 }
-uint32_t tml::FixedSizeGenerationalIdAllocator::pop() {
+uint32_t FixedSizeGenerationalIdAllocator::pop() {
     if (free_index > 0) {
         TM_ASSERT(free_index <= size);
         auto header = (Header*)((char*)data + free_index * allocation_size);
@@ -1969,14 +1986,14 @@ uint32_t tml::FixedSizeGenerationalIdAllocator::pop() {
     }
     return 0;
 }
-void tml::FixedSizeGenerationalIdAllocator::push(uint32_t id) {
+void FixedSizeGenerationalIdAllocator::push(uint32_t id) {
     auto index = Header::id(id);
     auto new_free = (Header*)((char*)data + index * allocation_size);
     TM_ASSERT(new_free->bits == id);
     *new_free = Header::make(new_free->generation() + 1, free_index, /*occupied=*/false);
     free_index = index;
 }
-void* tml::FixedSizeGenerationalIdAllocator::base_from_id(uint32_t id) {
+void* FixedSizeGenerationalIdAllocator::base_from_id(uint32_t id) {
     if (!Header::occupied(id)) return nullptr;
     auto index = Header::id(id);
     if ((int32_t)index >= size) return nullptr;
@@ -1985,20 +2002,31 @@ void* tml::FixedSizeGenerationalIdAllocator::base_from_id(uint32_t id) {
     if (header->bits != id) return nullptr;
     return result;
 }
-void* tml::FixedSizeGenerationalIdAllocator::body_from_base(void* header) {
+void* FixedSizeGenerationalIdAllocator::body_from_base(void* header) {
     auto end_of_header = (char*)header + sizeof(uint32_t);
     return end_of_header + alignment_offset(end_of_header, allocation_alignment);
 }
 
-bool tml::FixedSizeGenerationalIdAllocator::ForwardIterator::operator==(const ForwardIterator& other) const {
+FixedSizeGenerationalIdAllocator::ForwardIterator::ForwardIterator(void* data, int32_t size, int32_t allocation_size,
+                                                                   int32_t allocation_alignment)
+    : data(data), size(size), allocation_size(allocation_size), allocation_alignment(allocation_alignment) {
+    if (size) {
+        if (!((Header*)data)->occupied()) ++(*this);
+    }
+}
+
+bool FixedSizeGenerationalIdAllocator::ForwardIterator::operator==(const ForwardIterator& other) const {
     return data == other.data && size == other.size && allocation_size == other.allocation_size;
 }
-bool tml::FixedSizeGenerationalIdAllocator::ForwardIterator::operator!=(const ForwardIterator& other) const {
+bool FixedSizeGenerationalIdAllocator::ForwardIterator::operator!=(const ForwardIterator& other) const {
     return data != other.data || size != other.size || allocation_size != other.allocation_size;
 }
-void* tml::FixedSizeGenerationalIdAllocator::ForwardIterator::operator*() const { return data; }
-tml::FixedSizeGenerationalIdAllocator::ForwardIterator tml::FixedSizeGenerationalIdAllocator::ForwardIterator::
-operator++() {
+uint32_t FixedSizeGenerationalIdAllocator::ForwardIterator::id() const { return ((Header*)data)->bits; }
+void* FixedSizeGenerationalIdAllocator::ForwardIterator::operator*() const {
+    auto end_of_header = (char*)data + sizeof(uint32_t);
+    return end_of_header + alignment_offset(end_of_header, allocation_alignment);
+}
+FixedSizeGenerationalIdAllocator::ForwardIterator FixedSizeGenerationalIdAllocator::ForwardIterator::operator++() {
     // Prefix increment.
     TM_ASSERT(size);
     char* p = (char*)data + allocation_size;
@@ -2009,44 +2037,60 @@ operator++() {
         p += allocation_size;
         --size;
     } while (size);
+    data = p;
     return *this;
 }
-tml::FixedSizeGenerationalIdAllocator::ForwardIterator tml::FixedSizeGenerationalIdAllocator::ForwardIterator::
-operator++(int) {
+FixedSizeGenerationalIdAllocator::ForwardIterator FixedSizeGenerationalIdAllocator::ForwardIterator::operator++(int) {
     // Postfix increment.
     auto previous = *this;
     this->operator++();
     return previous;
 }
 
-bool tml::FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator==(const ConstForwardIterator& other) const {
+FixedSizeGenerationalIdAllocator::ConstForwardIterator::ConstForwardIterator(void* data, int32_t size,
+                                                                             int32_t allocation_size,
+                                                                             int32_t allocation_alignment)
+    : data(data), size(size), allocation_size(allocation_size), allocation_alignment(allocation_alignment) {
+    if (size) {
+        if (!((const Header*)data)->occupied()) ++(*this);
+    }
+}
+bool FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator==(const ConstForwardIterator& other) const {
     return data == other.data && size == other.size && allocation_size == other.allocation_size;
 }
-bool tml::FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator!=(const ConstForwardIterator& other) const {
+bool FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator!=(const ConstForwardIterator& other) const {
     return data != other.data || size != other.size || allocation_size != other.allocation_size;
 }
-const void* tml::FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator*() const { return data; }
-tml::FixedSizeGenerationalIdAllocator::ConstForwardIterator
-tml::FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator++() {
+const void* FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator*() const {
+    auto end_of_header = (const char*)data + sizeof(uint32_t);
+    return end_of_header + alignment_offset(end_of_header, allocation_alignment);
+}
+FixedSizeGenerationalIdAllocator::ConstForwardIterator
+FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator++() {
     // Prefix increment.
     TM_ASSERT(size);
-    char* p = (char*)data + allocation_size;
+    const char* p = (const char*)data + allocation_size;
     --size;
     do {
-        auto header = (Header*)p;
+        auto header = (const Header*)p;
         if (header->occupied()) break;
         p += allocation_size;
         --size;
     } while (size);
+    data = p;
     return *this;
 }
-tml::FixedSizeGenerationalIdAllocator::ConstForwardIterator
-tml::FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator++(int) {
+FixedSizeGenerationalIdAllocator::ConstForwardIterator
+FixedSizeGenerationalIdAllocator::ConstForwardIterator::operator++(int) {
     // Postfix increment.
     auto previous = *this;
     this->operator++();
     return previous;
 }
+
+uint32_t FixedSizeGenerationalIdAllocator::ConstForwardIterator::id() const { return ((const Header*)data)->bits; }
+
+}  // namespace tml
 
 tml::MemoryBlock tml::MallocAllocator::allocate_bytes(size_t size, size_t alignment) {
     TM_MAYBE_UNUSED(alignment);
@@ -2058,7 +2102,7 @@ tml::MemoryBlock tml::MallocAllocator::reallocate_bytes(void* ptr, size_t old_si
     TM_MAYBE_UNUSED(alignment);
     TM_MAYBE_UNUSED(new_size);
     TM_MAYBE_UNUSED(alignment);
-    void* new_ptr = TM_REALLOC(ptr, old_size, alignment, new_size, alignment);
+    void* new_ptr = TM_REALLOC(ptr, new_size, alignment);
     return {new_ptr, (new_ptr) ? new_size : 0};
 }
 bool tml::MallocAllocator::reallocate_bytes_in_place(void* ptr, size_t old_size, size_t new_size, size_t alignment) {
@@ -2067,7 +2111,7 @@ bool tml::MallocAllocator::reallocate_bytes_in_place(void* ptr, size_t old_size,
     TM_MAYBE_UNUSED(new_size);
     TM_MAYBE_UNUSED(alignment);
 #ifdef TM_REALLOC_IN_PLACE
-    return TM_REALLOC_IN_PLACE(ptr, old_size, alignment, new_size, alignment);
+    return TM_REALLOC_IN_PLACE(ptr, new_size, alignment);
 #else
     return false;
 #endif
@@ -2075,7 +2119,7 @@ bool tml::MallocAllocator::reallocate_bytes_in_place(void* ptr, size_t old_size,
 void tml::MallocAllocator::free_bytes(void* ptr, size_t size, size_t alignment) {
     TM_MAYBE_UNUSED(size);
     TM_MAYBE_UNUSED(alignment);
-    TM_FREE(ptr, size, alignment);
+    TM_FREE(ptr);
 }
 
 #endif /* defined(TM_ALLOCATOR_IMPLEMENTATION) */

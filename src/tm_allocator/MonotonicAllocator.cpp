@@ -20,7 +20,7 @@ tml::MonotonicAllocator::MonotonicAllocator(MonotonicAllocator&& other)
 tml::MonotonicAllocator& tml::MonotonicAllocator::operator=(MonotonicAllocator&& other) {
     if (this != &other) {
         if (!leak_memory && allocators) {
-            TM_FREE(allocators, capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
+            TM_FREE(allocators);
         }
         allocators = other.allocators;
         current = other.current;
@@ -37,7 +37,7 @@ tml::MonotonicAllocator& tml::MonotonicAllocator::operator=(MonotonicAllocator&&
 }
 tml::MonotonicAllocator::~MonotonicAllocator() {
     if (!leak_memory && allocators) {
-        TM_FREE(allocators, capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
+        TM_FREE(allocators);
         allocators = nullptr;
     }
 }
@@ -59,8 +59,7 @@ tml::MemoryBlock tml::MonotonicAllocator::allocate_bytes(size_t size, size_t ali
     if (auto result = allocators[current].allocate_bytes(size, alignment)) return result;
 
     auto new_capacity = capacity + 1;
-    auto new_allocators = TM_REALLOC(allocators, capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT,
-                                     new_capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
+    auto new_allocators = TM_REALLOC(allocators, new_capacity * sizeof(StackAllocator), TM_DEFAULT_ALIGNMENT);
     if (!new_allocators) return {};
     allocators = (StackAllocator*)new_allocators;
     capacity = new_capacity;

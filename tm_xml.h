@@ -100,9 +100,11 @@ HISTORY      (DD.MM.YY)
         // Either all or none have to be defined.
         #include <stdlib.h>
         #define TM_MALLOC(size, alignment) malloc((size))
-        #define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) realloc((ptr), (new_size))
-        // #define TM_REALLOC_IN_PLACE(ptr, old_size, old_alignment, new_size, new_alignment) // Optional
-        #define TM_FREE(ptr, size, alignment) free((ptr))
+        #define TM_REALLOC(ptr, new_size, new_alignment) realloc((ptr), (new_size))
+        // #define TM_REALLOC_IN_PLACE(ptr, new_size, new_alignment) // Optional
+        #define TM_FREE(ptr) free((ptr))
+        // Define as 1 if alignment parameter is actually respected.
+        #define TM_MALLOC_ALIGNMENT_AWARE 0
     #endif
 #endif
 // clang-format on
@@ -896,8 +898,7 @@ static tm_bool tmxml_grow_buffer(tmxml_reader* reader, tm_size_t content_size, s
     if (out->data == reader->sbo) {
         new_buffer = TM_MALLOC(content_size * sizeof(char), sizeof(char));
     } else {
-        new_buffer
-            = TM_REALLOC(out->data, out->size * sizeof(char), sizeof(char), content_size * sizeof(char), sizeof(char));
+        new_buffer = TM_REALLOC(out->data, content_size * sizeof(char), sizeof(char));
     }
     if (!new_buffer) {
         reader->current.type = tmxml_tok_error;
@@ -1635,7 +1636,7 @@ TMXML_DEF tm_bool tmxml_unescape_current_token(tmxml_reader* reader) {
 
 TMXML_DEF void tmxml_destroy_reader(tmxml_reader* reader) {
     if (reader && reader->buffer) {
-        TM_FREE(reader->buffer, reader->buffer_size * sizeof(char), sizeof(char));
+        TM_FREE(reader->buffer);
         reader->buffer = TM_NULL;
         reader->buffer_size = 0;
     }

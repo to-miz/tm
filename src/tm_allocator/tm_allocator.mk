@@ -2,7 +2,7 @@ unmerged.tm_allocator.out := ${build_dir}unmerged.tm_allocator${exe_ext}
 
 # ${unmerged.tm_allocator.out}: private override BUILD := release
 ${unmerged.tm_allocator.out}: private options.cl.exception := -EHs
-${unmerged.tm_allocator.out}: src/tm_allocator/*.cpp src/tm_allocator/*.h
+${unmerged.tm_allocator.out}: ${unmerged_deps} src/tm_allocator/*.cpp src/tm_allocator/*.h
 	${hide}echo Compiling $@.
 	${hide}$(call cxx_compile_and_link, src/tm_allocator/test.cpp, $@, src/tm_allocator .)
 

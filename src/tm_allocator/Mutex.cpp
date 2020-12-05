@@ -61,7 +61,7 @@ tml::RecursiveMutex& tml::RecursiveMutex::operator=(RecursiveMutex&& other) {
         if (internal) {
             using std::recursive_mutex;
             static_cast<recursive_mutex*>(internal)->~recursive_mutex();
-            TM_FREE(internal, sizeof(recursive_mutex), sizeof(void*));
+            TM_FREE(internal);
             internal = nullptr;
         }
     }

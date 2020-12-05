@@ -2,7 +2,7 @@ unmerged.tm_small_vector.out := ${build_dir}unmerged.tm_small_vector${exe_ext}
 
 # ${unmerged.tm_small_vector.out}: private override BUILD := release
 ${unmerged.tm_small_vector.out}: private options.cl.exception := -EHs
-${unmerged.tm_small_vector.out}: src/tm_small_vector/*.cpp
+${unmerged.tm_small_vector.out}: ${unmerged_deps} src/tm_small_vector/*.cpp
 	${hide}echo Compiling $@.
 	${hide}$(call cxx_compile_and_link, src/tm_small_vector/test.cpp, $@, src/tm_small_vector .)
 

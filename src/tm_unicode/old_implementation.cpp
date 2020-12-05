@@ -78,8 +78,8 @@ tmf_utf16_contents_result tmf_utf8_n_to_utf16(const char* str, tm_size_t len, tm
     #define TMF_FREE TM_FREE
 #else
     #define TMF_MALLOC(size, alignment) malloc((size))
-    #define TMF_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) realloc((ptr), (new_size))
-    #define TMF_FREE(ptr, size, alignment) free((ptr))
+    #define TMF_REALLOC(ptr, new_size, new_alignment) realloc((ptr), (new_size))
+    #define TMF_FREE(ptr) free((ptr))
 #endif
 
 #ifdef TM_MEMMOVE

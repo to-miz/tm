@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.9.2 - public domain - https://github.com/to-miz/tm
+tm_unicode.h v0.9.4 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
@@ -97,6 +97,8 @@ ISSUES
     - Grapheme break detection not implemented yet.
 
 HISTORY    (DD.MM.YY)
+    v0.9.4 19.11.20 Changed the signature of TM_MALLOC to be less restrictive.
+    v0.9.3  12.08.20 Removed *_managed functions, use tm_resource_ptr instead for RAII.
     v0.9.2  08.08.20 Added tmu_printf, tmu_vprintf, tmu_fprintf, tmu_vfprintf.
                      Added tests for console output.
     v0.9.1  06.08.20 Added tmu_module_filename, tmu_module_directory, tmu_open_directory,
@@ -170,6 +172,8 @@ HISTORY    (DD.MM.YY)
 #include "file_io.h"
 #endif /* !defined(TMU_NO_FILE_IO) */
 
+#include "cpp_overloads.h"
+
 #endif  // _TM_UNICODE_H_INCLUDED_28D2399D_8C7A_4524_8865_E05090EE0765
 
 #ifdef TM_UNICODE_IMPLEMENTATION
@@ -200,6 +204,8 @@ HISTORY    (DD.MM.YY)
 #include "file_io_implementation.cpp"
 
 #endif /* !defined(TMU_NO_FILE_IO) */
+
+#include "cpp_overloads.cpp"
 
 #endif /* defined(TM_UNICODE_IMPLEMENTATION) */
 

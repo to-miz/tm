@@ -1,5 +1,5 @@
 /*
-tm_small_vector.h v0.0.8 - public domain - https://github.com/to-miz/tm
+tm_small_vector.h v0.0.9 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2020
 
 No warranty; use at your own risk.
@@ -32,6 +32,7 @@ ISSUES
     - Not yet first release.
 
 HISTORY     (DD.MM.YY)
+    v0.0.9   08.11.20 Changed signatures of TM_REALLOC and TM_FREE.
     v0.0.8   16.02.20 Fixed clang and x86 compilation errors.
     v0.0.7   30.07.19 Added is_sbo method.
     v0.0.6   13.07.19 Fixed resize returning true on noop.
@@ -81,9 +82,11 @@ HISTORY     (DD.MM.YY)
     // Either all or none have to be defined.
     #include <stdlib.h>
     #define TM_MALLOC(size, alignment) malloc((size))
-    #define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) realloc((ptr), (new_size))
-    // #define TM_REALLOC_IN_PLACE(ptr, old_size, old_alignment, new_size, new_alignment) // Optional
-    #define TM_FREE(ptr, size, alignment) free((ptr))
+    #define TM_REALLOC(ptr, new_size, new_alignment) realloc((ptr), (new_size))
+    // #define TM_REALLOC_IN_PLACE(ptr, new_size, new_alignment) // Optional
+    #define TM_FREE(ptr) free((ptr))
+    // Define as 1 if alignment parameter is actually respected.
+    #define TM_MALLOC_ALIGNMENT_AWARE 0
 #endif
 
 #ifndef TM_UNREFERENCED_PARAM
@@ -388,8 +391,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_ba
         tm_size_t new_capacity = get_next_capacity(guts->capacity(), amount);
 #ifdef TM_REALLOC_IN_PLACE
         if (!guts->is_sbo()) {
-            void* new_data = TM_REALLOC_IN_PLACE(guts->ptr, sizeof(T) * guts->capacity(), alignof(T),
-                                                 sizeof(T) * new_capacity, alignof(T));
+            void* new_data = TM_REALLOC_IN_PLACE(guts->ptr, sizeof(T) * new_capacity, alignof(T));
             if (new_data) {
                 guts->ptr = (T*)new_data;
                 guts->set_capacity(new_capacity);
@@ -401,8 +403,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_ba
 #ifdef TM_REALLOC
         if constexpr (::std::is_trivially_copyable<T>::value) {
             if (!guts->is_sbo()) {
-                void* new_data = TM_REALLOC(guts->ptr, sizeof(T) * guts->capacity(), alignof(T),
-                                            sizeof(T) * new_capacity, alignof(T));
+                void* new_data = TM_REALLOC(guts->ptr, sizeof(T) * new_capacity, alignof(T));
                 if (new_data) {
                     guts->ptr = (T*)new_data;
                     guts->set_capacity(new_capacity);
@@ -434,7 +435,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_ba
             }
         }
         if (!guts->is_sbo()) {
-            TM_FREE(guts->ptr, sizeof(T) * guts->capacity(), alignof(T));
+            TM_FREE(guts->ptr);
         }
 
         guts->ptr = new_data;
@@ -449,7 +450,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_ba
             }
         }
         if (!guts->is_sbo()) {
-            TM_FREE(guts->ptr, sizeof(T) * guts->capacity(), alignof(T));
+            TM_FREE(guts->ptr);
             guts->ptr = nullptr;
             guts->set_capacity(0);
         }
@@ -463,7 +464,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_ba
             tm_size_t size = guts->sz;
 #ifdef TM_REALLOC_IN_PLACE
             void* new_data =
-                TM_REALLOC_IN_PLACE(guts->ptr, sizeof(T) * guts->capacity(), alignof(T), sizeof(T) * size, alignof(T));
+                TM_REALLOC_IN_PLACE(guts->ptr, sizeof(T) * size, alignof(T));
             if (new_data) {
                 guts->ptr = (T*)new_data;
                 guts->set_capacity(size);
@@ -473,8 +474,7 @@ struct small_vector_alloc<T, malloc_allocator_tag> : public small_vector_impl_ba
 
 #ifdef TM_REALLOC
             if constexpr (::std::is_trivially_copyable<T>::value) {
-                void* new_data =
-                    TM_REALLOC(guts->ptr, sizeof(T) * guts->capacity(), alignof(T), sizeof(T) * size, alignof(T));
+                void* new_data = TM_REALLOC(guts->ptr, sizeof(T) * size, alignof(T));
                 if (new_data) {
                     guts->ptr = (T*)new_data;
                     guts->set_capacity(size);

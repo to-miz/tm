@@ -488,7 +488,7 @@ WCHAR** test_CommandLineToArgvW(const WCHAR* command_line, int* out_args_count) 
 
 void test_LocalFree(WCHAR** ptr) {
     TM_ASSERT(ptr);
-    TM_FREE(ptr, sizeof(WCHAR*) * 2, sizeof(WCHAR*));
+    TM_FREE(ptr);
 }
 
 DWORD test_GetModuleFileNameW(HANDLE handle, WCHAR* out, DWORD out_size) {

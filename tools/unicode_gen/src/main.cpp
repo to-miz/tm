@@ -1424,19 +1424,19 @@ struct unique_ucd {
 
     static int32_t add_unique_run(vector<codepoint_run>* runs, const uint32_t* codepoints, int32_t count) {
         if (!count) return 0;
-        int32_t prev_codepoints = 0;
+        int32_t utf16_surrogate_leads = 0;
         for (int32_t i = 0, runs_count = (int32_t)runs->size(); i < runs_count; ++i) {
             auto current = &runs->at(i);
             if (current->equals(codepoints, count)) {
                 ++current->references;
-                return prev_codepoints;
+                return utf16_surrogate_leads;
             }
-            prev_codepoints += current->count + 1;
+            utf16_surrogate_leads += current->count + 1;
         }
         uint32_t* added = monotonic_new_array<uint32_t>(count);
         copy(codepoints, codepoints + count, added);
         runs->push_back({added, count, 1});
-        return prev_codepoints;
+        return utf16_surrogate_leads;
     }
     static int32_t add_unique_ucd_entry(vector<ucd_entry>* entries, const ucd_entry& entry) {
         for (int32_t i = 0, entries_count = (int32_t)entries->size(); i < entries_count; ++i) {

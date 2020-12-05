@@ -27,12 +27,12 @@ unmerged.tm_unicode.c.out := ${build_dir}unmerged.tm_unicode.c${exe_ext}
 
 ${unmerged.tm_unicode.out}: CXX_OPTIONS.gcc += -Wno-error=unused-function
 ${unmerged.tm_unicode.out}: CXX_OPTIONS.clang += -Wno-error=unused-function
-${unmerged.tm_unicode.out}: src/tm_unicode/*.cpp src/tm_unicode/*.h ${generated.tm_unicode}
+${unmerged.tm_unicode.out}: ${unmerged_deps} src/tm_unicode/*.cpp src/tm_unicode/*.h ${generated.tm_unicode}
 	${hide}echo Compiling $@.
 	${hide}$(call cxx_compile_and_link, src/tm_unicode/test.cpp, $@, src/tm_unicode .)
 
 ${unmerged.tm_unicode.c.out}: C_OPTIONS.clang += -Wno-newline-eof
-${unmerged.tm_unicode.c.out}: src/tm_unicode/*.cpp src/tm_unicode/*.c
+${unmerged.tm_unicode.c.out}: ${unmerged_deps} src/tm_unicode/*.cpp src/tm_unicode/*.c
 	${hide}echo Compiling $@.
 	${hide}$(call c_compile_and_link, src/tm_unicode/test.c, $@, src/tm_unicode .)
 
@@ -44,4 +44,4 @@ tm_unicode.h: ${generated.tm_unicode} ${merge.out} ${unmerged.tm_unicode.out} ${
 	${hide}echo Merging $@.
 	${hide}${merge.out} src/tm_unicode/main.cpp $@ src/tm_unicode -r
 
-merge.tm_unicode: tm_unicode.h
+merge.all: tm_unicode.h

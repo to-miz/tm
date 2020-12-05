@@ -1009,17 +1009,16 @@ TEST_CASE_TEMPLATE("write outside of range test", T, int, non_trivial, non_trivi
         --allocation_id;
         return result;
     };
-    auto my_realloc = [&](void* ptr, size_t old_size, size_t new_size) -> void* {
+    auto my_realloc = [&](void* ptr, size_t new_size) -> void* {
         auto result = my_malloc(new_size);
         if (ptr) {
             auto allocation = find_allocation(ptr);
             REQUIRE(allocation);
             REQUIRE(!allocation->freed);
-            REQUIRE(allocation->size == old_size);
             allocation->freed = (new_size == 0);
             if (result) {
                 allocation->freed = true;
-                size_t min_size = (new_size < old_size) ? new_size : old_size;
+                size_t min_size = (new_size < allocation->size) ? new_size : allocation->size;
                 if (min_size) memcpy(result, ptr, min_size);
             }
             if (allocation->freed) {
@@ -1028,23 +1027,23 @@ TEST_CASE_TEMPLATE("write outside of range test", T, int, non_trivial, non_trivi
         }
         return result;
     };
-    auto my_realloc_in_place = [&](void* ptr, size_t old_size, size_t new_size) -> void* {
-        if (ptr && new_size < old_size) {
+    auto my_realloc_in_place = [&](void* ptr, size_t new_size) -> void* {
+        if (ptr) {
             auto allocation = find_allocation(ptr);
-            REQUIRE(allocation);
-            REQUIRE(allocation->size == old_size);
-            REQUIRE(!allocation->freed);
-            memset((char*)ptr + new_size, allocation->id, old_size - new_size);
-            return ptr;
+            if (new_size < allocation->size) {
+                REQUIRE(allocation);
+                REQUIRE(!allocation->freed);
+                memset((char*)ptr + new_size, allocation->id, allocation->size - new_size);
+                return ptr;
+            }
         }
         return nullptr;
     };
-    auto my_free = [&](void* ptr, size_t size) -> void {
+    auto my_free = [&](void* ptr) -> void {
         if (ptr) {
             auto allocation = find_allocation(ptr);
             REQUIRE(allocation);
             REQUIRE(!allocation->freed);
-            REQUIRE(allocation->size == size);
             memset(ptr, allocation->id, allocation->total_size);
             allocation->freed = true;
         }

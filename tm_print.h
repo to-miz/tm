@@ -179,9 +179,11 @@ HISTORY
         // Either all or none have to be defined.
         #include <cstdlib>
         #define TM_MALLOC(size, alignment) std::malloc((size))
-        #define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) std::realloc((ptr), (new_size))
-        // #define TM_REALLOC_IN_PLACE(ptr, old_size, old_alignment, new_size, new_alignment) // Optional
-        #define TM_FREE(ptr, size, alignment) std::free((ptr))
+        #define TM_REALLOC(ptr, new_size, new_alignment) std::realloc((ptr), (new_size))
+        // #define TM_REALLOC_IN_PLACE(ptr, new_size, new_alignment) // Optional
+        #define TM_FREE(ptr) std::free((ptr))
+        // Define as 1 if alignment parameter is actually respected.
+        #define TM_MALLOC_ALIGNMENT_AWARE 0
     #endif
 
     /*
@@ -1623,8 +1625,7 @@ static tmp_reallocate_result tmp_allocator_default_reallocate(void* /*context*/,
 
     tmp_reallocate_result result = {nullptr, 0};
     if (old_ptr && old_size > 0) {
-        result.ptr =
-            (char*)TM_REALLOC(old_ptr, old_size * sizeof(char), sizeof(char), new_size * sizeof(char), sizeof(char));
+        result.ptr = (char*)TM_REALLOC(old_ptr, new_size * sizeof(char), sizeof(char));
     } else {
         result.ptr = (char*)TM_MALLOC(new_size * sizeof(char), sizeof(char));
     }
@@ -1633,7 +1634,7 @@ static tmp_reallocate_result tmp_allocator_default_reallocate(void* /*context*/,
 }
 static void tmp_allocator_default_destroy(void* /*context*/, char* ptr, tm_size_t size) {
     (void)size;
-    TM_FREE(ptr, size * sizeof(char), sizeof(char));
+    TM_FREE(ptr);
 }
 
 static tmp_allocator_context tmp_default_allocator() {

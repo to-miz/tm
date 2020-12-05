@@ -549,8 +549,7 @@ static tm_bool tmxml_grow_buffer(tmxml_reader* reader, tm_size_t content_size, s
     if (out->data == reader->sbo) {
         new_buffer = TM_MALLOC(content_size * sizeof(char), sizeof(char));
     } else {
-        new_buffer
-            = TM_REALLOC(out->data, out->size * sizeof(char), sizeof(char), content_size * sizeof(char), sizeof(char));
+        new_buffer = TM_REALLOC(out->data, content_size * sizeof(char), sizeof(char));
     }
     if (!new_buffer) {
         reader->current.type = tmxml_tok_error;
@@ -1288,7 +1287,7 @@ TMXML_DEF tm_bool tmxml_unescape_current_token(tmxml_reader* reader) {
 
 TMXML_DEF void tmxml_destroy_reader(tmxml_reader* reader) {
     if (reader && reader->buffer) {
-        TM_FREE(reader->buffer, reader->buffer_size * sizeof(char), sizeof(char));
+        TM_FREE(reader->buffer);
         reader->buffer = TM_NULL;
         reader->buffer_size = 0;
     }

@@ -39,8 +39,7 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
         while (getcwd(result.contents.data, result.contents.capacity) == TM_NULL) {
             if (errno == ERANGE) {
                 tm_size_t new_size = result.contents.capacity + increment_size;
-                char* new_data = (char*)TMU_REALLOC(result.contents.data, result.contents.capacity * sizeof(char),
-                                                    sizeof(char), new_size * sizeof(char), sizeof(char));
+                char* new_data = (char*)TMU_REALLOC(result.contents.data, new_size * sizeof(char), sizeof(char));
                 if (!new_data) {
                     tmu_destroy_contents(&result.contents);
                     result.ec = TM_ENOMEM;
@@ -65,8 +64,7 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
         /* Pad by extra_size and room for trailing '/'. */
         tm_size_t new_size = result.contents.size + extra_size + 1;
         if (new_size > result.contents.capacity) {
-            char* new_data = (char*)TMU_REALLOC(result.contents.data, result.contents.capacity * sizeof(char),
-                                                sizeof(char), new_size * sizeof(char), sizeof(char));
+            char* new_data = (char*)TMU_REALLOC(result.contents.data, new_size * sizeof(char), sizeof(char));
             if (!new_data) {
                 tmu_destroy_contents(&result.contents);
                 result.ec = TM_ENOMEM;
@@ -104,8 +102,7 @@ TMU_DEF tmu_contents_result tmu_module_filename() {
             last_error = errno;
             if (size < 0) break;
             if (size >= filename_size) {
-                new_filename = (char*)TMU_REALLOC(filename, filename_size * sizeof(char), sizeof(char),
-                                                  filename_size * sizeof(char) * 2, sizeof(char));
+                new_filename = (char*)TMU_REALLOC(filename, filename_size * sizeof(char) * 2, sizeof(char));
                 if (!new_filename) {
                     result.ec = TM_ENOMEM;
                     break;
@@ -138,7 +135,7 @@ TMU_DEF tmu_contents_result tmu_module_filename() {
         result.contents.size = (tm_size_t)size;
         result.contents.capacity = (tm_size_t)filename_size;
     } else {
-        TMU_FREE(filename, filename_size * sizeof(char), sizeof(char));
+        TMU_FREE(filename);
     }
     return result;
 }

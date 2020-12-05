@@ -66,21 +66,11 @@ TEST_CASE("write and read") {
     REQUIRE(mock.entries.size() == 1);
     REQUIRE((tm_size_t)mock.entries[0].contents.size() == write_result.written);
 
-    auto read_result = tmu_read_file_managed(filename);
-    REQUIRE(read_result.ec == TM_OK);
-    REQUIRE(read_result.contents.size == test_data_len);
-    REQUIRE(memcmp(read_result.contents.data, test_data, test_data_len) == 0);
+    auto read_result = tml::make_resource(tmu_read_file(filename));
+    REQUIRE(read_result->ec == TM_OK);
+    REQUIRE(read_result->contents.size == test_data_len);
+    REQUIRE(memcmp(read_result->contents.data, test_data, test_data_len) == 0);
     REQUIRE(!mock.file.is_open);
-
-    auto vec = tmu_read_file_to_vector(filename);
-    REQUIRE(!vec.empty());
-    REQUIRE((tm_size_t)vec.size() == test_data_len);
-    REQUIRE(memcmp(vec.data(), test_data, test_data_len) == 0);
-
-    auto vec_utf8 = tmu_read_file_as_utf8_to_vector(filename);
-    REQUIRE(!vec_utf8.empty());
-    REQUIRE((tm_size_t)vec_utf8.size() == test_data_len);
-    REQUIRE(memcmp(vec_utf8.data(), test_data, test_data_len) == 0);
 
     REQUIRE(tmu_delete_file(filename) == TM_OK);
     REQUIRE(mock.entries.empty());
@@ -220,19 +210,20 @@ TEST_CASE("unicode") {
         {"utf16le", tmu_encoding_utf16le}, {"utf16le_bom", tmu_encoding_utf16le_bom},
     };
 
-    auto utf8 = tmu_read_file_as_utf8_managed_ex(pairs[0].fn, tmu_encoding_utf8, tmu_validate_error, nullptr);
-    REQUIRE(utf8.ec == TM_OK);
-    REQUIRE(utf8.contents.size > 0);
+    using namespace tml;
+    auto utf8 = make_resource(tmu_read_file_as_utf8_ex(pairs[0].fn, tmu_encoding_utf8, tmu_validate_error, nullptr));
+    REQUIRE(utf8->ec == TM_OK);
+    REQUIRE(utf8->contents.size > 0);
 
     for (auto& pair : pairs) {
-        auto other = tmu_read_file_as_utf8_managed_ex(pair.fn, pair.encoding, tmu_validate_error, nullptr);
+        auto other = make_resource(tmu_read_file_as_utf8_ex(pair.fn, pair.encoding, tmu_validate_error, nullptr));
         CAPTURE(pair.fn);
-        REQUIRE(other.ec == TM_OK);
-        REQUIRE(other.contents.size > 0);
-        REQUIRE(other.contents.size == utf8.contents.size);
-        REQUIRE(other.contents.size < other.contents.capacity);  // Nullterminator is not part of size.
-        REQUIRE(other.contents.data[other.contents.size] == 0);  // Must be null-terminated.
-        REQUIRE(memcmp(other.contents.data, utf8.contents.data, utf8.contents.size) == 0);
+        REQUIRE(other->ec == TM_OK);
+        REQUIRE(other->contents.size > 0);
+        REQUIRE(other->contents.size == utf8->contents.size);
+        REQUIRE(other->contents.size < other->contents.capacity);  // Nullterminator is not part of size.
+        REQUIRE(other->contents.data[other->contents.size] == 0);  // Must be null-terminated.
+        REQUIRE(memcmp(other->contents.data, utf8->contents.data, utf8->contents.size) == 0);
     }
 }
 
@@ -241,27 +232,27 @@ TEST_CASE("current working dir") {
     mock.clear();
 
     tm_size_t extra_size = 20;
-    auto cwd = tmu_current_working_directory_managed(extra_size);
+    auto cwd = tml::make_resource(tmu_current_working_directory(extra_size));
 
-    REQUIRE(cwd.ec == TM_OK);
+    REQUIRE(cwd->ec == TM_OK);
 
     // Success checks.
-    REQUIRE(cwd.contents.size > 0);
-    REQUIRE(cwd.contents.capacity > 0);
-    REQUIRE(cwd.contents.size <= cwd.contents.capacity);
-    REQUIRE(cwd.contents.data != nullptr);
+    REQUIRE(cwd->contents.size > 0);
+    REQUIRE(cwd->contents.capacity > 0);
+    REQUIRE(cwd->contents.size <= cwd->contents.capacity);
+    REQUIRE(cwd->contents.data != nullptr);
 
-    CAPTURE(cwd.contents.data);
+    CAPTURE(cwd->contents.data);
 
     // Directories always have a trailing path delimiter '/'.
-    REQUIRE(cwd.contents.data[cwd.contents.size - 1] == '/');
+    REQUIRE(cwd->contents.data[cwd->contents.size - 1] == '/');
 
     // Nullterminated.
-    REQUIRE(cwd.contents.size < cwd.contents.capacity);
-    REQUIRE(cwd.contents.data[cwd.contents.size] == 0);
+    REQUIRE(cwd->contents.size < cwd->contents.capacity);
+    REQUIRE(cwd->contents.data[cwd->contents.size] == 0);
 
     // Check whether there is room for extra_size and a nullterminator.
-    REQUIRE(cwd.contents.size + extra_size + 1 <= cwd.contents.capacity);
+    REQUIRE(cwd->contents.size + extra_size + 1 <= cwd->contents.capacity);
 }
 
 #ifndef USE_WINDOWS_H
@@ -470,28 +461,28 @@ TEST_CASE("error reporting") {
 TEST_CASE("winapi command line") {
     allocation_guard alloc_guard;
 
-    auto result = tmu_utf8_winapi_get_command_line_managed();
-    REQUIRE(result.ec == TM_OK);
-    REQUIRE(result.command_line.args);
-    REQUIRE(result.command_line.args_count == 1);
-    REQUIRE(*result.command_line.args);
-    REQUIRE(result.command_line.args[0]);
-    REQUIRE(*result.command_line.args[0]);
-    REQUIRE(result.command_line.args[1]);
-    REQUIRE(*result.command_line.args[1] == 0);
-    REQUIRE(result.command_line.internal_buffer);
+    auto result = tml::make_resource(tmu_utf8_winapi_get_command_line());
+    REQUIRE(result->ec == TM_OK);
+    REQUIRE(result->command_line.args);
+    REQUIRE(result->command_line.args_count == 1);
+    REQUIRE(*result->command_line.args);
+    REQUIRE(result->command_line.args[0]);
+    REQUIRE(*result->command_line.args[0]);
+    REQUIRE(result->command_line.args[1]);
+    REQUIRE(*result->command_line.args[1] == 0);
+    REQUIRE(result->command_line.internal_buffer);
 
     mock.set_fail(fail_GetCommandLineW, ERROR_MOCK);
-    result = tmu_utf8_winapi_get_command_line_managed();
-    REQUIRE(result.ec != TM_OK);
+    result = tml::make_resource(tmu_utf8_winapi_get_command_line());
+    REQUIRE(result->ec != TM_OK);
 
     mock.set_fail(fail_GetCommandLineW, ERROR_MOCK_INVALID_COMMAND_LINE);
-    result = tmu_utf8_winapi_get_command_line_managed();
-    REQUIRE(result.ec != TM_OK);
+    result = tml::make_resource(tmu_utf8_winapi_get_command_line());
+    REQUIRE(result->ec != TM_OK);
 
     mock.set_fail(fail_CommandLineToArgvW, ERROR_MOCK);
-    result = tmu_utf8_winapi_get_command_line_managed();
-    REQUIRE(result.ec != TM_OK);
+    result = tml::make_resource(tmu_utf8_winapi_get_command_line());
+    REQUIRE(result->ec != TM_OK);
 }
 
 #endif /* defined(USE_WINDOWS_H) */
@@ -540,33 +531,33 @@ TEST_CASE("command line") {
     };
 
     {
-        auto result = tmu_utf8_command_line_from_utf16_managed(wide_args, entries_count - 1);
-        REQUIRE(result.ec == TM_OK);
-        REQUIRE(result.command_line.args);
-        REQUIRE(result.command_line.internal_buffer);
-        REQUIRE(result.command_line.args_count == entries_count - 1);
+        auto result = tml::make_resource(tmu_utf8_command_line_from_utf16(wide_args, entries_count - 1));
+        REQUIRE(result->ec == TM_OK);
+        REQUIRE(result->command_line.args);
+        REQUIRE(result->command_line.internal_buffer);
+        REQUIRE(result->command_line.args_count == entries_count - 1);
 
         for (int i = 0; i < entries_count; i++) {
-            REQUIRE(result.command_line.args[i] == ascii_options[i]);
+            REQUIRE(result->command_line.args[i] == ascii_options[i]);
         }
     }
 
     {
-        auto result = tmu_utf8_command_line_from_utf16_managed(wide_args, 0);
-        REQUIRE(result.ec == TM_OK);
-        REQUIRE(result.command_line.args);
-        REQUIRE(result.command_line.internal_buffer);
-        REQUIRE(result.command_line.args[0]);
-        REQUIRE(*result.command_line.args[0] == 0);
+        auto result = tml::make_resource(tmu_utf8_command_line_from_utf16(wide_args, 0));
+        REQUIRE(result->ec == TM_OK);
+        REQUIRE(result->command_line.args);
+        REQUIRE(result->command_line.internal_buffer);
+        REQUIRE(result->command_line.args[0]);
+        REQUIRE(*result->command_line.args[0] == 0);
     }
 
     {
         const uint16_t invalid[2] = {0xDC00u, 0};
         uint16_t empty = 0;
 
-        uint16_t const * const invalid_args[2] = {invalid, &empty};
-        auto result = tmu_utf8_command_line_from_utf16_managed(invalid_args, 1);
-        REQUIRE(result.ec == TM_EINVAL);
+        uint16_t const* const invalid_args[2] = {invalid, &empty};
+        auto result = tml::make_resource(tmu_utf8_command_line_from_utf16(invalid_args, 1));
+        REQUIRE(result->ec == TM_EINVAL);
     }
 }
 

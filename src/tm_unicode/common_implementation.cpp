@@ -27,7 +27,7 @@ void tmu_destroy_platform_path(tmu_platform_path* path) {
         if (path->path && path->allocated_size > 0) {
             TM_ASSERT(path->path != path->sbo);
             // Cast away const-ness, since we know that path was allocated.
-            TMU_FREE(((void*)path->path), path->allocated_size * sizeof(tmu_tchar), sizeof(tmu_tchar));
+            TMU_FREE(((void*)path->path));
         }
         path->path = TM_NULL;
         path->allocated_size = 0;
@@ -56,8 +56,7 @@ static tm_bool tmu_internal_append_wildcard(tmu_platform_path* dir, const tmu_tc
             dir->path = (tmu_tchar*)new_path;
         }
     } else {
-        void* new_path = TMU_REALLOC(dir->path, dir->allocated_size * sizeof(tmu_tchar), sizeof(tmu_tchar),
-                                     required_size * sizeof(tmu_tchar), sizeof(tmu_tchar));
+        void* new_path = TMU_REALLOC(dir->path, required_size * sizeof(tmu_tchar), sizeof(tmu_tchar));
         if (!new_path) return TM_FALSE;
         dir->path = (tmu_tchar*)new_path;
     }
@@ -159,8 +158,7 @@ TMU_DEF tm_bool tmu_grow_by(tmu_contents* contents, tm_size_t amount) {
 
     tm_size_t new_capacity = contents->capacity + (contents->capacity / 2);
     if (new_capacity < contents->size + amount) new_capacity = contents->size + amount;
-    char* new_data = (char*)TMU_REALLOC(contents->data, contents->capacity * sizeof(char), sizeof(char),
-                                        new_capacity * sizeof(char), sizeof(char));
+    char* new_data = (char*)TMU_REALLOC(contents->data, new_capacity * sizeof(char), sizeof(char));
     if (!new_data) return TM_FALSE;
 
     contents->data = new_data;
@@ -233,7 +231,7 @@ TMU_DEF void tmu_destroy_contents(tmu_contents* contents) {
     if (contents) {
         if (contents->data) {
             TM_ASSERT(contents->capacity > 0);
-            TMU_FREE(contents->data, contents->capacity * sizeof(char), sizeof(char));
+            TMU_FREE(contents->data);
         }
         contents->data = TM_NULL;
         contents->size = 0;
@@ -476,7 +474,7 @@ TMU_DEF tmu_utf8_command_line_result tmu_utf8_command_line_from_utf16(tmu_char16
     if (result.ec != TM_OK) {
         if (buffer) {
             TM_ASSERT(buffer_size > 0);
-            TMU_FREE(buffer, buffer_size * sizeof(char), sizeof(char));
+            TMU_FREE(buffer);
             buffer = TM_NULL;
             buffer_size = 0;
         }
@@ -488,7 +486,7 @@ TMU_DEF void tmu_utf8_destroy_command_line(tmu_utf8_command_line* command_line) 
     if (command_line) {
         if (command_line->internal_buffer) {
             TM_ASSERT(command_line->internal_allocated_size > 0);
-            TMU_FREE(command_line->internal_buffer, command_line->internal_allocated_size * sizeof(char), sizeof(char));
+            TMU_FREE(command_line->internal_buffer);
         }
         command_line->args = TM_NULL;
         command_line->args_count = 0;
@@ -508,32 +506,7 @@ TMU_DEF tmu_opened_dir tmu_open_directory(const char* dir) {
     return result;
 }
 
-#if defined(__cplusplus)
-
-static tmu_contents_managed_result tmu_to_managed_result(tmu_contents_result in) {
-    tmu_contents_managed_result result;
-    result.contents.data = in.contents.data;
-    result.contents.size = in.contents.size;
-    result.contents.capacity = in.contents.capacity;
-    result.ec = in.ec;
-    return result;
-}
-static tmu_utf8_managed_result tmu_to_utf8_managed_result(tmu_utf8_contents_result in) {
-    tmu_utf8_managed_result result;
-    result.contents.data = in.contents.data;
-    result.contents.size = in.contents.size;
-    result.contents.capacity = in.contents.capacity;
-    result.ec = in.ec;
-    result.original_encoding = in.original_encoding;
-    result.invalid_codepoints_encountered = in.invalid_codepoints_encountered;
-    return result;
-}
-
-TMU_DEF tmu_contents_managed_result tmu_current_working_directory_managed(tm_size_t extra_size) {
-    return tmu_to_managed_result(tmu_current_working_directory(extra_size));
-}
-
-#if defined(TM_STRING_VIEW)
+#if defined(__cplusplus) && defined(TM_STRING_VIEW)
 
 TMU_DEF tmu_exists_result tmu_file_exists(TM_STRING_VIEW filename) {
     tmu_exists_result result = {TM_FALSE, TM_ENOMEM};
@@ -645,18 +618,6 @@ TMU_DEF tm_errc tmu_delete_file(TM_STRING_VIEW filename) {
     return result;
 }
 
-TMU_DEF tmu_contents_managed_result tmu_read_file_managed(TM_STRING_VIEW filename) {
-    return tmu_to_managed_result(tmu_read_file(filename));
-}
-
-TMU_DEF tmu_utf8_managed_result tmu_read_file_as_utf8_managed(TM_STRING_VIEW filename) {
-    return tmu_to_utf8_managed_result(tmu_read_file_as_utf8(filename));
-}
-TMU_DEF tmu_utf8_managed_result tmu_read_file_as_utf8_managed_ex(TM_STRING_VIEW filename, tmu_encoding encoding,
-                                                                 tmu_validate validate, TM_STRING_VIEW replace_str) {
-    return tmu_to_utf8_managed_result(tmu_read_file_as_utf8_ex(filename, encoding, validate, replace_str));
-}
-
 TMU_DEF tm_errc tmu_create_directory(TM_STRING_VIEW dir) {
     tm_errc result = TM_ENOMEM;
     tmu_platform_path platform_dir;
@@ -676,109 +637,7 @@ TMU_DEF tm_errc tmu_delete_directory(TM_STRING_VIEW dir) {
     return result;
 }
 
-#endif /* defined(TM_STRING_VIEW) */
-
-tmu_contents_managed::tmu_contents_managed() {
-    data = nullptr;
-    size = 0;
-    capacity = 0;
-}
-tmu_contents_managed::tmu_contents_managed(tmu_contents_managed&& other) {
-    static_cast<tmu_contents&>(*this) = static_cast<tmu_contents&>(other);
-    static_cast<tmu_contents&>(other) = {TM_NULL, 0, 0};
-}
-tmu_contents_managed& tmu_contents_managed::operator=(tmu_contents_managed&& other) {
-    if (this != &other) {
-        /* Swap contents and let destructor of other release memory. */
-        tmu_contents temp = static_cast<tmu_contents&>(*this);
-        static_cast<tmu_contents&>(*this) = static_cast<tmu_contents&>(other);
-        static_cast<tmu_contents&>(other) = temp;
-    }
-    return *this;
-}
-tmu_contents_managed::~tmu_contents_managed() { tmu_destroy_contents(this); }
-
-TMU_DEF tmu_contents_managed_result tmu_read_file_managed(const char* filename) {
-    return tmu_to_managed_result(tmu_read_file(filename));
-}
-
-TMU_DEF tmu_utf8_managed_result tmu_read_file_as_utf8_managed(const char* filename) {
-    return tmu_to_utf8_managed_result(tmu_read_file_as_utf8(filename));
-}
-TMU_DEF tmu_utf8_managed_result tmu_read_file_as_utf8_managed_ex(const char* filename, tmu_encoding encoding,
-                                                                 tmu_validate validate, const char* replace_str) {
-    return tmu_to_utf8_managed_result(tmu_read_file_as_utf8_ex(filename, encoding, validate, replace_str));
-}
-
-tmu_utf8_command_line_managed::tmu_utf8_command_line_managed() {
-    args = nullptr;
-    args_count = 0;
-    internal_buffer = nullptr;
-    internal_allocated_size = 0;
-}
-tmu_utf8_command_line_managed::tmu_utf8_command_line_managed(tmu_utf8_command_line_managed&& other) {
-    static_cast<tmu_utf8_command_line&>(*this) = static_cast<tmu_utf8_command_line&>(other);
-    static_cast<tmu_utf8_command_line&>(other) = {nullptr, 0, nullptr, 0};
-}
-tmu_utf8_command_line_managed& tmu_utf8_command_line_managed::operator=(tmu_utf8_command_line_managed&& other) {
-    if (this != &other) {
-        /* Swap contents and let destructor of other release memory. */
-        tmu_utf8_command_line temp = static_cast<tmu_utf8_command_line&>(*this);
-        static_cast<tmu_utf8_command_line&>(*this) = static_cast<tmu_utf8_command_line&>(other);
-        static_cast<tmu_utf8_command_line&>(other) = temp;
-    }
-    return *this;
-}
-tmu_utf8_command_line_managed::~tmu_utf8_command_line_managed() { tmu_utf8_destroy_command_line(this); }
-
-tmu_utf8_command_line_managed_result tmu_utf8_command_line_from_utf16_managed(tmu_char16 const* const* utf16_args,
-                                                                              int utf16_args_count) {
-    tmu_utf8_command_line_managed_result result;
-    tmu_utf8_command_line_result unmanaged = tmu_utf8_command_line_from_utf16(utf16_args, utf16_args_count);
-    static_cast<tmu_utf8_command_line&>(result.command_line) = unmanaged.command_line;
-    result.ec = unmanaged.ec;
-    return result;
-}
-
-#if defined(TMU_USE_STL)
-TMU_DEF std::vector<char> tmu_read_file_to_vector(const char* filename) {
-    std::vector<char> result;
-    tmu_contents_managed_result file = tmu_read_file_managed(filename);
-    if (file.ec == TM_OK && file.contents.size > 0) {
-        result.assign(file.contents.data, file.contents.data + file.contents.size);
-    }
-    return result;
-}
-TMU_DEF std::vector<char> tmu_read_file_as_utf8_to_vector(const char* filename) {
-    std::vector<char> result;
-    tmu_utf8_managed_result file = tmu_read_file_as_utf8_managed(filename);
-    if (file.ec == TM_OK && file.contents.size > 0) {
-        result.assign(file.contents.data, file.contents.data + file.contents.size);
-    }
-    return result;
-}
-#if defined(TM_STRING_VIEW)
-TMU_DEF std::vector<char> tmu_read_file_to_vector(TM_STRING_VIEW filename) {
-    std::vector<char> result;
-    tmu_contents_managed_result file = tmu_read_file_managed(filename);
-    if (file.ec == TM_OK && file.contents.size > 0) {
-        result.assign(file.contents.data, file.contents.data + file.contents.size);
-    }
-    return result;
-}
-TMU_DEF std::vector<char> tmu_read_file_as_utf8_to_vector(TM_STRING_VIEW filename) {
-    std::vector<char> result;
-    tmu_utf8_managed_result file = tmu_read_file_as_utf8_managed(filename);
-    if (file.ec == TM_OK && file.contents.size > 0) {
-        result.assign(file.contents.data, file.contents.data + file.contents.size);
-    }
-    return result;
-}
-#endif /* defined(TM_STRING_VIEW) */
-
-#endif /* defined(TMU_USE_STL) */
-
-#endif /* defined(__cplusplus) */
+#endif /* defined(__cplusplus) && defined(TM_STRING_VIEW) */
 
 #undef TMU_TEXT
 #undef TMU_DIR_DELIM

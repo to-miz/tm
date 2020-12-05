@@ -15,8 +15,7 @@ static tmp_reallocate_result tmp_allocator_default_reallocate(void* /*context*/,
 
     tmp_reallocate_result result = {nullptr, 0};
     if (old_ptr && old_size > 0) {
-        result.ptr =
-            (char*)TM_REALLOC(old_ptr, old_size * sizeof(char), sizeof(char), new_size * sizeof(char), sizeof(char));
+        result.ptr = (char*)TM_REALLOC(old_ptr, new_size * sizeof(char), sizeof(char));
     } else {
         result.ptr = (char*)TM_MALLOC(new_size * sizeof(char), sizeof(char));
     }
@@ -25,7 +24,7 @@ static tmp_reallocate_result tmp_allocator_default_reallocate(void* /*context*/,
 }
 static void tmp_allocator_default_destroy(void* /*context*/, char* ptr, tm_size_t size) {
     (void)size;
-    TM_FREE(ptr, size * sizeof(char), sizeof(char));
+    TM_FREE(ptr);
 }
 
 static tmp_allocator_context tmp_default_allocator() {

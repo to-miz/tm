@@ -184,7 +184,7 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
 #endif
 
 // Adapted from https://stackoverflow.com/a/6849629
-#if defined(_MSC_VER) && _MSC_VER >= 1400 && !defined(__clang__) && !defined(__MINGW32__)
+#if defined(_MSC_VER) && _MSC_VER >= 1400 && !defined(__clang__) && !defined(__MINGW32__) && !defined(TMU_TESTING)
     #include <sal.h>
     #if _MSC_VER > 1400
         #define TMU_FORMAT_STRING(p) _Printf_format_string_ p
@@ -205,62 +205,8 @@ TMU_DEF int tmu_vfprintf(FILE* stream, const char* format, va_list args);
 
 #endif
 
-#if defined(__cplusplus)
+#if defined(__cplusplus) && defined(TM_STRING_VIEW)
 
-struct tmu_contents_managed : tmu_contents {
-    tmu_contents_managed();
-    tmu_contents_managed(tmu_contents_managed&& other);
-    tmu_contents_managed& operator=(tmu_contents_managed&& other);
-    ~tmu_contents_managed();
-};
-
-struct tmu_contents_managed_result {
-    tmu_contents_managed contents;
-    tm_errc ec;
-};
-TMU_DEF tmu_contents_managed_result tmu_read_file_managed(const char* filename);
-
-struct tmu_utf8_managed_result {
-    tmu_contents_managed contents;
-    tm_errc ec;
-    tmu_encoding original_encoding;
-    tm_bool invalid_codepoints_encountered;
-};
-TMU_DEF tmu_utf8_managed_result tmu_read_file_as_utf8_managed(const char* filename);
-TMU_DEF tmu_utf8_managed_result tmu_read_file_as_utf8_managed_ex(const char* filename, tmu_encoding encoding,
-                                                                 tmu_validate validate, const char* replace_str);
-
-TMU_DEF tmu_contents_managed_result tmu_current_working_directory_managed(tm_size_t extra_size);
-
-struct tmu_utf8_command_line_managed : tmu_utf8_command_line {
-    tmu_utf8_command_line_managed();
-    tmu_utf8_command_line_managed(tmu_utf8_command_line_managed&& other);
-    tmu_utf8_command_line_managed& operator=(tmu_utf8_command_line_managed&& other);
-    ~tmu_utf8_command_line_managed();
-};
-
-struct tmu_utf8_command_line_managed_result {
-    tmu_utf8_command_line_managed command_line;
-    tm_errc ec;
-};
-TMU_DEF tmu_utf8_command_line_managed_result
-tmu_utf8_command_line_from_utf16_managed(tmu_char16 const* const* utf16_args, int utf16_args_count);
-
-#if defined(TMU_USE_WINDOWS_H) && !defined(TMU_NO_SHELLAPI)
-/*
-Winapi only extension, get command line directly without supplying the Utf-16 arguments.
-Result must still be destroyed using tmu_utf8_destroy_command_line.
-Requires to link against Shell32.lib.
-*/
-TMU_DEF tmu_utf8_command_line_managed_result tmu_utf8_winapi_get_command_line_managed();
-#endif
-
-#if defined(TMU_USE_STL)
-TMU_DEF std::vector<char> tmu_read_file_to_vector(const char* filename);
-TMU_DEF std::vector<char> tmu_read_file_as_utf8_to_vector(const char* filename);
-#endif /* defined(TMU_USE_STL) */
-
-#if defined(TM_STRING_VIEW)
 TMU_DEF tmu_exists_result tmu_file_exists(TM_STRING_VIEW filename);
 TMU_DEF tmu_exists_result tmu_directory_exists(TM_STRING_VIEW dir);
 TMU_DEF tmu_file_timestamp_result tmu_file_timestamp(TM_STRING_VIEW filename);
@@ -278,18 +224,8 @@ TMU_DEF tmu_write_file_result tmu_write_file_as_utf8_ex(TM_STRING_VIEW filename,
 
 TMU_DEF tm_errc tmu_rename_file(TM_STRING_VIEW from, TM_STRING_VIEW to);
 TMU_DEF tm_errc tmu_rename_file_ex(TM_STRING_VIEW from, TM_STRING_VIEW to, uint32_t flags);
-TMU_DEF tmu_contents_managed_result tmu_read_file_managed(TM_STRING_VIEW filename);
-TMU_DEF tmu_utf8_managed_result tmu_read_file_as_utf8_managed(TM_STRING_VIEW filename);
-TMU_DEF tmu_utf8_managed_result tmu_read_file_as_utf8_managed_ex(TM_STRING_VIEW filename, tmu_encoding encoding,
-                                                                 tmu_validate validate, TM_STRING_VIEW replace_str);
 
 TMU_DEF tm_errc tmu_create_directory(TM_STRING_VIEW dir);
 TMU_DEF tm_errc tmu_delete_directory(TM_STRING_VIEW dir);
 
-#if defined(TMU_USE_STL)
-TMU_DEF std::vector<char> tmu_read_file_to_vector(TM_STRING_VIEW filename);
-TMU_DEF std::vector<char> tmu_read_file_as_utf8_to_vector(TM_STRING_VIEW filename);
-#endif /* defined(TMU_USE_STL) */
-#endif /* defined(TM_STRING_VIEW) */
-
-#endif /* defined(__cplusplus) */
+#endif /* defined(__cplusplus) && defined(TM_STRING_VIEW) */

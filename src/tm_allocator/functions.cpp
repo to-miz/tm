@@ -50,7 +50,7 @@ size_t tml::alignment_offset(uintptr_t ptr, size_t alignment) {
     void* tml::tmal_mmap(size_t size) { return TM_MALLOC(size, 4096); }
     bool tml::tmal_munmap(void* ptr, size_t size) {
         TM_MAYBE_UNUSED(size);
-        TM_FREE(ptr, size, 4096);
+        TM_FREE(ptr);
         return true;
     }
     size_t tml::tmal_get_mmap_granularity() { return 4096; }

@@ -461,6 +461,7 @@ merge_result merge(const std::vector<char>& in, const char* dir, const std::vect
                         continue;
                     case merge_error:
                         return result;
+                    case merge_skip:
                     default:
                         break;
                 }
@@ -470,10 +471,13 @@ merge_result merge(const std::vector<char>& in, const char* dir, const std::vect
                         continue;
                     case merge_error:
                         return result;
+                    case merge_skip:
                     default:
                         break;
                 }
             }
+            case tok_identifier:
+            case tok_string:
             default: { break; }
         }
         std::vector<char> cur(prev, stream.p);

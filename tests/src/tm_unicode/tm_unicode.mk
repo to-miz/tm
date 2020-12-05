@@ -25,7 +25,7 @@ ${tests.generated.tm_unicode}: ${unicode_gen.out} ${unicode_gen.data}
 		--no-header-guard --output=tests/src/tm_unicode/generated/tests_unicode_data.c \
 		--header=tests/src/tm_unicode/generated/tests_unicode_data.h
 
-tests.tm_unicode.deps := tm_unicode.h tests/src/tm_unicode/*.cpp tests/src/tm_unicode/*.c tests/src/tm_unicode/*.h ${tests.generated.tm_unicode}
+tests.tm_unicode.deps := tm_unicode.h tm_resource_ptr.h tests/src/tm_unicode/*.cpp tests/src/tm_unicode/*.c tests/src/tm_unicode/*.h ${tests.generated.tm_unicode}
 
 tests.tm_unicode.default.c.out := ${build_dir}tests.tm_unicode.default.c${exe_ext}
 tests.tm_unicode.windows.c.out := ${build_dir}tests.tm_unicode.windows.c${exe_ext}

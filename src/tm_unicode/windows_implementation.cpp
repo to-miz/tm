@@ -245,7 +245,7 @@ static tmu_contents_result tmu_read_file_t(const WCHAR* filename) {
         BOOL read_file_result = ReadFile(file, data, bytes_to_read, &bytes_read, TM_NULL);
         if (!read_file_result || bytes_read != bytes_to_read) {
             result.ec = tmu_winerror_to_errc(GetLastError(), TM_EIO);
-            TMU_FREE(data, data_size * sizeof(char), sizeof(char));
+            TMU_FREE(data);
             CloseHandle(file);
             return result;
         }
@@ -375,7 +375,9 @@ static tmu_write_file_result tmu_write_file_ex_t(const WCHAR* filename, const vo
     tmu_write_file_result temp_write_result = tmu_write_file_ex_internal(temp_file, data, size, 0);
     if (temp_write_result.ec != TM_OK) {
         result.ec = temp_write_result.ec;
-        if (temp_file != temp_file_buffer) TMU_FREE(temp_file, temp_file_len * sizeof(WCHAR), sizeof(WCHAR));
+        if (temp_file != temp_file_buffer) {
+            TMU_FREE(temp_file);
+        }
         return result;
     }
 
@@ -383,10 +385,14 @@ static tmu_write_file_result tmu_write_file_ex_t(const WCHAR* filename, const vo
     if (flags & tmu_overwrite) move_flags |= MOVEFILE_REPLACE_EXISTING;
     if (!MoveFileExW(temp_file, filename, move_flags)) {
         result.ec = tmu_winerror_to_errc(GetLastError(), TM_EIO);
-        if (temp_file != temp_file_buffer) TMU_FREE(temp_file, temp_file_len * sizeof(WCHAR), sizeof(WCHAR));
+        if (temp_file != temp_file_buffer) {
+            TMU_FREE(temp_file);
+        }
         return result;
     }
-    if (temp_file != temp_file_buffer) TMU_FREE(temp_file, temp_file_len * sizeof(WCHAR), sizeof(WCHAR));
+    if (temp_file != temp_file_buffer) {
+        TMU_FREE(temp_file);
+    }
     return result;
 }
 
@@ -471,7 +477,7 @@ TMU_DEF tmu_contents_result tmu_current_working_directory(tm_size_t extra_size) 
 
     result = tmu_to_utf8(dir, extra_size + 1);
     if (result.ec == TM_OK) tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_TRUE);
-    TMU_FREE(dir, len * sizeof(WCHAR), sizeof(WCHAR));
+    TMU_FREE(dir);
     return result;
 }
 
@@ -501,8 +507,7 @@ TMU_DEF tmu_contents_result tmu_module_filename() {
                 break;
             }
             if (size >= filename_size) {
-                new_filename = (WCHAR*)TMU_REALLOC(filename, filename_size * sizeof(WCHAR), sizeof(WCHAR),
-                                                   filename_size * sizeof(WCHAR) * 2, sizeof(WCHAR));
+                new_filename = (WCHAR*)TMU_REALLOC(filename, filename_size * sizeof(WCHAR) * 2, sizeof(WCHAR));
                 if (!new_filename) {
                     result.ec = TM_ENOMEM;
                     break;
@@ -525,7 +530,7 @@ TMU_DEF tmu_contents_result tmu_module_filename() {
     if (result.ec == TM_OK) tmu_to_tmu_path(&result.contents, /*is_dir=*/TM_FALSE);
 
     if (filename != sbo) {
-        TMU_FREE(filename, filename_size * sizeof(WCHAR), sizeof(WCHAR));
+        TMU_FREE(filename);
     }
     return result;
 }
@@ -560,7 +565,7 @@ static tmu_opened_dir tmu_open_directory_t(tmu_platform_path* dir) {
     find_data->handle = FindFirstFileW(path, &find_data->data);
     if (find_data->handle == INVALID_HANDLE_VALUE) {
         result.ec = tmu_winerror_to_errc(GetLastError(), TM_EIO);
-        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+        TMU_FREE(find_data);
         return result;
     }
 
@@ -576,7 +581,7 @@ TMU_DEF void tmu_close_directory(tmu_opened_dir* dir) {
         if (find_data->handle != INVALID_HANDLE_VALUE) {
             FindClose(find_data->handle);
         }
-        TMU_FREE(find_data, sizeof(struct tmu_internal_find_data), sizeof(void*));
+        TMU_FREE(find_data);
     }
     tmu_destroy_contents(&dir->internal_buffer);
     ZeroMemory(dir, sizeof(tmu_opened_dir));
@@ -684,16 +689,6 @@ TMU_DEF tmu_utf8_command_line_result tmu_utf8_winapi_get_command_line() {
     return result;
 }
 
-#if defined(__cplusplus)
-TMU_DEF tmu_utf8_command_line_managed_result tmu_utf8_winapi_get_command_line_managed() {
-    tmu_utf8_command_line_managed_result result;
-    tmu_utf8_command_line_result unmanaged = tmu_utf8_winapi_get_command_line();
-    static_cast<tmu_utf8_command_line&>(result.command_line) = unmanaged.command_line;
-    result.ec = unmanaged.ec;
-    return result;
-}
-#endif /* defined(__cplusplus) */
-
 #endif /* !defined(TMU_NO_SHELLAPI) */
 
 #if defined(TMU_USE_CONSOLE)
@@ -762,7 +757,7 @@ TMU_DEF tm_bool tmu_console_output_n(tmu_console_handle handle, const char* str,
     }
 
     if (wide && wide != sbo) {
-        TMU_FREE(wide, conv_result.size * sizeof(tmu_char16), sizeof(tmu_char16));
+        TMU_FREE(wide);
     }
     return written == (DWORD)conv_result.size;
 }

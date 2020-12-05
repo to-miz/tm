@@ -1,5 +1,5 @@
 /*
-tm_json.h v0.9.0 - public domain - https://github.com/to-miz/tm
+tm_json.h v0.9.1 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak 2016
 
 No warranty; use at your own risk.
@@ -119,6 +119,7 @@ ISSUES
     - Json5 unquoted identifiers don't allow for \u unicode escape sequences or unicode letters.
 
 HISTORY
+    v0.9.1  08.11.20  Fixed some warnings with newest MSCV compiler.
     v0.9.0  03.04.20  Added jsonResolveJsonPointer, that resolves Json Pointer according to
                       https://tools.ietf.org/html/rfc6901
     v0.4.2  29.10.19  Fixed a buffer overrun error in skipWhitespace.
@@ -254,9 +255,11 @@ HISTORY
         // Either all or none have to be defined.
         #include <stdlib.h>
         #define TM_MALLOC(size, alignment) malloc((size))
-        #define TM_REALLOC(ptr, old_size, old_alignment, new_size, new_alignment) realloc((ptr), (new_size))
-        // #define TM_REALLOC_IN_PLACE(ptr, old_size, old_alignment, new_size, new_alignment) // Optional
-        #define TM_FREE(ptr, size, alignment) free((ptr))
+        #define TM_REALLOC(ptr, new_size, new_alignment) realloc((ptr), (new_size))
+        // #define TM_REALLOC_IN_PLACE(ptr, new_size, new_alignment) // Optional
+        #define TM_FREE(ptr) free((ptr))
+        // Define as 1 if alignment parameter is actually respected.
+        #define TM_MALLOC_ALIGNMENT_AWARE 0
     #endif
 
     // define this if you want to use infinity and nan extensions for json using math.h
@@ -492,7 +495,7 @@ typedef enum {
 
 TMJ_DEF const char* jsonGetErrorString(JsonErrorType error);
 
-typedef struct {
+typedef struct JsonStringViewStruct {
     const char* data;
     tm_size_t size;
 
@@ -617,7 +620,7 @@ typedef JsonStringView tmj_string_view;
 #define TMJ_STRING_VIEW_MAKE(data, size) {(data), (size)}
 #endif
 
-typedef struct {
+typedef struct JsonObjectStruct {
     JsonNode* nodes;
     tm_size_t count;
 
@@ -635,7 +638,7 @@ typedef struct {
 #endif
 } JsonObject;
 
-typedef struct {
+typedef struct JsonArrayStruct {
     JsonValue* values;
     tm_size_t count;
 
@@ -646,7 +649,7 @@ typedef struct {
 #endif
 } JsonArray;
 
-typedef struct {
+typedef struct JsonObjectArrayStruct {
     JsonValue* values;
     tm_size_t count;
 
@@ -3286,7 +3289,7 @@ TMJ_DEF JsonDocument jsonMakeDocumentEx(JsonStackAllocator* allocator, const cha
 }
 TMJ_DEF void jsonFreeDocument(JsonAllocatedDocument* doc) {
     if (doc->pool) {
-        TM_FREE(doc->pool, doc->poolSize, JSON_ALIGNMENT_VALUE);
+        TM_FREE(doc->pool);
         doc->pool = TM_NULL;
         doc->poolSize = 0;
     }
@@ -3676,8 +3679,7 @@ TMJ_DEF JsonValue jsonResolveJsonPointer(const JsonValue* value, const char* jso
                 if (buffer == sbo) {
                     new_buffer = (char*)TM_MALLOC(new_size * sizeof(char), sizeof(char));
                 } else {
-                    new_buffer = (char*)TM_REALLOC(buffer, buffer_size * sizeof(char), sizeof(char),
-                                                   new_size * sizeof(char*), sizeof(char));
+                    new_buffer = (char*)TM_REALLOC(buffer, new_size * sizeof(char*), sizeof(char));
                 }
                 if (!new_buffer) {
                     error = TM_TRUE;
@@ -3757,7 +3759,7 @@ TMJ_DEF JsonValue jsonResolveJsonPointer(const JsonValue* value, const char* jso
     }
 
     if (buffer != sbo) {
-        TM_FREE(buffer, buffer_size * sizeof(char), sizeof(char));
+        TM_FREE(buffer);
     }
 
     if (error) {

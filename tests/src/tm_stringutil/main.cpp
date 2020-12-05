@@ -173,6 +173,180 @@ TEST_CASE("find last not of") {
     CHECK(find_last_not_of(first, last, "b", nullptr) == first);
 }
 
+TEST_CASE("find") {
+    auto find_index = [](const char* str, const char* find_str) {
+        return (tm_size_t)(tmsu_find(str, find_str) - str);
+    };
+    auto find_index_v = [](const char* str, const char* find_str) {
+        return (tm_size_t)(tmsu_find_v(tmsu_view(str), tmsu_view(find_str)) - str);
+    };
+    auto find_last_index = [](const char* str, const char* find_str) {
+        return (tm_size_t)(tmsu_find_last(str, find_str) - str);
+    };
+    auto find_last_index_v = [](const char* str, const char* find_str) {
+        return (tm_size_t)(tmsu_find_last_v(tmsu_view(str), tmsu_view(find_str)) - str);
+    };
+    auto find_index_ignore_case = [](const char* str, const char* find_str) {
+        return (tm_size_t)(tmsu_find_ignore_case_ansi(str, find_str) - str);
+    };
+    auto find_index_ignore_case_v = [](const char* str, const char* find_str) {
+        return (tm_size_t)(tmsu_find_ignore_case_ansi_v(tmsu_view(str), tmsu_view(find_str)) - str);
+    };
+
+    typedef tm_size_t find_func_t(const char*, const char*);
+    struct func_name {
+        find_func_t* func;
+        const char* name;
+    };
+
+    func_name test_funcs[] = {
+        {find_index, "tmsu_find"},
+        {find_index_v, "tmsu_find_v"},
+        {find_last_index, "tmsu_find_last"},
+        {find_last_index_v, "tmsu_find_last_v"},
+        {find_index_ignore_case, "tmsu_find_ignore_case_ansi"},
+        {find_index_ignore_case_v, "tmsu_find_ignore_case_ansi_v"},
+    };
+
+    for (auto entry : test_funcs) {
+        CAPTURE(entry.name);
+        CHECK(entry.func("test", "test") == 0);
+        CHECK(entry.func("test", "not_test") == 4);
+        CHECK(entry.func("test", "www") == 4);
+
+        CHECK(entry.func("test", "") == 0);
+        CHECK(entry.func("", "asd") == 0);
+
+        CHECK(entry.func("testinfixtest", "infix") == 4);
+        CHECK(entry.func("infiinfixtest", "infix") == 4);
+        CHECK(entry.func("infiinfix", "infix") == 4);
+        CHECK(entry.func("testinfix", "infix") == 4);
+        CHECK(entry.func("testinfi", "infix") == 8);
+    }
+
+    func_name test_funcs_forward[] = {
+        {find_index, "tmsu_find"},
+        {find_index_v, "tmsu_find_v"},
+        {find_index_ignore_case, "tmsu_find_ignore_case_ansi"},
+        {find_index_ignore_case_v, "tmsu_find_ignore_case_ansi_v"},
+    };
+    for (auto entry : test_funcs_forward) {
+        CAPTURE(entry.name);
+        CHECK(entry.func("test", "t") == 0);
+        CHECK(entry.func("testinfixtestinfix", "infix") == 4);
+    }
+
+    func_name test_funcs_backward[] = {
+        {find_last_index, "tmsu_find_last"},
+        {find_last_index_v, "tmsu_find_last_v"},
+    };
+    for (auto entry : test_funcs_backward) {
+        CAPTURE(entry.name);
+        CHECK(entry.func("test", "t") == 3);
+        CHECK(entry.func("testinfixtestinfix", "infix") == 13);
+    }
+
+    func_name caseless[] = {
+        {find_index_ignore_case, "tmsu_find_ignore_case_ansi"},
+        {find_index_ignore_case_v, "tmsu_find_ignore_case_ansi_v"},
+    };
+
+    for (auto entry : caseless) {
+        CAPTURE(entry.name);
+        CHECK(entry.func("TEST", "t") == 0);
+        CHECK(entry.func("test", "T") == 0);
+        CHECK(entry.func("TEST", "test") == 0);
+        CHECK(entry.func("test", "TEST") == 0);
+        CHECK(entry.func("TEST", "not_test") == 4);
+        CHECK(entry.func("test", "NOT_TEST") == 4);
+        CHECK(entry.func("TEST", "www") == 4);
+        CHECK(entry.func("test", "WWW") == 4);
+
+        CHECK(entry.func("TEST", "") == 0);
+        CHECK(entry.func("", "ASD") == 0);
+
+        CHECK(entry.func("TESTINFIXTEST", "infix") == 4);
+        CHECK(entry.func("testinfixtest", "INFIX") == 4);
+        CHECK(entry.func("INFIINFIXTEST", "infix") == 4);
+        CHECK(entry.func("infiinfixtest", "INFIX") == 4);
+        CHECK(entry.func("INFIINFIX", "infix") == 4);
+        CHECK(entry.func("infiinfix", "INFIX") == 4);
+        CHECK(entry.func("TESTINFIX", "infix") == 4);
+        CHECK(entry.func("testinfix", "INFIX") == 4);
+        CHECK(entry.func("TESTINFI", "infix") == 8);
+        CHECK(entry.func("testinfi", "INFIX") == 8);
+        CHECK(entry.func("TESTINFIXTESTINFIX", "infix") == 4);
+        CHECK(entry.func("testinfixtestinfix", "INFIX") == 4);
+    }
+}
+
+TEST_CASE("tokenizing") {
+    const char* comma_separated = "This,is,a,,test";
+    const char* delimiters = ",";
+
+    {
+        auto tokenizer = tmsu_tokenizer(comma_separated);
+        tmsu_view_t value = {};
+        tmsu_next_token(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("This")));
+        tmsu_next_token(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("is")));
+        tmsu_next_token(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("a")));
+        tmsu_next_token(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("")));
+        tmsu_next_token(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("test")));
+        CHECK(!tmsu_next_token(&tokenizer, delimiters, &value));
+    }
+
+    {
+        auto tokenizer = tmsu_view(comma_separated);
+        auto delims = tmsu_view(delimiters);
+        tmsu_view_t value = {};
+        tmsu_next_token_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("This")));
+        tmsu_next_token_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("is")));
+        tmsu_next_token_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("a")));
+        tmsu_next_token_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("")));
+        tmsu_next_token_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("test")));
+        CHECK(!tmsu_next_token_v(&tokenizer, delims, &value));
+    }
+
+    {
+        auto tokenizer = tmsu_tokenizer(comma_separated);
+        tmsu_view_t value = {};
+        tmsu_next_token_skip_empty(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("This")));
+        tmsu_next_token_skip_empty(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("is")));
+        tmsu_next_token_skip_empty(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("a")));
+        tmsu_next_token_skip_empty(&tokenizer, delimiters, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("test")));
+        CHECK(!tmsu_next_token_skip_empty(&tokenizer, delimiters, &value));
+    }
+
+    {
+        auto tokenizer = tmsu_view(comma_separated);
+        auto delims = tmsu_view(delimiters);
+        tmsu_view_t value = {};
+        tmsu_next_token_skip_empty_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("This")));
+        tmsu_next_token_skip_empty_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("is")));
+        tmsu_next_token_skip_empty_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("a")));
+        tmsu_next_token_skip_empty_v(&tokenizer, delims, &value);
+        CHECK(tmsu_equals_v(value, tmsu_view("test")));
+        CHECK(!tmsu_next_token_skip_empty_v(&tokenizer, delims, &value));
+    }
+}
+
 TEST_CASE("word tokenizing") {
     {
         // Check logic behind word seperators array.
