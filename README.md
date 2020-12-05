@@ -16,6 +16,7 @@ tm_hashmapx.h | A hashmap implementation library using [X-Macros](https://en.wik
 tm_json.h | C++ and C99 json parsing library that can do both json reading and parsing into a json document for queries. Accepts a wide variety of flags, can be used to parse json in strict mode, or in json5 mode with the right combination of flags. | C99/C++ | v0.9.0
 tm_polygon.h | Triangulation and clipping of polygons. Clipping supports union, difference and substraction. | C99/C++ | v1.1
 tm_print.h | Lightweight typesafe variadic print and snprint using C++11 and variadic templates. | C++11 | v0.0.22
+tm_resource_ptr.h | This is a helper class to manage resources allocated by other tm libraries in a RAII manner similar to std::unique_ptr. | C++11 | v0.1.0
 tm_small_vector.h | Dynamic array container similar to STL \<vector> with a template parameter for small buffer optimization. Uses a non customizable malloc allocator making use of realloc whenever possible. | C++11 | v0.0.8
 tm_stringutil.h | String utility functions, from matching, comparison to tokenizing. | C99/C++ | v0.9.3
 tm_uint128.h | A uint128 type with a couple of backends to choose. | C99/C++11 | v0.0.4

@@ -1,5 +1,5 @@
 /*
-tm_unicode.h v0.1.0 - public domain - https://github.com/to-miz/tm
+tm_resource_ptr.h v0.1.0 - public domain - https://github.com/to-miz/tm
 Author: Tolga Mizrak MERGE_YEAR
 
 No warranty; use at your own risk.
