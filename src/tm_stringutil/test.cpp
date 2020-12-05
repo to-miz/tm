@@ -1,12 +1,10 @@
 #include <string_view>
 using std::string_view;
 
-#if 1
 #define TM_STRING_VIEW string_view
 #define TM_STRING_VIEW_DATA(str) (str).data()
 #define TM_STRING_VIEW_SIZE(str) ((tm_size_t)(str).size())
 #define TM_STRING_VIEW_MAKE(data, size) string_view{data, (size_t)(size)}
-#endif
 
 #define TM_STRINGUTIL_IMPLEMENTATION
 #include "main.cpp"
@@ -18,35 +16,33 @@ auto my_end(string_view v) { return v.data() + v.size(); }
 
 int main() {
     auto str = "- This, a sample string.";
-    auto delimeters = " ,.-";
+    auto delimiters = " ,.-";
 
     // nullterminated version
     {
-        auto tokenizer = tmsu_make_tokenizer(str);
-        tmsu_string_view view = {};
-        while (tmsu_next_token(&tokenizer, delimeters, &view)) {
-            printf("%.*s\n", (int)TMSU_STRING_VIEW_SIZE(view), TMSU_STRING_VIEW_DATA(view));
+        auto tokenizer = tmsu_tokenizer(str);
+        tmsu_view_t view = {};
+        while (tmsu_next_token(&tokenizer, delimiters, &view)) {
+            printf("%.*s\n", (int)tmsu_view_size(view), tmsu_view_data(view));
         }
     }
 
     // iterator version
     {
-        auto str_first = str;
-        auto str_last = str_first + strlen(str_first);
-        auto delimeters_first = delimeters;
-        auto delimeters_last = delimeters_first + strlen(delimeters_first);
-        auto tokenizer = tmsu_make_tokenizer_n(str_first, str_last);
-        tmsu_string_view view = {};
-        while (tmsu_next_token_n(&tokenizer, delimeters_first, delimeters_last, &view)) {
-            printf("%.*s\n", (int)TMSU_STRING_VIEW_SIZE(view), TMSU_STRING_VIEW_DATA(view));
+        auto str_view = tmsu_view(str);
+        auto delimiters_view = tmsu_view(delimiters);
+        auto tokenizer = str_view;
+        tmsu_view_t view = {};
+        while (tmsu_next_token_v(&tokenizer, delimiters_view, &view)) {
+            printf("%.*s\n", (int)tmsu_view_size(view), tmsu_view_data(view));
         }
     }
 
     {
-    	string_view p = "This";
-    	string_view f = "This";
+        string_view p = "Hello";
+        string_view f = "Hello";
 
-    	auto first = tmsu_find_n(my_begin(p), my_end(p), my_begin(f), my_end(f));
+        auto first = tmsu_find_n(my_begin(p), my_end(p), my_begin(f), my_end(f));
     	if(first != my_end(p)) {
     		printf("%.*s\n", (int)(my_end(p) - first), first);
     	}

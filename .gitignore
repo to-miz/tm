@@ -7,7 +7,9 @@ projects/
 # Project files.
 *.sln
 *.VC.db
-
+.tg/
+.subl/
+.vscode/
 
 # Visual Studio.
 .vs/
@@ -15,9 +17,10 @@ projects/
 # Workspace.
 config.mk
 config_clang.mk
+config_clang_cl.mk
 config_gcc.mk
 *.sublime-workspace
 
 # Misc test files.
-# src/experimental/*
+src/experimental/*
 tools/merge/tests/*

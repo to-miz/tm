@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.9.1 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.9.3 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak MERGE_YEAR
 
 no warranty; use at your own risk
@@ -17,21 +17,26 @@ PURPOSE
     Some string based utility functions for searching and tokenizing.
     Most functions have versions that work on nullterminated and length based strings.
 
-HISTORY
-    v0.9.1  20.04.20 Added tmsu_sv_begin and tmsu_sv_end convenience functions.
-    v0.9.0  03.04.20 Added tmsu_base64_decode, tmsu_base64url_encode, tmsu_base64url_decode,
-                     tmsu_url_encode, tmsu_url_decode.
-    v0.3.4  02.05.19 Added tmsu_find_word_end_n and tmsu_find_word_start_n.
-    v0.3.3  06.03.19 Added optional defines for TM_STRCSPN and TM_STRSPN to make use
-                     of CRT if it is present.
-                     Fixed a C compilation error due to use of auto.
-    v0.3.2  03.03.19 Fixed a bug in tmsu_find_last_not_of_n_ex and tmsu_trim_right_n.
-    v0.3.1  15.01.19 Fixed some warnings in msvc with signed size_t and string_view.
-    v0.3    15.10.18 Added more string_view overloads.
-    v0.2    14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
-                     Added tmsu_equals.
-                     Fixed MSVC warning about unreachable code.
-    v0.1    07.10.18 Initial commit.
+HISTORY    (DD.MM.YY)
+    v0.9.3  05.12.20  Tokenizer does not skip empty tokens anymore. Instead there is tmsu_next_token_skip_empty.
+    v0.9.2  04.12.20  Removed C++ string_view overloads, instead there is tmsu_view_t for C.
+                      The C++ string_view apis overloads were sort of useless, since a C++
+                      string_view class would already have most of these functions as methods.
+                      Fixed some bugs with tmsu_find.
+    v0.9.1  20.04.20  Added tmsu_sv_begin and tmsu_sv_end convenience functions.
+    v0.9.0  03.04.20  Added tmsu_base64_decode, tmsu_base64url_encode, tmsu_base64url_decode,
+                      tmsu_url_encode, tmsu_url_decode.
+    v0.3.4  02.05.19  Added tmsu_find_word_end_n and tmsu_find_word_start_n.
+    v0.3.3  06.03.19  Added optional defines for TM_STRCSPN and TM_STRSPN to make use
+                      of CRT if it is present.
+                      Fixed a C compilation error due to use of auto.
+    v0.3.2  03.03.19  Fixed a bug in tmsu_find_last_not_of_n_ex and tmsu_trim_right_n.
+    v0.3.1  15.01.19  Fixed some warnings in msvc with signed size_t and string_view.
+    v0.3    15.10.18  Added more string_view overloads.
+    v0.2    14.10.18  Fixed an tmsu_compare functions to do proper lexicographical comparison.
+                      Added tmsu_equals.
+                      Fixed MSVC warning about unreachable code.
+    v0.1    07.10.18  Initial commit.
 */
 
 #include "../common/GENERATED_WARNING.inc"
@@ -61,9 +66,6 @@ HISTORY
         #endif
 
         /* Optional defines. */
-        #ifndef TM_STRSTR
-            #define TM_STRSTR strstr
-        #endif
         #ifndef TM_STRCMP
             #define TM_STRCMP strcmp
         #endif
@@ -116,30 +118,27 @@ extern "C" {
 
 #include "../common/tm_string_view.inc"
 
-/*
-Use the C++ string_view type if it is available. This will pull out any string_view returning function
-out of C-linkage, since they cannot be defined in C. If C interop is needed, #undef TM_STRING_VIEW before
-including this file, so both C and C++ use the same data types.
-*/
-#if defined(TM_STRING_VIEW) && defined(__cplusplus)
-    typedef TM_STRING_VIEW tmsu_string_view;
-    #define TMSU_STRING_VIEW_DATA(x) TM_STRING_VIEW_DATA(x)
-    #define TMSU_STRING_VIEW_SIZE(x) TM_STRING_VIEW_SIZE(x)
-    #define TMSU_STRING_VIEW_MAKE(str, size) TM_STRING_VIEW_MAKE((str), (size))
-#else
-    typedef struct {
-        const char* data;
-        tm_size_t size;
-    } tmsu_string_view;
-    #define TMSU_STRING_VIEW_DATA(x) (x).data
-    #define TMSU_STRING_VIEW_SIZE(x) (x).size
-    #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, (tm_size_t)(size))
-#endif
-
-static inline const char* tmsu_sv_begin(tmsu_string_view str) { return TMSU_STRING_VIEW_DATA(str); }
-static inline const char* tmsu_sv_end(tmsu_string_view str) { return TMSU_STRING_VIEW_DATA(str) + TMSU_STRING_VIEW_SIZE(str); }
-
 /* clang-format on */
+
+typedef struct tmsu_view_struct {
+    const char* first;
+    const char* last;
+
+#if defined(__cplusplus) && defined(TM_STRING_VIEW)
+    inline operator TM_STRING_VIEW() const {
+        TM_ASSERT(first <= last);
+        tm_size_t len = (tm_size_t)(last - first);
+        return TM_STRING_VIEW_MAKE(first, len);
+    }
+#endif
+} tmsu_view_t;
+
+TMSU_DEF tmsu_view_t tmsu_view(const char* str);
+TMSU_DEF tmsu_view_t tmsu_view_n(const char* first, const char* last);
+TMSU_DEF tmsu_view_t tmsu_view_l(const char* str, tm_size_t len);
+TMSU_DEF tm_bool tmsu_view_empty(tmsu_view_t str);
+TMSU_DEF const char* tmsu_view_data(tmsu_view_t str);
+TMSU_DEF tm_size_t tmsu_view_size(tmsu_view_t str);
 
 /*
 Find functions for nullterminated strings.
@@ -191,10 +190,26 @@ TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* 
 TMSU_DEF const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
                                                 const char* find_str_last, const char* not_found);
 
+TMSU_DEF const char* tmsu_find_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found);
+TMSU_DEF const char* tmsu_find_first_of_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_first_not_of_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_of_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_of_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found);
+TMSU_DEF const char* tmsu_find_last_not_of_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_not_of_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found);
+
 /* Ignores case for ansi characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi(const char* str, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_ansi(const char* str, const char* find_str);
+
 TMSU_DEF const char* tmsu_find_char_ignore_case_ansi_n(const char* str_first, const char* str_last, char c);
 TMSU_DEF const char* tmsu_find_ignore_case_ansi_n(const char* str_first, const char* str_last,
                                                   const char* find_str_first, const char* find_str_last);
+
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi_v(tmsu_view_t str, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str);
 
 /*
 Find functions that allow escaping of the character to look for. Useful for parsing.
@@ -207,36 +222,29 @@ TMSU_DEF const char* tmsu_find_char_unescaped_n(const char* str_first, const cha
 TMSU_DEF const char* tmsu_find_first_of_unescaped_n(const char* str_first, const char* str_last,
                                                     const char* find_str_first, const char* find_str_last,
                                                     char escape_char);
+TMSU_DEF const char* tmsu_find_char_unescaped_v(tmsu_view_t str, char c, char escape_char);
+TMSU_DEF const char* tmsu_find_first_of_unescaped_v(tmsu_view_t str, tmsu_view_t find_str, char escape_char);
 
-/* Ignores case for ansi characters. */
-TMSU_DEF const char* tmsu_find_char_ignore_case_ansi(const char* str, char c);
-TMSU_DEF const char* tmsu_find_ignore_case_ansi(const char* str, const char* find_str);
+/* Tokenizing */
 
 typedef struct {
     const char* current;
-} tmsu_tokenizer;
+} tmsu_tokenizer_t;
 
 /* Tokenizer for nullterminated strings. Alternative to strtok. */
-TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str);
+TMSU_DEF tmsu_tokenizer_t tmsu_tokenizer(const char* str);
 /*
-Returns true if a token could be extracted. Delimeters can be different between calls.
-The start and length of the token is then stored into the output parameter out.
+Returns true if a token could be extracted. delimiters can be different between calls.
+The view of the token is then stored into the output parameter out.
 */
-TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_string_view* out);
-
-typedef struct {
-    const char* first;
-    const char* last;
-} tmsu_tokenizer_n;
-
-/* Tokenizer for length based strings/iterators. Alternative to strtok. */
-TMSU_DEF tmsu_tokenizer_n tmsu_make_tokenizer_n(const char* first, const char* last);
-/*
-Returns true if a token could be extracted. Delimeters can be different between calls.
-The start and length of the token is then stored into the output parameter out.
-*/
-TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
-                                   const char* delimiters_last, tmsu_string_view* out);
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer_t* tokenizer, const char* delimiters, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_skip_empty(tmsu_tokenizer_t* tokenizer, const char* delimiters, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_n(tmsu_view_t* tokenizer, const char* delimiters_first,
+                                   const char* delimiters_last, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_skip_empty_n(tmsu_view_t* tokenizer, const char* delimiters_first,
+                                              const char* delimiters_last, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_v(tmsu_view_t* tokenizer, tmsu_view_t delimiters, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_skip_empty_v(tmsu_view_t* tokenizer, tmsu_view_t delimiters, tmsu_view_t* out);
 
 /* Word tokenizing. */
 
@@ -250,8 +258,10 @@ TMSU_DEF const char* tmsu_find_word_end_ex(const char* str, const char* word_sep
 TMSU_DEF const char* tmsu_find_word_end_n(const char* first, const char* last);
 TMSU_DEF const char* tmsu_find_word_end_n_ex(const char* first, const char* last, const char* word_seperators_first,
                                              const char* word_seperators_last);
+TMSU_DEF const char* tmsu_find_word_end_v(tmsu_view_t str);
+TMSU_DEF const char* tmsu_find_word_end_v_ex(tmsu_view_t str, tmsu_view_t word_separators);
 
-/*
+/*!
 Returns the start of a word by doing a reverse search from the end of the string and moving backwards.
 Behavior is similar to pressing Control+Left on most editors.
 Default word seperators are: " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?".
@@ -259,6 +269,8 @@ Default word seperators are: " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?".
 TMSU_DEF const char* tmsu_find_word_start_n(const char* first, const char* last);
 TMSU_DEF const char* tmsu_find_word_start_n_ex(const char* first, const char* last, const char* word_seperators_first,
                                                const char* word_seperators_last);
+TMSU_DEF const char* tmsu_find_word_start_v(tmsu_view_t str);
+TMSU_DEF const char* tmsu_find_word_start_v_ex(tmsu_view_t str, tmsu_view_t word_separators);
 
 /* Whitespace trimming */
 
@@ -266,8 +278,13 @@ TMSU_DEF const char* tmsu_trim_left(const char* str);
 
 /* Trims whitespace from the left. Returns new left/first boundary. */
 TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last);
+TMSU_DEF const char* tmsu_trim_left_v(tmsu_view_t str);
 /* Trims whitespace from the right. Returns new right/last boundary. */
 TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
+TMSU_DEF const char* tmsu_trim_right_v(tmsu_view_t str);
+
+TMSU_DEF tmsu_view_t tmsu_trim_n(const char* first, const char* last);
+TMSU_DEF tmsu_view_t tmsu_trim_v(tmsu_view_t str);
 
 /* Comparisons */
 
@@ -279,14 +296,21 @@ TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char*
 TMSU_DEF int tmsu_compare_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
                                              const char* b_last);
 
+TMSU_DEF int tmsu_compare_v(tmsu_view_t a, tmsu_view_t b);
+TMSU_DEF int tmsu_compare_ignore_case_ansi_v(tmsu_view_t a, tmsu_view_t b);
+
 /* String comparison for humans. See http://stereopsis.com/strcmp4humans.html. */
 TMSU_DEF int tmsu_human_compare_ansi_n(const char* a_first, const char* a_last, const char* b_first,
                                        const char* b_last);
+TMSU_DEF int tmsu_human_compare_ansi_v(tmsu_view_t a, tmsu_view_t b);
 
 /* Equality check, faster than lexicographical compare, since we can check lengths first. */
 TMSU_DEF tm_bool tmsu_equals_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
 TMSU_DEF tm_bool tmsu_equals_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
                                                 const char* b_last);
+
+TMSU_DEF tm_bool tmsu_equals_v(tmsu_view_t a, tmsu_view_t b);
+TMSU_DEF tm_bool tmsu_equals_ignore_case_ansi_v(tmsu_view_t a, tmsu_view_t b);
 
 TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str);
 TMSU_DEF tm_bool tmsu_ends_with(const char* str, const char* find_str);
@@ -295,6 +319,9 @@ TMSU_DEF tm_bool tmsu_starts_with_n(const char* a_first, const char* a_last, con
 TMSU_DEF tm_bool tmsu_ends_with_n(const char* str_first, const char* str_last, const char* find_str_first,
                                   const char* find_str_last);
 
+TMSU_DEF tm_bool tmsu_starts_with_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF tm_bool tmsu_ends_with_v(tmsu_view_t str, tmsu_view_t find_str);
+
 TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi(const char* str, const char* find_str);
 TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi(const char* str, const char* find_str);
 
@@ -302,6 +329,9 @@ TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_n(const char* a_first, const 
                                                      const char* b_last);
 TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_n(const char* str_first, const char* str_last,
                                                    const char* find_str_first, const char* find_str_last);
+
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str);
 
 /* Some encoding/decoding functions. */
 
@@ -404,6 +434,7 @@ TMSU_DEF tm_size_t tmsu_url_decode(const char* url_encoded_input, tm_size_t inpu
 
 /* Only checks chars from '0' to '9'. */
 TMSU_DEF tm_bool tmsu_isdigit(unsigned c);
+TMSU_DEF tm_bool tmsu_isdigit_c(char c);
 
 TMSU_DEF const char* tmsu_stristr(const char* str, const char* find_str);
 TMSU_DEF int tmsu_stricmp(const char* a, const char* b);
@@ -416,45 +447,25 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
 }
 #endif
 
-/* string_view returning types are only extern C if the string_view isn't a C++ type. */
-#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
-extern "C" {
-#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
-
-#include "string_view_c_linkage.h"
-
-#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
-}
-#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
-
-#if defined(__cplusplus) && defined(TM_STRING_VIEW)
-
-#include "string_view_overloads.h"
-
-#endif
-
 #endif /* !defined(_TM_STRINGUTIL_INCLUDED_49458961_DD38_441D_B888_A589548CA6F5_) */
 
 #ifdef TM_STRINGUTIL_IMPLEMENTATION
 
-#include "implementation.cpp"
-
-#if defined(__cplusplus) && defined(TM_STRING_VIEW)
-
-#include "string_view_overloads.cpp"
-
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-/* string_view returning types are only extern C if the string_view isn't a C++ type. */
-#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
-extern "C" {
-#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
+#include "../common/tm_assert_valid_size.inc"
 
-#include "string_view_c_linkage.c"
+#include "../common/tm_null.inc"
 
-#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
+#include "implementation.cpp"
+
+#include "implementation_view.cpp"
+
+#ifdef __cplusplus
 }
-#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
+#endif
 
 #endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
 

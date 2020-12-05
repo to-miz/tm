@@ -1,5 +1,5 @@
 /*
-tm_stringutil.h v0.9.1 - public domain - https://github.com/to-miz/tm
+tm_stringutil.h v0.9.3 - public domain - https://github.com/to-miz/tm
 author: Tolga Mizrak 2020
 
 no warranty; use at your own risk
@@ -17,21 +17,26 @@ PURPOSE
     Some string based utility functions for searching and tokenizing.
     Most functions have versions that work on nullterminated and length based strings.
 
-HISTORY
-    v0.9.1  20.04.20 Added tmsu_sv_begin and tmsu_sv_end convenience functions.
-    v0.9.0  03.04.20 Added tmsu_base64_decode, tmsu_base64url_encode, tmsu_base64url_decode,
-                     tmsu_url_encode, tmsu_url_decode.
-    v0.3.4  02.05.19 Added tmsu_find_word_end_n and tmsu_find_word_start_n.
-    v0.3.3  06.03.19 Added optional defines for TM_STRCSPN and TM_STRSPN to make use
-                     of CRT if it is present.
-                     Fixed a C compilation error due to use of auto.
-    v0.3.2  03.03.19 Fixed a bug in tmsu_find_last_not_of_n_ex and tmsu_trim_right_n.
-    v0.3.1  15.01.19 Fixed some warnings in msvc with signed size_t and string_view.
-    v0.3    15.10.18 Added more string_view overloads.
-    v0.2    14.10.18 Fixed an tmsu_compare functions to do proper lexicographical comparison.
-                     Added tmsu_equals.
-                     Fixed MSVC warning about unreachable code.
-    v0.1    07.10.18 Initial commit.
+HISTORY    (DD.MM.YY)
+    v0.9.3  05.12.20  Tokenizer does not skip empty tokens anymore. Instead there is tmsu_next_token_skip_empty.
+    v0.9.2  04.12.20  Removed C++ string_view overloads, instead there is tmsu_view_t for C.
+                      The C++ string_view apis overloads were sort of useless, since a C++
+                      string_view class would already have most of these functions as methods.
+                      Fixed some bugs with tmsu_find.
+    v0.9.1  20.04.20  Added tmsu_sv_begin and tmsu_sv_end convenience functions.
+    v0.9.0  03.04.20  Added tmsu_base64_decode, tmsu_base64url_encode, tmsu_base64url_decode,
+                      tmsu_url_encode, tmsu_url_decode.
+    v0.3.4  02.05.19  Added tmsu_find_word_end_n and tmsu_find_word_start_n.
+    v0.3.3  06.03.19  Added optional defines for TM_STRCSPN and TM_STRSPN to make use
+                      of CRT if it is present.
+                      Fixed a C compilation error due to use of auto.
+    v0.3.2  03.03.19  Fixed a bug in tmsu_find_last_not_of_n_ex and tmsu_trim_right_n.
+    v0.3.1  15.01.19  Fixed some warnings in msvc with signed size_t and string_view.
+    v0.3    15.10.18  Added more string_view overloads.
+    v0.2    14.10.18  Fixed an tmsu_compare functions to do proper lexicographical comparison.
+                      Added tmsu_equals.
+                      Fixed MSVC warning about unreachable code.
+    v0.1    07.10.18  Initial commit.
 */
 
 /* This is a generated file, do not modify directly. You can find the generator files in the src directory. */
@@ -65,9 +70,6 @@ HISTORY
         #endif
 
         /* Optional defines. */
-        #ifndef TM_STRSTR
-            #define TM_STRSTR strstr
-        #endif
         #ifndef TM_STRCMP
             #define TM_STRCMP strcmp
         #endif
@@ -153,30 +155,27 @@ TM_STRING_VIEW_SIZE and TM_STRING_VIEW_MAKE.
     #endif
 #endif
 
-/*
-Use the C++ string_view type if it is available. This will pull out any string_view returning function
-out of C-linkage, since they cannot be defined in C. If C interop is needed, #undef TM_STRING_VIEW before
-including this file, so both C and C++ use the same data types.
-*/
-#if defined(TM_STRING_VIEW) && defined(__cplusplus)
-    typedef TM_STRING_VIEW tmsu_string_view;
-    #define TMSU_STRING_VIEW_DATA(x) TM_STRING_VIEW_DATA(x)
-    #define TMSU_STRING_VIEW_SIZE(x) TM_STRING_VIEW_SIZE(x)
-    #define TMSU_STRING_VIEW_MAKE(str, size) TM_STRING_VIEW_MAKE((str), (size))
-#else
-    typedef struct {
-        const char* data;
-        tm_size_t size;
-    } tmsu_string_view;
-    #define TMSU_STRING_VIEW_DATA(x) (x).data
-    #define TMSU_STRING_VIEW_SIZE(x) (x).size
-    #define TMSU_STRING_VIEW_MAKE(str, size) tmsu_make_string_view(str, (tm_size_t)(size))
-#endif
-
-static inline const char* tmsu_sv_begin(tmsu_string_view str) { return TMSU_STRING_VIEW_DATA(str); }
-static inline const char* tmsu_sv_end(tmsu_string_view str) { return TMSU_STRING_VIEW_DATA(str) + TMSU_STRING_VIEW_SIZE(str); }
-
 /* clang-format on */
+
+typedef struct tmsu_view_struct {
+    const char* first;
+    const char* last;
+
+#if defined(__cplusplus) && defined(TM_STRING_VIEW)
+    inline operator TM_STRING_VIEW() const {
+        TM_ASSERT(first <= last);
+        tm_size_t len = (tm_size_t)(last - first);
+        return TM_STRING_VIEW_MAKE(first, len);
+    }
+#endif
+} tmsu_view_t;
+
+TMSU_DEF tmsu_view_t tmsu_view(const char* str);
+TMSU_DEF tmsu_view_t tmsu_view_n(const char* first, const char* last);
+TMSU_DEF tmsu_view_t tmsu_view_l(const char* str, tm_size_t len);
+TMSU_DEF tm_bool tmsu_view_empty(tmsu_view_t str);
+TMSU_DEF const char* tmsu_view_data(tmsu_view_t str);
+TMSU_DEF tm_size_t tmsu_view_size(tmsu_view_t str);
 
 /*
 Find functions for nullterminated strings.
@@ -228,10 +227,26 @@ TMSU_DEF const char* tmsu_find_last_not_of_n(const char* str_first, const char* 
 TMSU_DEF const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_last, const char* find_str_first,
                                                 const char* find_str_last, const char* not_found);
 
+TMSU_DEF const char* tmsu_find_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found);
+TMSU_DEF const char* tmsu_find_first_of_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_first_not_of_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_of_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_of_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found);
+TMSU_DEF const char* tmsu_find_last_not_of_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF const char* tmsu_find_last_not_of_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found);
+
 /* Ignores case for ansi characters. */
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi(const char* str, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_ansi(const char* str, const char* find_str);
+
 TMSU_DEF const char* tmsu_find_char_ignore_case_ansi_n(const char* str_first, const char* str_last, char c);
 TMSU_DEF const char* tmsu_find_ignore_case_ansi_n(const char* str_first, const char* str_last,
                                                   const char* find_str_first, const char* find_str_last);
+
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi_v(tmsu_view_t str, char c);
+TMSU_DEF const char* tmsu_find_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str);
 
 /*
 Find functions that allow escaping of the character to look for. Useful for parsing.
@@ -244,36 +259,29 @@ TMSU_DEF const char* tmsu_find_char_unescaped_n(const char* str_first, const cha
 TMSU_DEF const char* tmsu_find_first_of_unescaped_n(const char* str_first, const char* str_last,
                                                     const char* find_str_first, const char* find_str_last,
                                                     char escape_char);
+TMSU_DEF const char* tmsu_find_char_unescaped_v(tmsu_view_t str, char c, char escape_char);
+TMSU_DEF const char* tmsu_find_first_of_unescaped_v(tmsu_view_t str, tmsu_view_t find_str, char escape_char);
 
-/* Ignores case for ansi characters. */
-TMSU_DEF const char* tmsu_find_char_ignore_case_ansi(const char* str, char c);
-TMSU_DEF const char* tmsu_find_ignore_case_ansi(const char* str, const char* find_str);
+/* Tokenizing */
 
 typedef struct {
     const char* current;
-} tmsu_tokenizer;
+} tmsu_tokenizer_t;
 
 /* Tokenizer for nullterminated strings. Alternative to strtok. */
-TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str);
+TMSU_DEF tmsu_tokenizer_t tmsu_tokenizer(const char* str);
 /*
-Returns true if a token could be extracted. Delimeters can be different between calls.
-The start and length of the token is then stored into the output parameter out.
+Returns true if a token could be extracted. delimiters can be different between calls.
+The view of the token is then stored into the output parameter out.
 */
-TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_string_view* out);
-
-typedef struct {
-    const char* first;
-    const char* last;
-} tmsu_tokenizer_n;
-
-/* Tokenizer for length based strings/iterators. Alternative to strtok. */
-TMSU_DEF tmsu_tokenizer_n tmsu_make_tokenizer_n(const char* first, const char* last);
-/*
-Returns true if a token could be extracted. Delimeters can be different between calls.
-The start and length of the token is then stored into the output parameter out.
-*/
-TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
-                                   const char* delimiters_last, tmsu_string_view* out);
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer_t* tokenizer, const char* delimiters, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_skip_empty(tmsu_tokenizer_t* tokenizer, const char* delimiters, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_n(tmsu_view_t* tokenizer, const char* delimiters_first,
+                                   const char* delimiters_last, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_skip_empty_n(tmsu_view_t* tokenizer, const char* delimiters_first,
+                                              const char* delimiters_last, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_v(tmsu_view_t* tokenizer, tmsu_view_t delimiters, tmsu_view_t* out);
+TMSU_DEF tm_bool tmsu_next_token_skip_empty_v(tmsu_view_t* tokenizer, tmsu_view_t delimiters, tmsu_view_t* out);
 
 /* Word tokenizing. */
 
@@ -287,8 +295,10 @@ TMSU_DEF const char* tmsu_find_word_end_ex(const char* str, const char* word_sep
 TMSU_DEF const char* tmsu_find_word_end_n(const char* first, const char* last);
 TMSU_DEF const char* tmsu_find_word_end_n_ex(const char* first, const char* last, const char* word_seperators_first,
                                              const char* word_seperators_last);
+TMSU_DEF const char* tmsu_find_word_end_v(tmsu_view_t str);
+TMSU_DEF const char* tmsu_find_word_end_v_ex(tmsu_view_t str, tmsu_view_t word_separators);
 
-/*
+/*!
 Returns the start of a word by doing a reverse search from the end of the string and moving backwards.
 Behavior is similar to pressing Control+Left on most editors.
 Default word seperators are: " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?".
@@ -296,6 +306,8 @@ Default word seperators are: " \t\n\v\f\r./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?".
 TMSU_DEF const char* tmsu_find_word_start_n(const char* first, const char* last);
 TMSU_DEF const char* tmsu_find_word_start_n_ex(const char* first, const char* last, const char* word_seperators_first,
                                                const char* word_seperators_last);
+TMSU_DEF const char* tmsu_find_word_start_v(tmsu_view_t str);
+TMSU_DEF const char* tmsu_find_word_start_v_ex(tmsu_view_t str, tmsu_view_t word_separators);
 
 /* Whitespace trimming */
 
@@ -303,8 +315,13 @@ TMSU_DEF const char* tmsu_trim_left(const char* str);
 
 /* Trims whitespace from the left. Returns new left/first boundary. */
 TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last);
+TMSU_DEF const char* tmsu_trim_left_v(tmsu_view_t str);
 /* Trims whitespace from the right. Returns new right/last boundary. */
 TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last);
+TMSU_DEF const char* tmsu_trim_right_v(tmsu_view_t str);
+
+TMSU_DEF tmsu_view_t tmsu_trim_n(const char* first, const char* last);
+TMSU_DEF tmsu_view_t tmsu_trim_v(tmsu_view_t str);
 
 /* Comparisons */
 
@@ -316,14 +333,21 @@ TMSU_DEF int tmsu_compare_n(const char* a_first, const char* a_last, const char*
 TMSU_DEF int tmsu_compare_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
                                              const char* b_last);
 
+TMSU_DEF int tmsu_compare_v(tmsu_view_t a, tmsu_view_t b);
+TMSU_DEF int tmsu_compare_ignore_case_ansi_v(tmsu_view_t a, tmsu_view_t b);
+
 /* String comparison for humans. See http://stereopsis.com/strcmp4humans.html. */
 TMSU_DEF int tmsu_human_compare_ansi_n(const char* a_first, const char* a_last, const char* b_first,
                                        const char* b_last);
+TMSU_DEF int tmsu_human_compare_ansi_v(tmsu_view_t a, tmsu_view_t b);
 
 /* Equality check, faster than lexicographical compare, since we can check lengths first. */
 TMSU_DEF tm_bool tmsu_equals_n(const char* a_first, const char* a_last, const char* b_first, const char* b_last);
 TMSU_DEF tm_bool tmsu_equals_ignore_case_ansi_n(const char* a_first, const char* a_last, const char* b_first,
                                                 const char* b_last);
+
+TMSU_DEF tm_bool tmsu_equals_v(tmsu_view_t a, tmsu_view_t b);
+TMSU_DEF tm_bool tmsu_equals_ignore_case_ansi_v(tmsu_view_t a, tmsu_view_t b);
 
 TMSU_DEF tm_bool tmsu_starts_with(const char* str, const char* find_str);
 TMSU_DEF tm_bool tmsu_ends_with(const char* str, const char* find_str);
@@ -332,6 +356,9 @@ TMSU_DEF tm_bool tmsu_starts_with_n(const char* a_first, const char* a_last, con
 TMSU_DEF tm_bool tmsu_ends_with_n(const char* str_first, const char* str_last, const char* find_str_first,
                                   const char* find_str_last);
 
+TMSU_DEF tm_bool tmsu_starts_with_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF tm_bool tmsu_ends_with_v(tmsu_view_t str, tmsu_view_t find_str);
+
 TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi(const char* str, const char* find_str);
 TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi(const char* str, const char* find_str);
 
@@ -339,6 +366,9 @@ TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_n(const char* a_first, const 
                                                      const char* b_last);
 TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_n(const char* str_first, const char* str_last,
                                                    const char* find_str_first, const char* find_str_last);
+
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str);
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str);
 
 /* Some encoding/decoding functions. */
 
@@ -441,6 +471,7 @@ TMSU_DEF tm_size_t tmsu_url_decode(const char* url_encoded_input, tm_size_t inpu
 
 /* Only checks chars from '0' to '9'. */
 TMSU_DEF tm_bool tmsu_isdigit(unsigned c);
+TMSU_DEF tm_bool tmsu_isdigit_c(char c);
 
 TMSU_DEF const char* tmsu_stristr(const char* str, const char* find_str);
 TMSU_DEF int tmsu_stricmp(const char* a, const char* b);
@@ -453,58 +484,6 @@ TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len);
 }
 #endif
 
-/* string_view returning types are only extern C if the string_view isn't a C++ type. */
-#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
-extern "C" {
-#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
-
-/* Trims whitespace from both sides. */
-TMSU_DEF tmsu_string_view tmsu_trim(const char* str);
-/* Trims whitespace from both sides. */
-TMSU_DEF tmsu_string_view tmsu_trim_n(const char* first, const char* last);
-
-#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
-}
-#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
-
-#if defined(__cplusplus) && defined(TM_STRING_VIEW)
-
-const char* tmsu_find_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str);
-const char* tmsu_find_last_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str);
-const char* tmsu_find_last_n_ex(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
-                                const char* not_found);
-const char* tmsu_find_first_of_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str);
-const char* tmsu_find_first_not_of_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str);
-const char* tmsu_find_last_of_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str);
-const char* tmsu_find_last_of_n_ex(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
-                                   const char* not_found);
-const char* tmsu_find_last_not_of_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str);
-const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
-                                       const char* not_found);
-const char* tmsu_find_ignore_case_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str);
-const char* tmsu_find_first_of_unescaped_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
-                                           char escape_char);
-
-TM_STRING_VIEW tmsu_trim_left(TM_STRING_VIEW str);
-TM_STRING_VIEW tmsu_trim_right(TM_STRING_VIEW str);
-TM_STRING_VIEW tmsu_trim(TM_STRING_VIEW str);
-
-int tmsu_compare(TM_STRING_VIEW a, TM_STRING_VIEW b);
-int tmsu_compare_ignore_case(TM_STRING_VIEW a, TM_STRING_VIEW b);
-int tmsu_human_compare(TM_STRING_VIEW a, TM_STRING_VIEW b);
-
-tm_bool tmsu_equals(TM_STRING_VIEW a, TM_STRING_VIEW b);
-tm_bool tmsu_equals_ignore_case(TM_STRING_VIEW a, TM_STRING_VIEW b);
-
-tm_bool tmsu_starts_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
-tm_bool tmsu_ends_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
-tm_bool tmsu_starts_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
-tm_bool tmsu_ends_with_ignore_case(TM_STRING_VIEW str, TM_STRING_VIEW find_str);
-
-tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, TM_STRING_VIEW find_str, tmsu_string_view* out);
-
-#endif
-
 #endif /* !defined(_TM_STRINGUTIL_INCLUDED_49458961_DD38_441D_B888_A589548CA6F5_) */
 
 #ifdef TM_STRINGUTIL_IMPLEMENTATION
@@ -513,14 +492,14 @@ tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, TM_STRING_VIEW find_str, 
 extern "C" {
 #endif
 
-#if !defined(__cplusplus) || !defined(TM_STRING_VIEW)
-inline static tmsu_string_view tmsu_make_string_view(const char* str, tm_size_t size) {
-    tmsu_string_view result;
-    result.data = str;
-    result.size = size;
-    return result;
-}
-#endif /* !defined(__cplusplus) || !defined(TM_STRING_VIEW) */
+#ifndef TM_ASSERT_VALID_SIZE
+    #if defined(TM_SIZE_T_IS_SIGNED) && TM_SIZE_T_IS_SIGNED
+        #define TM_ASSERT_VALID_SIZE(x) TM_ASSERT((x) >= 0)
+    #else
+        /* always true if size_t is unsigned */
+        #define TM_ASSERT_VALID_SIZE(x) ((void)0)
+    #endif
+#endif /* !defined(TM_ASSERT_VALID_SIZE) */
 
 /* Use null of the underlying language. */
 #ifndef TM_NULL
@@ -545,7 +524,7 @@ inline static size_t tmsu_distance_sz(const char* first, const char* last) {
 TMSU_DEF const char* tmsu_find_char(const char* str, char c) {
     TM_ASSERT(str);
     for (; *str; ++str) {
-        if (*str == c) return str;
+        if (*str == c) break;
     }
     return str;
 }
@@ -563,6 +542,8 @@ TMSU_DEF const char* tmsu_find_last_char(const char* str, char c) {
 }
 
 TMSU_DEF const char* tmsu_find_char_n(const char* str_first, const char* str_last, char c) {
+    if (str_first == str_last) return str_last;
+    TM_ASSERT(str_first);
     const void* result = TM_MEMCHR(str_first, TMSU_C2I(c), tmsu_distance_sz(str_first, str_last));
     return (result) ? (const char*)result : str_last;
 }
@@ -616,10 +597,13 @@ TMSU_DEF const char* tmsu_find_n(const char* str_first, const char* str_last, co
     if (find_str_len > tmsu_distance_sz(str_first, str_last)) return str_last; /* Not enough room for a match. */
 
     /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
-    str_last -= find_str_len;
+    --find_str_len;
+    const char* search_last = str_last - find_str_len;
     const char* cur = str_first;
-    while ((cur = tmsu_find_char_n(cur, str_last, *find_str_first)) != str_last) {
-        if (TM_MEMCMP(cur, find_str_first, find_str_len) == 0) {
+    char find_firs_char = *find_str_first;
+    ++find_str_first;
+    while ((cur = tmsu_find_char_n(cur, search_last, find_firs_char)) != search_last) {
+        if (TM_MEMCMP(cur + 1, find_str_first, find_str_len) == 0) {
             return cur;
         }
         ++cur;
@@ -637,11 +621,14 @@ TMSU_DEF const char* tmsu_find_last_n_ex(const char* str_first, const char* str_
     if (find_str_len > tmsu_distance_sz(str_first, str_last)) return not_found; /* Not enough room for a match. */
 
     /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
-    str_last -= find_str_len;
-    const char* prev = str_last;
-    const char* cur = str_last;
-    while ((cur = tmsu_find_last_char_n(str_first, prev, *find_str_first)) != prev) {
-        if (TM_MEMCMP(cur, find_str_first, find_str_len) == 0) {
+    --find_str_len;
+    const char* search_last = str_last - find_str_len;
+    const char* prev = search_last;
+    const char* cur = search_last;
+    char find_firs_char = *find_str_first;
+    ++find_str_first;
+    while ((cur = tmsu_find_last_char_n(str_first, prev, find_firs_char)) != prev) {
+        if (TM_MEMCMP(cur + 1, find_str_first, find_str_len) == 0) {
             return cur;
         }
         prev = cur;
@@ -658,32 +645,18 @@ TMSU_DEF const char* tmsu_find(const char* str, const char* find_str) {
     TM_ASSERT(str);
     TM_ASSERT(find_str);
 
-#ifdef TM_STRSTR
-    return TM_STRSTR(str, find_str);
-#else
-    /* TODO: is this better than calling the _n variant with two strlens? */
-#if 0
-    return tmsu_find_n(str, str + TM_STRLEN(str), find_str, TM_STRLEN(find_str));
-#else
-    if (!*find_str) return str;
-    for (;;) {
-        while (*str && *str != *find_str) {
-            ++str;
-        }
-        if (!*str) {
-            return str;
-        }
-        const char* other = find_str;
-        while (*str && *other && *str == *other) {
-            ++str;
-            ++other;
-        }
-        if (!*str && !*other) {
-            return str;
-        }
-    }
-#endif
-#endif
+    if (!*str) return str;
+    char first_char = *find_str;
+    if (!first_char) return str;
+    ++find_str;
+    size_t find_str_len = TM_STRLEN(find_str);
+    do {
+        str = tmsu_find_char(str, first_char);
+        if (!*str) return str;
+        if (TM_STRNCMP(str + 1, find_str, find_str_len) == 0) return str;
+        ++str;
+    } while (*str);
+    return str;
 }
 
 TMSU_DEF const char* tmsu_find_last(const char* str, const char* find_str) {
@@ -831,10 +804,13 @@ TMSU_DEF const char* tmsu_find_ignore_case_ansi_n(const char* str_first, const c
     if (find_str_len > tmsu_distance_sz(str_first, str_last)) return str_last; /* Not enough room for a match. */
 
     /* We can reduce str_last by find_str_len, since the remaining size at the end doesn't allow for a match. */
-    str_last -= find_str_len;
+    --find_str_len;
+    const char* search_last = str_last - find_str_len;
     const char* cur = str_first;
-    while ((cur = tmsu_find_char_ignore_case_ansi_n(cur, str_last, *find_str_first)) != str_last) {
-        if (tmsu_compare_ignore_case_ansi_n(cur, cur + find_str_len, find_str_first, find_str_last) == 0) {
+    char find_firs_char = *find_str_first;
+    ++find_str_first;
+    while ((cur = tmsu_find_char_ignore_case_ansi_n(cur, search_last, find_firs_char)) != search_last) {
+        if (tmsu_compare_ignore_case_ansi_n(cur + 1, cur + 1 + find_str_len, find_str_first, find_str_last) == 0) {
             return cur;
         }
         ++cur;
@@ -953,14 +929,30 @@ TMSU_DEF const char* tmsu_find_first_of_unescaped_n(const char* str_first, const
 
 /* Tokenizer */
 
-TMSU_DEF tmsu_tokenizer tmsu_make_tokenizer(const char* str) {
+TMSU_DEF tmsu_tokenizer_t tmsu_tokenizer(const char* str) {
     TM_ASSERT(str);
-    tmsu_tokenizer result;
+    tmsu_tokenizer_t result;
     result.current = str;
     return result;
 }
 
-TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimiters, tmsu_string_view* out) {
+TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer_t* tokenizer, const char* delimiters, tmsu_view_t* out) {
+    TM_ASSERT(tokenizer);
+    TM_ASSERT(tokenizer->current);
+    TM_ASSERT(delimiters);
+
+    /* Skip everything until we find other delimiters or the end of the string. */
+    const char* next = tmsu_find_first_of(tokenizer->current, delimiters);
+    if (out) {
+        out->first = tokenizer->current;
+        out->last = next;
+    }
+    tm_bool result = (*next != 0);
+    tokenizer->current = next + result;
+    return result;
+}
+
+TMSU_DEF tm_bool tmsu_next_token_skip_empty(tmsu_tokenizer_t* tokenizer, const char* delimiters, tmsu_view_t* out) {
     TM_ASSERT(tokenizer);
     TM_ASSERT(tokenizer->current);
     TM_ASSERT(delimiters);
@@ -968,26 +960,32 @@ TMSU_DEF tm_bool tmsu_next_token(tmsu_tokenizer* tokenizer, const char* delimite
     /* Skip delimiters at the beginning. */
     tokenizer->current = tmsu_find_first_not_of(tokenizer->current, delimiters);
     if (!*tokenizer->current) return TM_FALSE;
-    /* Skip skip everything until we find other delimiters. */
+    /* Skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of(tokenizer->current, delimiters);
     if (out) {
-        *out = TMSU_STRING_VIEW_MAKE(tokenizer->current, tmsu_distance(tokenizer->current, next));
+        out->first = tokenizer->current;
+        out->last = next;
     }
     tokenizer->current = next;
     return TM_TRUE;
 }
 
-TMSU_DEF tmsu_tokenizer_n tmsu_make_tokenizer_n(const char* first, const char* last) {
-    TM_ASSERT(first && first <= last);
+TMSU_DEF tm_bool tmsu_next_token_n(tmsu_view_t* tokenizer, const char* delimiters_first,
+                                   const char* delimiters_last, tmsu_view_t* out) {
+    TM_ASSERT(tokenizer);
+    TM_ASSERT(tokenizer->first && tokenizer->first <= tokenizer->last);
+    TM_ASSERT(delimiters_first && delimiters_first <= delimiters_last);
 
-    tmsu_tokenizer_n result;
-    result.first = first;
-    result.last = last;
+    /* Skip everything until we find other delimiters. */
+    const char* next = tmsu_find_first_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
+    if (out) *out = tmsu_view_n(tokenizer->first, next);
+    tm_bool result = (next != tokenizer->last);
+    tokenizer->first = next + result;
     return result;
 }
 
-TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* delimiters_first,
-                                   const char* delimiters_last, tmsu_string_view* out) {
+TMSU_DEF tm_bool tmsu_next_token_skip_empty_n(tmsu_view_t* tokenizer, const char* delimiters_first,
+                                              const char* delimiters_last, tmsu_view_t* out) {
     TM_ASSERT(tokenizer);
     TM_ASSERT(tokenizer->first && tokenizer->first <= tokenizer->last);
     TM_ASSERT(delimiters_first && delimiters_first <= delimiters_last);
@@ -995,9 +993,9 @@ TMSU_DEF tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, const char* deli
     /* Skip delimiters at the beginning. */
     tokenizer->first = tmsu_find_first_not_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
     if (tokenizer->first == tokenizer->last) return TM_FALSE;
-    /* Skip skip everything until we find other delimiters. */
+    /* Skip everything until we find other delimiters. */
     const char* next = tmsu_find_first_of_n(tokenizer->first, tokenizer->last, delimiters_first, delimiters_last);
-    if (out) *out = TMSU_STRING_VIEW_MAKE(tokenizer->first, tmsu_distance(tokenizer->first, next));
+    if (out) *out = tmsu_view_n(tokenizer->first, next);
     tokenizer->first = next;
     return TM_TRUE;
 }
@@ -1056,8 +1054,7 @@ TMSU_DEF const char* tmsu_trim_left_n(const char* first, const char* last) {
     return tmsu_find_first_not_of_n(first, last, TMSU_WHITESPACE, TMSU_WHITESPACE + TMSU_WHITESPACE_COUNT);
 }
 TMSU_DEF const char* tmsu_trim_right_n(const char* first, const char* last) {
-    const char* result =
-        tmsu_find_last_not_of_n_ex(first, last, TMSU_WHITESPACE, TMSU_WHITESPACE + TMSU_WHITESPACE_COUNT, TM_NULL);
+    const char* result = tmsu_find_last_not_of_n_ex(first, last, TMSU_WHITESPACE, TMSU_WHITESPACE + TMSU_WHITESPACE_COUNT, TM_NULL);
     if (result == TM_NULL) {
         /* No non whitespace found, point to first. */
         result = first;
@@ -1291,10 +1288,14 @@ TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_n(const char* str_first, const 
 /* Crt extensions */
 
 TMSU_DEF tm_bool tmsu_isdigit(unsigned c) { return c >= '0' && c <= '9'; }
+TMSU_DEF tm_bool tmsu_isdigit_c(char c) { return c >= '0' && c <= '9'; }
 
 TMSU_DEF const char* tmsu_stristr(const char* str, const char* find_str) {
-    return tmsu_find_ignore_case_ansi(str, find_str);
+    // Strstr returns NULL if find_str was not found, so we replicate this behavior here too.
+    const char* result = tmsu_find_ignore_case_ansi(str, find_str);
+    return (*result) ? result : TM_NULL;
 }
+
 TMSU_DEF int tmsu_stricmp(const char* a, const char* b) {
     while (*a && *b) {
         int aUpper = TM_TOUPPER(TMSU_C2I(*a));
@@ -1328,6 +1329,8 @@ TMSU_DEF int tmsu_strnicmp(const char* a, const char* b, size_t count) {
 }
 TMSU_DEF char* tmsu_strrev(char* str) { return tmsu_strnrev(str, TM_STRLEN(str)); }
 TMSU_DEF char* tmsu_strnrev(char* str, size_t count) {
+    TM_ASSERT(str || count == 0);
+    if (count == 0) return str;
     for (size_t i = 0, j = count - 1; i < j; ++i, --j) {
         char tmp = str[i];
         str[i] = str[j];
@@ -1336,14 +1339,17 @@ TMSU_DEF char* tmsu_strnrev(char* str, size_t count) {
     return str;
 }
 TMSU_DEF const void* tmsu_memrchr(const void* ptr, int value, size_t len) {
+    TM_ASSERT(ptr || len == 0);
+    TM_ASSERT(value >= 0 && value <= 0xFF);
+    if (!len) return TM_NULL;
     const char* p = (const char*)ptr + len;
-    while (len) {
+    do {
         --len;
         --p;
         if ((unsigned char)*p == value) {
             return (const void*)p;
         }
-    }
+    } while (len);
     return TM_NULL;
 }
 
@@ -1431,20 +1437,20 @@ static tm_size_t tmsu_base64_encode_chars(char const* const chars, tm_bool pad, 
 }
 
 static tm_size_t tmsu_base64_decode_chars(char const* const chars, tm_bool expect_padding,
-                                          const char* base64_encoded_string, tm_size_t base64_input_size, void* out,
+                                          const char* base64_in, tm_size_t base64_in_size, void* out,
                                           tm_size_t out_size) {
     TM_ASSERT((chars == tmsu_base64_chars) || (chars == tmsu_base64url_chars));
-    TM_ASSERT((base64_input_size % 4 == 0) || !expect_padding);
+    TM_ASSERT((base64_in_size % 4 == 0) || !expect_padding);
 
     tm_size_t out_index = 0;
     char* p = (char*)out;
     unsigned int char_value[4];
     tm_size_t i = 0;
-    for (; base64_input_size > 4; i += 4, base64_input_size -= 4) {
-        char_value[0] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 0]) - chars);
-        char_value[1] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 1]) - chars);
-        char_value[2] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 2]) - chars);
-        char_value[3] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 3]) - chars);
+    for (; base64_in_size > 4; i += 4, base64_in_size -= 4) {
+        char_value[0] = (unsigned int)(tmsu_find_char(chars, base64_in[i + 0]) - chars);
+        char_value[1] = (unsigned int)(tmsu_find_char(chars, base64_in[i + 1]) - chars);
+        char_value[2] = (unsigned int)(tmsu_find_char(chars, base64_in[i + 2]) - chars);
+        char_value[3] = (unsigned int)(tmsu_find_char(chars, base64_in[i + 3]) - chars);
 
         if (char_value[0] >= 64) return 0;
         if (char_value[1] >= 64) return 0;
@@ -1462,38 +1468,38 @@ static tm_size_t tmsu_base64_decode_chars(char const* const chars, tm_bool expec
     }
 
     // Handle last 4 bytes seperately, since they might have padding '='.
-    if (base64_input_size > 0) {
+    if (base64_in_size > 0) {
         int padding_count = 0;
         if (expect_padding) {
-            char_value[0] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 0]) - chars);
-            char_value[1] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 1]) - chars);
-            char_value[2] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 2]) - chars);
-            char_value[3] = (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 3]) - chars);
+            char_value[0] = (unsigned int)(tmsu_find_char(chars, base64_in[i + 0]) - chars);
+            char_value[1] = (unsigned int)(tmsu_find_char(chars, base64_in[i + 1]) - chars);
+            char_value[2] = (unsigned int)(tmsu_find_char(chars, base64_in[i + 2]) - chars);
+            char_value[3] = (unsigned int)(tmsu_find_char(chars, base64_in[i + 3]) - chars);
 
             if (char_value[0] >= 64) return 0;
             if (char_value[1] >= 64) return 0;
             if (char_value[3] >= 64) {
-                if (base64_encoded_string[i + 3] != '=') return 0;
+                if (base64_in[i + 3] != '=') return 0;
                 char_value[3] = 0;
                 padding_count = 1;
             }
             if (char_value[2] >= 64) {
-                if (base64_encoded_string[i + 2] != '=') return 0;
+                if (base64_in[i + 2] != '=') return 0;
                 char_value[2] = 0;
                 padding_count = 2;
             }
         } else {
-            char_value[0] = (base64_input_size > 0) ? (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 0]) - chars) : 0;
-            char_value[1] = (base64_input_size > 1) ? (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 1]) - chars) : 0;
-            char_value[2] = (base64_input_size > 2) ? (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 2]) - chars) : 0;
-            char_value[3] = (base64_input_size > 3) ? (unsigned int)(tmsu_find_char(chars, base64_encoded_string[i + 3]) - chars) : 0;
+            char_value[0] = (base64_in_size > 0) ? (unsigned int)(tmsu_find_char(chars, base64_in[i + 0]) - chars) : 0;
+            char_value[1] = (base64_in_size > 1) ? (unsigned int)(tmsu_find_char(chars, base64_in[i + 1]) - chars) : 0;
+            char_value[2] = (base64_in_size > 2) ? (unsigned int)(tmsu_find_char(chars, base64_in[i + 2]) - chars) : 0;
+            char_value[3] = (base64_in_size > 3) ? (unsigned int)(tmsu_find_char(chars, base64_in[i + 3]) - chars) : 0;
 
             if (char_value[0] >= 64) return 0;
             if (char_value[1] >= 64) return 0;
             if (char_value[2] >= 64) return 0;
             if (char_value[3] >= 64) return 0;
 
-            padding_count = 2 - (base64_input_size > 2) - (base64_input_size > 3);
+            padding_count = 2 - (base64_in_size > 2) - (base64_in_size > 3);
         }
 
         // Decompose each four 6 bit blocks into three 8 bit blocks:
@@ -1505,7 +1511,7 @@ static tm_size_t tmsu_base64_decode_chars(char const* const chars, tm_bool expec
             ++out_index;
         }
         if (padding_count < 1) {
-            if (out_index + 1 < out_size)  p[out_index] = (char)(((char_value[2] << 6) & 0xC0u) | (char_value[3]));
+            if (out_index + 1 < out_size) p[out_index] = (char)(((char_value[2] << 6) & 0xC0u) | (char_value[3]));
             ++out_index;
         }
     }
@@ -1549,8 +1555,8 @@ TMSU_DEF tm_size_t tmsu_url_encode(const void* input, tm_size_t input_size, char
     for (tm_size_t i = 0; i < input_size; ++i) {
         unsigned int c = (unsigned char)in[i];
         // Special case characters, that are allowed in uri strings.
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '-') || (c == '_') ||
-            (c == '.')) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+            || (c == '-') || (c == '_') || (c == '.')) {
             if (out_index < out_size) out[out_index] = (char)c;
             ++out_index;
             continue;
@@ -1582,8 +1588,7 @@ TMSU_DEF tm_size_t tmsu_url_decode(const char* url_encoded_input, tm_size_t inpu
     for (tm_size_t i = 0; i < input_size; ++i) {
         unsigned int c = (unsigned char)url_encoded_input[i];
         // Special case characters, that are allowed in uri strings.
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '-') || (c == '_') ||
-            (c == '.')) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '-') || (c == '_') || (c == '.')) {
             if (out_index < out_size) p[out_index] = (char)c;
             ++out_index;
             continue;
@@ -1628,134 +1633,174 @@ TMSU_DEF tm_size_t tmsu_url_decode(const char* url_encoded_input, tm_size_t inpu
     return out_index;
 }
 
+TMSU_DEF tmsu_view_t tmsu_view(const char* str) {
+    tmsu_view_t result;
+    result.first = str;
+    result.last = (str) ? (str + TM_STRLEN(str)) : str;
+    return result;
+}
+
+TMSU_DEF tmsu_view_t tmsu_view_n(const char* first, const char* last) {
+    TM_ASSERT(first <= last);
+    tmsu_view_t result;
+    result.first = first;
+    result.last = last;
+    return result;
+}
+
+TMSU_DEF tmsu_view_t tmsu_view_l(const char* str, tm_size_t len) {
+    TM_ASSERT(str || len == 0);
+    TM_ASSERT_VALID_SIZE(len);
+    tmsu_view_t result;
+    result.first = str;
+    result.last = (str) ? (str + len) : str;
+    return result;
+}
+
+TMSU_DEF tm_bool tmsu_view_empty(tmsu_view_t str) {
+    return str.first == str.last;
+}
+
+TMSU_DEF const char* tmsu_view_data(tmsu_view_t str) {
+    return str.first;
+}
+
+TMSU_DEF tm_size_t tmsu_view_size(tmsu_view_t str) {
+    TM_ASSERT(str.first <= str.last);
+    return (tm_size_t)(str.last - str.first);
+}
+
+TMSU_DEF const char* tmsu_find_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_find_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF const char* tmsu_find_last_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_find_last_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF const char* tmsu_find_last_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found) {
+    return tmsu_find_last_n_ex(str.first, str.last, find_str.first, find_str.last, not_found);
+}
+
+TMSU_DEF const char* tmsu_find_first_of_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_find_first_of_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF const char* tmsu_find_first_not_of_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_find_first_not_of_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF const char* tmsu_find_last_of_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_find_last_of_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF const char* tmsu_find_last_of_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found) {
+    return tmsu_find_last_of_n_ex(str.first, str.last, find_str.first, find_str.last, not_found);
+}
+
+TMSU_DEF const char* tmsu_find_last_not_of_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_find_last_not_of_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF const char* tmsu_find_last_not_of_v_ex(tmsu_view_t str, tmsu_view_t find_str, const char* not_found) {
+    return tmsu_find_last_not_of_n_ex(str.first, str.last, find_str.first, find_str.last, not_found);
+}
+
+TMSU_DEF const char* tmsu_find_char_ignore_case_ansi_v(tmsu_view_t str, char c) {
+    return tmsu_find_char_ignore_case_ansi_n(str.first, str.last, c);
+}
+
+TMSU_DEF const char* tmsu_find_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_find_ignore_case_ansi_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF const char* tmsu_find_char_unescaped_v(tmsu_view_t str, char c, char escape_char) {
+    return tmsu_find_char_unescaped_n(str.first, str.last, c, escape_char);
+}
+
+TMSU_DEF const char* tmsu_find_first_of_unescaped_v(tmsu_view_t str, tmsu_view_t find_str, char escape_char) {
+    return tmsu_find_first_of_unescaped_n(str.first, str.last, find_str.first, find_str.last, escape_char);
+}
+
+TMSU_DEF const char* tmsu_find_word_end_v(tmsu_view_t str) {
+    return tmsu_find_word_end_n(str.first, str.last);
+}
+
+TMSU_DEF const char* tmsu_find_word_end_v_ex(tmsu_view_t str, tmsu_view_t word_separators) {
+    return tmsu_find_word_end_n_ex(str.first, str.last, word_separators.first, word_separators.last);
+}
+
+TMSU_DEF const char* tmsu_find_word_start_v(tmsu_view_t str) {
+    return tmsu_find_word_start_n(str.first, str.last);
+}
+
+TMSU_DEF const char* tmsu_find_word_start_v_ex(tmsu_view_t str, tmsu_view_t word_separators) {
+    return tmsu_find_word_start_n_ex(str.first, str.last, word_separators.first, word_separators.last);
+}
+
+TMSU_DEF const char* tmsu_trim_left_v(tmsu_view_t str) {
+    return tmsu_trim_left_n(str.first, str.last);
+}
+
+TMSU_DEF const char* tmsu_trim_right_v(tmsu_view_t str) {
+    return tmsu_trim_right_n(str.first, str.last);
+}
+
+TMSU_DEF tmsu_view_t tmsu_trim_n(const char* first, const char* last) {
+    return tmsu_view_n(tmsu_trim_left_n(first, last), tmsu_trim_right_n(first, last));
+}
+
+TMSU_DEF tmsu_view_t tmsu_trim_v(tmsu_view_t str) {
+    return tmsu_view_n(tmsu_trim_left_n(str.first, str.last), tmsu_trim_right_n(str.first, str.last));
+}
+
+TMSU_DEF int tmsu_compare_v(tmsu_view_t a, tmsu_view_t b) {
+    return tmsu_compare_n(a.first, a.last, b.first, b.last);
+}
+
+TMSU_DEF int tmsu_compare_ignore_case_ansi_v(tmsu_view_t a, tmsu_view_t b) {
+    return tmsu_compare_ignore_case_ansi_n(a.first, a.last, b.first, b.last);
+}
+
+TMSU_DEF int tmsu_human_compare_ansi_v(tmsu_view_t a, tmsu_view_t b) {
+    return tmsu_human_compare_ansi_n(a.first, a.last, b.first, b.last);
+}
+
+TMSU_DEF tm_bool tmsu_equals_v(tmsu_view_t a, tmsu_view_t b) {
+    return tmsu_equals_n(a.first, a.last, b.first, b.last);
+}
+
+TMSU_DEF tm_bool tmsu_equals_ignore_case_ansi_v(tmsu_view_t a, tmsu_view_t b) {
+    return tmsu_equals_ignore_case_ansi_n(a.first, a.last, b.first, b.last);
+}
+
+TMSU_DEF tm_bool tmsu_starts_with_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_starts_with_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF tm_bool tmsu_ends_with_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_ends_with_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF tm_bool tmsu_starts_with_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_starts_with_ignore_case_ansi_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF tm_bool tmsu_ends_with_ignore_case_ansi_v(tmsu_view_t str, tmsu_view_t find_str) {
+    return tmsu_ends_with_ignore_case_ansi_n(str.first, str.last, find_str.first, find_str.last);
+}
+
+TMSU_DEF tm_bool tmsu_next_token_v(tmsu_view_t* tokenizer, tmsu_view_t delimiters, tmsu_view_t* out) {
+    return tmsu_next_token_n(tokenizer, delimiters.first, delimiters.last, out);
+}
+
+TMSU_DEF tm_bool tmsu_next_token_skip_empty_v(tmsu_view_t* tokenizer, tmsu_view_t delimiters, tmsu_view_t* out) {
+    return tmsu_next_token_skip_empty_n(tokenizer, delimiters.first, delimiters.last, out);
+}
+
 #ifdef __cplusplus
 }
 #endif
-
-#if defined(__cplusplus) && defined(TM_STRING_VIEW)
-
-#define TMSU_SV_BEGIN(str) TM_STRING_VIEW_DATA(str)
-#define TMSU_SV_END(str) (TM_STRING_VIEW_DATA(str) + TM_STRING_VIEW_SIZE(str))
-
-const char* tmsu_find_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
-    return tmsu_find_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-const char* tmsu_find_last_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
-    return tmsu_find_last_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-const char* tmsu_find_last_n_ex(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
-                                const char* not_found) {
-    return tmsu_find_last_n_ex(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str), not_found);
-}
-const char* tmsu_find_first_of_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
-    return tmsu_find_first_of_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-const char* tmsu_find_first_not_of_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
-    return tmsu_find_first_not_of_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-const char* tmsu_find_last_of_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
-    return tmsu_find_last_of_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-const char* tmsu_find_last_of_n_ex(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
-                                   const char* not_found) {
-    return tmsu_find_last_of_n_ex(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str), not_found);
-}
-const char* tmsu_find_last_not_of_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
-    return tmsu_find_last_not_of_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-const char* tmsu_find_last_not_of_n_ex(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
-                                       const char* not_found) {
-    return tmsu_find_last_not_of_n_ex(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str), not_found);
-}
-const char* tmsu_find_ignore_case_ansi_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str) {
-    return tmsu_find_ignore_case_ansi_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-const char* tmsu_find_first_of_unescaped_n(const char* str_first, const char* str_last, TM_STRING_VIEW find_str,
-                                           char escape_char) {
-    return tmsu_find_first_of_unescaped_n(str_first, str_last, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str),
-                                          escape_char);
-}
-
-TM_STRING_VIEW tmsu_trim_left(TM_STRING_VIEW str) {
-    const char* first = TMSU_SV_BEGIN(str);
-    const char* last = TMSU_SV_END(str);
-    first = tmsu_trim_left_n(first, last);
-    return TM_STRING_VIEW_MAKE(first, tmsu_distance_sz(first, last));
-}
-TM_STRING_VIEW tmsu_trim_right(TM_STRING_VIEW str) {
-    const char* first = TMSU_SV_BEGIN(str);
-    const char* last = TMSU_SV_END(str);
-    last = tmsu_trim_right_n(first, last);
-    return TM_STRING_VIEW_MAKE(first, tmsu_distance_sz(first, last));
-}
-TM_STRING_VIEW tmsu_trim(TM_STRING_VIEW str) {
-    const char* first = TMSU_SV_BEGIN(str);
-    const char* last = TMSU_SV_END(str);
-    first = tmsu_trim_left_n(first, last);
-    last = tmsu_trim_right_n(first, last);
-    return TM_STRING_VIEW_MAKE(first, tmsu_distance_sz(first, last));
-}
-
-int tmsu_compare(TM_STRING_VIEW a, TM_STRING_VIEW b) {
-    return tmsu_compare_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
-}
-int tmsu_compare_ignore_case_ansi(TM_STRING_VIEW a, TM_STRING_VIEW b) {
-    return tmsu_compare_ignore_case_ansi_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
-}
-int tmsu_human_compare_ansi(TM_STRING_VIEW a, TM_STRING_VIEW b) {
-    return tmsu_human_compare_ansi_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
-}
-
-tm_bool tmsu_equals(TM_STRING_VIEW a, TM_STRING_VIEW b) {
-    return tmsu_equals_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
-}
-tm_bool tmsu_equals_ignore_case_ansi(TM_STRING_VIEW a, TM_STRING_VIEW b) {
-    return tmsu_equals_ignore_case_ansi_n(TMSU_SV_BEGIN(a), TMSU_SV_END(a), TMSU_SV_BEGIN(b), TMSU_SV_END(b));
-}
-
-tm_bool tmsu_starts_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
-    return tmsu_starts_with_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-tm_bool tmsu_ends_with(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
-    return tmsu_ends_with_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str));
-}
-tm_bool tmsu_starts_with_ignore_case_ansi(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
-    return tmsu_starts_with_ignore_case_ansi_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str),
-                                                TMSU_SV_END(find_str));
-}
-
-tm_bool tmsu_ends_with_ignore_case_ansi(TM_STRING_VIEW str, TM_STRING_VIEW find_str) {
-    return tmsu_ends_with_ignore_case_ansi_n(TMSU_SV_BEGIN(str), TMSU_SV_END(str), TMSU_SV_BEGIN(find_str),
-                                              TMSU_SV_END(find_str));
-}
-
-tm_bool tmsu_next_token_n(tmsu_tokenizer_n* tokenizer, TM_STRING_VIEW find_str, tmsu_string_view* out) {
-    return tmsu_next_token_n(tokenizer, TMSU_SV_BEGIN(find_str), TMSU_SV_END(find_str), out);
-}
-
-#undef TMSU_SV_BEGIN
-#undef TMSU_SV_END
-
-#endif
-
-/* string_view returning types are only extern C if the string_view isn't a C++ type. */
-#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
-extern "C" {
-#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
-
-TMSU_DEF tmsu_string_view tmsu_trim(const char* str) {
-    TM_ASSERT(str);
-    return tmsu_trim_n(str, str + TM_STRLEN(str));
-}
-TMSU_DEF tmsu_string_view tmsu_trim_n(const char* first, const char* last) {
-    first = tmsu_trim_left_n(first, last);
-    last = tmsu_trim_right_n(first, last);
-    return TMSU_STRING_VIEW_MAKE(first, tmsu_distance(first, last));
-}
-
-#if defined(__cplusplus) && !defined(TM_STRING_VIEW)
-}
-#endif /* defined(__cplusplus) && !defined(TM_STRING_VIEW) */
 
 #endif /* defined(TM_STRINGUTIL_IMPLEMENTATION) */
 
